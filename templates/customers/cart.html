@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="menu-header">
+    <h1>My Cart 🛒</h1>
+</div>
+
+{% if cart_items %}
+<div class="checkout-container">
+    <div class="checkout-main">
+        <h2 style="color: var(--zarly-orange); margin-bottom: 25px;">Your Order</h2>
+        
+        {% for item in cart_items %}
+        <div class="order-card" style="background: white; padding: 20px; margin-bottom: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="flex: 1;">
+                    <h4 style="margin: 0 0 10px 0; color: var(--zarly-dark);">{{ item.product.name }}</h4>
+                    <p style="color: #7f8c8d; margin: 0;">RM {{ item.product.price }} x {{ item.quantity }}</p>
+                </div>
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <form method="post" action="{% url 'update_cart' %}" style="display: flex; align-items: center; gap: 10px;">
+                        {% csrf_token %}
+                        <input type="hidden" name="product_id" value="{{ item.product.id }}">
+                        <div class="quantity-control">
+                            <button type="button" class="qty-minus" onclick="decreaseQty(this)">-</button>
+                            <input type="number" name="quantity" value="{{ item.quantity }}" min="0" max="{{ item.product.stock }}" class="qty-input">
+                            <button 
+                                type="button" 
+                                class="qty-plus" 
+                                data-stock="{{ item.product.stock }}" 
+                                onclick="increaseQty(this, this.getAttribute('data-stock'))">
+                                +
+                            </button>
+                        </div>
+                        <button type="submit" class="btn btn-sm" style="background: var(--zarly-orange); color: white; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer;">Update</button>
+                    </form>
+                    <div style="font-size: 24px; font-weight: bold; color: var(--zarly-orange); min-width: 100px; text-align: right;">
+                        RM {{ item.subtotal }}
+                    </div>
+                    <form method="post" action="{% url 'remove_from_cart' %}" style="display: inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="product_id" value="{{ item.product.id }}">
+                        <button type="submit" class="btn" style="background: var(--zarly-red); color: white; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer;">🗑️</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        
+        <div style="margin-top: 30px; text-align: center;">
+            <a href="{% url 'product_list' %}" class="btn" style="background: #95a5a6; color: white; padding: 15px 40px; border-radius: 8px; text-decoration: none; display: inline-block; margin-right: 15px;">
+                ← Continue Shopping
+            </a>
+            <a href="{% url 'checkout' %}" class="btn-submit-order" style="padding: 15px 40px; border-radius: 8px; text-decoration: none; display: inline-block;">
+                Proceed to Checkout →
+            </a>
+        </div>
+    </div>
+    
+    <!-- Cart Summary -->
+    <div class="cart-summary">
+        <h2>Order Summary</h2>
+        
+        {% for item in cart_items %}
+        <div class="cart-item">
+            <div class="cart-item-info">
+                <h5>{{ item.product.name }}</h5>
+                <p class="quantity">{{ item.quantity }}x RM {{ item.product.price }}</p>
+            </div>
+            <div class="cart-item-price">RM {{ item.subtotal }}</div>
+        </div>
+        {% endfor %}
+        
+        <div class="cart-total">
+            <h3>
+                <span>Subtotal:</span>
+                <span class="amount">RM {{ total_price }}</span>
+            </h3>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<div style="text-align: center; padding: 80px 20px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+    <div style="font-size: 80px; margin-bottom: 20px;">🛒</div>
+    <h2 style="color: #7f8c8d; margin-bottom: 20px;">Your cart is empty</h2>
+    <p style="color: #95a5a6; margin-bottom: 30px;">Browse our delicious menu and add items to your cart!</p>
+    <a href="{% url 'product_list' %}" class="hero-btn">Browse Menu</a>
+</div>
+{% endif %}
+
+<script>
+function decreaseQty(btn) {
+    const input = btn.parentElement.querySelector('.qty-input');
+    if (input.value > 0) {
+        input.value = parseInt(input.value) - 1;
+    }
+}
+
+function increaseQty(btn, max) {
+    const input = btn.parentElement.querySelector('.qty-input');
+    if (input.value < max) {
+        input.value = parseInt(input.value) + 1;
+    }
+}
+</script>
+
+{% endblock %}

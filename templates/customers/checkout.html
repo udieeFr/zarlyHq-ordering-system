@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+
+<div class="menu-header">
+    <h1>Check Out Now</h1>
+</div>
+
+<div class="checkout-container">
+    <div class="checkout-main">
+        <h2 style="color: var(--zarly-orange);">Payment Options</h2>
+        
+        <form method="post" action="{% url 'submit_order' %}" enctype="multipart/form-data" id="checkoutForm">
+            {% csrf_token %}
+            
+            <div class="payment-options">
+                <div class="payment-option" id="option1" onclick="selectPayment('pay_now')">
+                    <input type="radio" name="payment_method" value="pay_now" id="pay_now" required>
+                    <label for="pay_now">
+                        <h4>1. Pay now, upload your payment proof</h4>
+                        <p>Upload bukti bayaran sekarang untuk pemprosesan segera</p>
+                    </label>
+                </div>
+                
+                <div class="payment-option" id="option2" onclick="selectPayment('pay_later')">
+                    <input type="radio" name="payment_method" value="pay_later" id="pay_later" required>
+                    <label for="pay_later">
+                        <h4>2. Pay later after order has been approved</h4>
+                        <p>Bayar selepas pesanan anda diluluskan oleh admin</p>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- QR Code Section (shown when pay_now is selected) -->
+            <div class="qr-section" id="qrSection" style="display: none;">
+                <h3 style="color: var(--zarly-dark); margin-bottom: 20px;">
+                    <img src="{% static 'images/duitnow-logo.jpg' %}" alt="DuitNow" style="height: 40px; vertical-align: middle;" onerror="this.style.display='none';">
+                    MALAYSIA NATIONAL QR
+                </h3>
+                
+                <div class="qr-placeholder">
+                    <img src="{% static 'images/duitnow-qr.jpg' %}" alt="DuitNow QR Code" style="width: 100%; height: 100%; object-fit: contain;">
+                    <div style="position: absolute; bottom: 10px; width: 100%; text-align: center; background: rgba(255,255,255,0.9); padding: 8px;">
+                        <img src="{% static 'images/bsn-logo.jpg' %}" alt="BSN" style="height: 30px;" onerror="this.outerHTML='<strong>BANK SIMPANAN NASIONAL</strong>';">
+                    </div>
+                </div>
+                
+                <p style="margin-top: 20px; color: #7f8c8d;">
+                    <strong>DON TRADER</strong><br>
+                    Accepted by participating Banks and eWallets<br>
+                    <small>Instant Payment | Powered by PayNet</small>
+                </p>
+                
+                <div class="upload-section">
+                    <h4 style="color: var(--zarly-orange); margin-bottom: 15px;">Upload your payment proof here</h4>
+                    <input type="file" name="payment_proof" id="paymentProof" accept="image/*,.pdf" 
+                           style="display: block; margin: 0 auto 20px; padding: 10px; border: 2px dashed var(--zarly-orange); border-radius: 8px; width: 100%; max-width: 400px;">
+                    <button type="button" class="btn-upload" onclick="document.getElementById('paymentProof').click()">
+                        📁 Choose File
+                    </button>
+                    <p id="fileName" style="margin-top: 10px; color: #27ae60; font-weight: bold;"></p>
+                </div>
+            </div>
+            
+            <div style="margin-top: 30px; text-align: center;">
+                <button type="submit" class="btn-submit-order" id="submitBtn">
+                    Submit order for approval
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Cart Summary -->
+    <div class="cart-summary">
+        <h2>My Cart</h2>
+        
+        {% for item in cart_items %}
+        <div class="cart-item">
+            <div class="cart-item-info">
+                <h5>{{ loop.index }}. {{ item.product.name }}</h5>
+                <p class="quantity">{{ item.quantity }}x RM {{ item.product.price }}</p>
+            </div>
+            <div class="cart-item-price">RM {{ item.subtotal }}</div>
+        </div>
+        {% endfor %}
+        
+        <div class="cart-total">
+            <h3>
+                <span>Subtotal:</span>
+                <span class="amount">RM {{ total_price }}</span>
+            </h3>
+        </div>
+        
+        <p style="margin-top: 20px; font-size: 14px; color: #7f8c8d; text-align: center;">
+            Your order will be sent for admin approval after submission
+        </p>
+    </div>
+</div>
+
+<script>
+function selectPayment(method) {
+    // Remove all selected classes
+    document.querySelectorAll('.payment-option').forEach(opt => {
+        opt.classList.remove('selected');
+    });
+    
+    // Add selected class to clicked option
+    const option = document.getElementById(method === 'pay_now' ? 'option1' : 'option2');
+    option.classList.add('selected');
+    
+    // Check the radio button
+    document.getElementById(method).checked = true;
+    
+    // Show/hide QR section
+    const qrSection = document.getElementById('qrSection');
+    const paymentProof = document.getElementById('paymentProof');
+    
+    if (method === 'pay_now') {
+        qrSection.style.display = 'block';
+        paymentProof.required = true;
+    } else {
+        qrSection.style.display = 'none';
+        paymentProof.required = false;
+        paymentProof.value = '';
+        document.getElementById('fileName').textContent = '';
+    }
+}
+
+// Show selected file name
+document.getElementById('paymentProof').addEventListener('change', function() {
+    const fileName = this.files[0] ? this.files[0].name : '';
+    document.getElementById('fileName').textContent = fileName ? `✓ Selected: ${fileName}` : '';
+});
+
+// Form validation
+document.getElementById('checkoutForm').addEventListener('submit', function(e) {
+    const paymentMethod = document.querySelector('input[name="payment_method"]:checked');
+    
+    if (!paymentMethod) {
+        e.preventDefault();
+        alert('Please select a payment method');
+        return;
+    }
+    
+    if (paymentMethod.value === 'pay_now') {
+        const paymentProof = document.getElementById('paymentProof');
+        if (!paymentProof.files.length) {
+            e.preventDefault();
+            alert('Please upload your payment proof');
+            return;
+        }
+    }
+    
+    // Show loading state
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting order...';
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="dashboard-container">
+    <!-- Header -->
+    <div class="header">
+        <div class="logo">ZARLY</div>
+        <div class="slogan">SEIZE THE MOMENT</div>
+        <div class="greeting">
+            Hello, sales admin #{{ request.user.id|default:"001" }}
+            {% if request.user.is_superuser %}
+                <a href="{% url 'admin:index' %}" class="btn btn-sm btn-warning ms-3">Django Admin Panel</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="main-content">
+        <!-- Left: Pending Orders -->
+        <div class="pending-section">
+            <h2>Pending order:</h2>
+            {% for order in pending_orders %}
+            <div class="order-card pending">
+                <div class="order-info">
+                    Order #{{ order.id }}<br>
+                    Customer: {{ order.customer.username }}<br>
+                    Total: RM {{ order.total_price }}<br>
+                    Time: {{ order.created_at|date:"d/m/Y H:i" }}
+                </div>
+                <div class="actions">
+                    <a href="#" class="btn detail">View detail</a>
+                    <a href="#" class="btn approve">Approve</a>
+                    <a href="#" class="btn reject">Reject</a>
+                </div>
+            </div>
+            {% empty %}
+            <p class="no-data">No pending orders at the moment.</p>
+            {% endfor %}
+        </div>
+
+        <!-- Right: Accepted & Processing -->
+        <div class="accepted-section">
+            <h2>Accepted order</h2>
+            {% for order in accepted_orders %}
+            <div class="order-card accepted">
+                <div class="order-info">
+                    Order #{{ order.id }}<br>
+                    Total: RM {{ order.total_price }}<br>
+                    Approved: {{ order.approved_at|date:"d/m/Y H:i" }}
+                </div>
+                <div class="status-bar green"></div>
+            </div>
+            {% empty %}
+            <p class="no-data">No accepted orders yet.</p>
+            {% endfor %}
+
+            <h3>Accepted, but pending payment</h3>
+            {% for order in pending_payment_orders %}
+            <div class="order-card pending-payment">
+                <div class="order-info">
+                    Order #{{ order.id }}<br>
+                    Total: RM {{ order.total_price }}
+                </div>
+                <div class="status-bar gray"></div>
+            </div>
+            {% empty %}
+            <p class="no-data">No pending payment orders.</p>
+            {% endfor %}
+        </div>
+
+        <!-- Edit Menu Button -->
+        <div class="edit-menu">
+            <a href="{% url 'product_list' %}" class="btn edit-menu-btn">edit menu</a>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
