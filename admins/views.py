@@ -84,3 +84,22 @@ def reject_order(request, order_id):
     order.save()
     messages.warning(request, f"Order #{order.id} Rejected.")
     return redirect('sales_admin_dashboard')
+
+@login_required
+@user_passes_test(is_sales_admin, login_url='/')
+def admin_order_detail(request, order_id):
+    order = get_object_or_404(Order, id=order_id)
+    return render(request, 'admins/order_detail.html', {'order': order})
+
+@login_required
+@user_passes_test(is_sales_admin, login_url='/')
+def set_pending_payment(request, order_id):
+    """
+    Moves order from 'Pending' -> 'Accepted but pending payment'
+    This tells the customer: "We can make this, please pay now."
+    """
+    order = get_object_or_404(Order, id=order_id)
+    order.status = 'pending_payment'
+    order.save()
+    messages.success(request, f"Order #{order.id} marked as 'Accepted & Waiting for Payment'")
+    return redirect('sales_admin_dashboard')
