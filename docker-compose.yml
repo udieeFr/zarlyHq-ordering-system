@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:latest # Uses the latest stable PostgreSQL (17+ in 2026)
+    restart: always
+    environment:
+      POSTGRES_DB: zarly_db # Database name
+      POSTGRES_USER: zarly_user # Username
+      POSTGRES_PASSWORD: supersecret123 # Change this to a strong password!
+    volumes:
+      - postgres_data:/var/lib/postgresql # Saves data even if container stops
+    ports:
+      - "5433:5432" # Makes DB accessible from your computer
+
+volumes:
+  postgres_data:
