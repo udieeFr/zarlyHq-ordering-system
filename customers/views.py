@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import logout
 from django.contrib import messages
 from .models import Product
 from admins.models import Order, OrderItem
@@ -195,3 +196,9 @@ def order_success(request, order_id):
     return render(request, 'customers/order_success.html', {
         'order': order
     })
+
+def logout_view(request):
+    """Log user out"""
+    logout(request)
+    messages.success(request, "You have been logged out.")
+    return redirect('product_list')

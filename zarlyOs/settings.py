@@ -94,20 +94,20 @@ DATABASES = {
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
 
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
-]
+# AUTH_PASSWORD_VALIDATORS = [
+#     {
+#         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+#     },
+#     {
+#         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+#     },
+#     {
+#         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+#     },
+#     {
+#         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+#     },
+# ]
 
 
 # Internationalization
@@ -135,6 +135,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # use own cutome user model, bukan default
 AUTH_USER_MODEL = 'customers.User'
 
+# setting utk authentication
 LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = 'home'  # Will use our home_redirect function
-LOGOUT_REDIRECT_URL = 'login'
+LOGIN_REDIRECT_URL = 'product_list' # Will use our home_redirect function
+LOGOUT_REDIRECT_URL = 'product_list'

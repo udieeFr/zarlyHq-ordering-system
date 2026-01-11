@@ -11,18 +11,27 @@ import os
 def is_sales_admin(user):
     return user.is_authenticated and user.role in ['sales_admin', 'manager']
 
+
 def custom_login(request):
     if request.method == 'POST':
         form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
             login(request, user)
+
+            # 1. CHECK IF THERE IS A 'NEXT' URL (e.g. User came from Checkout)
+            next_url = request.POST.get('next') or request.GET.get('next')
+            if next_url:
+                return redirect(next_url)
+
+            # 2. STANDARD REDIRECT (If direct login)
             if user.role in ['sales_admin', 'manager']:
                 return redirect('sales_admin_dashboard')
             else:
                 return redirect('product_list')
     else:
         form = AuthenticationForm()
+
     return render(request, 'registration/login.html', {'form': form})
 
 @login_required

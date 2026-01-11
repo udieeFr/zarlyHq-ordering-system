@@ -5,3 +5,4 @@ db.sqlite3
 media/
 secure_keys/
 .DS_Store
+.env
