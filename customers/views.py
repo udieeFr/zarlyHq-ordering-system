@@ -28,15 +28,44 @@ def get_cart_from_session(request):
     return cart_items, total_price
 
 def product_list(request):
-    """Display all products"""
+    """Display all products and user's recent orders"""
     products = Product.objects.all()
     cart = request.session.get('cart', {})
     cart_count = sum(cart.values())
-    
+
+    user_orders = []
+    if request.user.is_authenticated:
+        user_orders = Order.objects.filter(
+            customer=request.user,
+            status__in=['pending', 'approved', 'pending_payment']
+        ).select_related('digital_signature').order_by('-created_at')[:5]
+
     return render(request, 'customers/product_list.html', {
         'products': products,
-        'cart_count': cart_count
+        'cart_count': cart_count,
+        'user_orders': user_orders,
     })
+
+@login_required
+def upload_payment_proof(request, order_id):
+    """Handles payment proof upload for 'pending_payment' orders."""
+    if request.method == 'POST':
+        order = get_object_or_404(Order, id=order_id, customer=request.user)
+
+        # Security check
+        if order.status != 'pending_payment':
+            messages.error(request, "You can only upload proof for orders awaiting payment.")
+            return redirect('product_list')
+
+        if request.FILES.get('payment_proof'):
+            order.payment_proof = request.FILES['payment_proof']
+            order.status = 'pending'  # Re-queue for admin approval
+            order.save()
+            messages.success(request, "Payment proof uploaded! The admin will review it shortly.")
+        else:
+            messages.error(request, "Please select a file to upload.")
+
+    return redirect('product_list')
 
 def add_to_cart(request):
     """Add product to cart (session-based)"""

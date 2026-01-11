@@ -24,6 +24,26 @@
         </div>
     </nav>
     <div class="container mt-4">
+        {% comment %}
+        {% if messages %}
+            <div style="max-width: 800px; margin: 20px auto;">
+                {% for message in messages %}
+
+                    {% if 'error' in message.tags %}
+                        <div style="background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; padding: 15px; border-radius: 5px; margin-bottom: 10px;">
+                            <strong>Error:</strong> {{ message }}
+                        </div>
+
+                    {% else %}
+                        <div style="background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin-bottom: 10px;">
+                            {{ message }}
+                        </div>
+                    {% endif %}
+
+                {% endfor %}
+            </div>
+        {% endif %}
+        {% endcomment %}
         {% block content %}{% endblock %}
     </div>
 </body>

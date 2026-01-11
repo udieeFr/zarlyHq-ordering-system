@@ -1,29 +1,83 @@
 {% extends 'base.html' %}
 {% load static %} {% block content %}
-<h1>Menu</h1>
+
 <div class="row">
-    {% for product in products %}
-    <div class="col-md-4 mb-4">
-        <div class="card">
-            {% if product.image %}
-                <img src="{{ product.image.url }}" class="card-img-top" alt="{{ product.name }}" style="height: 300px; object-fit: cover;">
-            {% else %}
-                <img src="{% static 'images/products/promo1.jpg' %}" class="card-img-top" alt="Placeholder" style="height: 200px; object-fit: cover;">
-            {% endif %}
-            <div class="card-body">
-                <h5 class="card-title">{{ product.name }}</h5>
-                <p class="card-text">{{ product.description }}</p>
-                <p><strong>RM {{ product.price }}</strong></p>
-                
-                <form method="post" action="{% url 'add_to_cart' %}">
-                    {% csrf_token %}
-                    <input type="hidden" name="product_id" value="{{ product.id }}">
-                    <button type="submit" class="btn btn-primary">Add to Cart</button>
-                </form>
+    <!-- Main Content: Product List -->
+    <div class="col-md-9">
+        <h1>Menu</h1>
+        <div class="row">
+            {% for product in products %}
+            <div class="col-md-4 mb-4">
+                <div class="card">
+                    {% if product.image %}
+                        <img src="{{ product.image.url }}" class="card-img-top" alt="{{ product.name }}" style="height: 300px; object-fit: cover;">
+                    {% else %}
+                        <img src="{% static 'images/products/promo1.jpg' %}" class="card-img-top" alt="Placeholder" style="height: 200px; object-fit: cover;">
+                    {% endif %}
+                    <div class="card-body">
+                        <h5 class="card-title">{{ product.name }}</h5>
+                        <p class="card-text">{{ product.description }}</p>
+                        <p><strong>RM {{ product.price }}</strong></p>
+                        
+                        <form method="post" action="{% url 'add_to_cart' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="product_id" value="{{ product.id }}">
+                            <button type="submit" class="btn btn-primary">Add to Cart</button>
+                        </form>
+                    </div>
+                </div>
             </div>
+            {% endfor %}
         </div>
+        <a href="{% url 'cart' %}" class="btn btn-success">View Cart</a>
     </div>
-    {% endfor %}
+
+    <!-- Right Sidebar: Order History -->
+    <div class="col-md-3">
+        {% if user.is_authenticated and user_orders %}
+            <h4>Your Recent Orders</h4>
+            <div class="list-group">
+                {% for order in user_orders %}
+                    <div class="list-group-item list-group-item-action flex-column align-items-start">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">Order #{{ order.id }}</h6>
+                            <small>{{ order.created_at|date:"d M" }}</small>
+                        </div>
+                        <p class="mb-1">Total: RM {{ order.total_amount }}</p>
+                        <small>Status: 
+                            {% if order.status == 'pending' %}
+                                <span class="badge bg-warning text-dark">Pending</span>
+                            {% elif order.status == 'approved' %}
+                                <span class="badge bg-success">Approved</span>
+                            {% elif order.status == 'pending_payment' %}
+                                <span class="badge bg-info text-dark">Waiting for Payment</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ order.status|capfirst }}</span>
+                            {% endif %}
+                        </small>
+
+                        <div class="mt-2">
+                            <a href="{% url 'order_success' order.id %}" class="btn btn-sm btn-outline-primary">Details</a>
+
+                            {% if order.status == 'approved' and order.digital_signature.pdf_path.url %}
+                                <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-sm btn-outline-success" download>Download Receipt</a>
+                            {% endif %}
+
+                            {% if order.status == 'pending_payment' %}
+                                <form method="post" action="{% url 'upload_payment_proof' order.id %}" enctype="multipart/form-data" class="mt-2">
+                                    {% csrf_token %}
+                                    <div class="input-group input-group-sm">
+                                        <input type="file" name="payment_proof" class="form-control" required>
+                                        <button class="btn btn-outline-secondary" type="submit">Upload</button>
+                                    </div>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
 </div>
-<a href="{% url 'cart' %}" class="btn btn-success">View Cart</a>
+
 {% endblock %}

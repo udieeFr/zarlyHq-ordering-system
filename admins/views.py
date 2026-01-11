@@ -19,16 +19,17 @@ def custom_login(request):
             user = form.get_user()
             login(request, user)
 
-            # 1. CHECK IF THERE IS A 'NEXT' URL (e.g. User came from Checkout)
+            # If the user is a sales admin or manager, always redirect them to the dashboard
+            if user.role in ['sales_admin', 'manager']:
+                return redirect('sales_admin_dashboard')
+
+            # Otherwise, check for a 'next' URL (e.g., for customers returning to checkout)
             next_url = request.POST.get('next') or request.GET.get('next')
             if next_url:
                 return redirect(next_url)
 
-            # 2. STANDARD REDIRECT (If direct login)
-            if user.role in ['sales_admin', 'manager']:
-                return redirect('sales_admin_dashboard')
-            else:
-                return redirect('product_list')
+            # Default redirect for all other users (e.g., customers)
+            return redirect('product_list')
     else:
         form = AuthenticationForm()
 
