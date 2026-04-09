@@ -58,3 +58,21 @@ class DigitalSignature(models.Model):
     # Helper field (Good to keep for debug, even if not in PDF)
     signature_value = models.TextField()
 
+class Complaint(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pending Review'),
+        ('resolved', 'Resolved'),
+    )
+
+    # Receipt Validation: Only allow complaints on 'approved' orders
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='complaints')
+    customer = models.ForeignKey(User, on_delete=models.CASCADE)
+    
+    subject = models.CharField(max_length=200)
+    message = models.TextField()
+    evidence_image = models.ImageField(upload_to='complaint_evidence/', null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Complaint #{self.id} - Order #{self.order.id}"

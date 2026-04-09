@@ -2,102 +2,154 @@
 {% load static %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-9">
-        <h1 class="mb-4">Menu</h1>
+<style>
+    .product-card { transition: all 0.3s ease; border: none; border-radius: 12px; overflow: hidden; }
+    .product-card:hover { transform: translateY(-8px); box-shadow: 0 12px 24px rgba(0,0,0,0.1); }
+    .filter-card { background: #fff; border-radius: 15px; border: 1px solid #eee; }
+    .status-badge { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; }
+    .allergy-pill { font-size: 0.7rem; padding: 4px 10px; }
+</style>
 
-        <div class="card p-3 mb-4 shadow-sm border-0 bg-light">
-            <form method="GET" action="{% url 'product_list' %}" class="row g-2 align-items-end">
-                <div class="col-md-4">
-                    <label class="form-label small fw-bold">Category</label>
-                    <select name="category" class="form-select">
-                        <option value="">All Categories</option>
-                        {% for cat in categories %}
-                            <option value="{{ cat.id }}" {% if request.GET.category == cat.id|stringformat:"s" %}selected{% endif %}>
-                                {{ cat.name }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label small fw-bold">Allergy Concerns</label>
-                    <select name="allergy" class="form-select">
-                        <option value="">None</option>
-                        {% for allergy in allergies %}
-                            <option value="{{ allergy.id }}" {% if request.GET.allergy == allergy.id|stringformat:"s" %}selected{% endif %}>
-                                {{ allergy.name }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-4 d-flex gap-2">
-                    <button type="submit" class="btn btn-primary w-100">Apply Filter</button>
-                    <a href="{% url 'product_list' %}" class="btn btn-outline-secondary w-100">Reset</a>
-                </div>
-            </form>
-        </div>
+<div class="container py-4">
+    <div class="row">
+        <div class="col-md-9">
+            <h2 class="fw-bold mb-4">Zarly.co Catalog</h2>
 
-        <div class="row">
-            {% for product in products %}
-            <div class="col-md-4 mb-4">
-                <div class="card h-100 shadow-sm border-0">
-                    {% if product.image %}
-                        <img src="{{ product.image.url }}" class="card-img-top" alt="{{ product.name }}" style="height: 200px; object-fit: cover;">
-                    {% else %}
-                        <img src="{% static 'images/products/promo1.jpg' %}" class="card-img-top" alt="Placeholder" style="height: 200px; object-fit: cover;">
-                    {% endif %}
-                    <div class="card-body">
-                        <span class="badge bg-info text-dark mb-2">{{ product.category.name }}</span>
-                        <h5 class="card-title">{{ product.name }}</h5>
-                        <p class="mb-1 text-primary fw-bold">RM {{ product.price }}</p>
-                        <p class="small text-muted mb-2">Weight: {{ product.weight_grams }}g | Stock: {{ product.stock }}</p>
-
-                        <div class="mb-3">
-                            {% for allergy in product.allergies.all %}
-                                <span class="badge rounded-pill bg-warning text-dark" style="font-size: 0.75rem;">⚠️ {{ allergy.name }}</span>
-                            {% empty %}
-                                <span class="badge rounded-pill bg-light text-dark border" style="font-size: 0.75rem;">✅ No Allergens</span>
+            <div class="filter-card p-4 mb-5 shadow-sm">
+                <form method="GET" class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-muted">Category</label>
+                        <select name="category" class="form-select bg-light border-0">
+                            <option value="">All Categories</option>
+                            {% for cat in categories %}
+                                <option value="{{ cat.id }}" {% if request.GET.category == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
                             {% endfor %}
-                        </div>
-                        
-                        <form method="post" action="{% url 'add_to_cart' %}">
-                            {% csrf_token %}
-                            <input type="hidden" name="product_id" value="{{ product.id }}">
-                            <div class="input-group input-group-sm">
-                                <input type="number" name="quantity" value="1" min="1" max="{{ product.stock }}" class="form-control">
-                                <button type="submit" class="btn btn-success">Add to Cart</button>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-muted">Allergy Concerns</label>
+                        <select name="allergy" class="form-select bg-light border-0">
+                            <option value="">All Products</option>
+                            <option value="none" {% if request.GET.allergy == "none" %}selected{% endif %}>✅ No Allergens (Safe)</option>
+                            {% for allergy in allergies %}
+                                <option value="{{ allergy.id }}" {% if request.GET.allergy == allergy.id|stringformat:"s" %}selected{% endif %}>Contains {{ allergy.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4 d-flex gap-2">
+                        <button type="submit" class="btn btn-dark w-100">Filter</button>
+                        <a href="{% url 'product_list' %}" class="btn btn-outline-secondary w-100">Reset</a>
+                    </div>
+                </form>
+            </div>
+
+            <div class="row g-4">
+                {% for product in products %}
+                <div class="col-md-4">
+                    <div class="card h-100 product-card shadow-sm">
+                        {% if product.image %}
+                            <img src="{{ product.image.url }}" class="card-img-top" style="height: 220px; object-fit: cover;">
+                        {% else %}
+                            <div class="bg-light text-muted d-flex align-items-center justify-content-center" style="height: 220px;">No Image</div>
+                        {% endif %}
+                        <div class="card-body">
+                            <span class="text-primary small fw-bold">{{ product.category.name }}</span>
+                            <h5 class="card-title fw-bold mt-1 mb-2">{{ product.name }}</h5>
+                            <h4 class="fw-bold mb-3">RM {{ product.price }}</h4>
+                            
+                            <div class="mb-3">
+                                {% for al in product.allergies.all %}
+                                    <span class="badge bg-warning text-dark allergy-pill rounded-pill">⚠️ {{ al.name }}</span>
+                                {% empty %}
+                                    <span class="badge bg-success allergy-pill rounded-pill">✅ Safe</span>
+                                {% endfor %}
                             </div>
-                        </form>
+
+                            <form method="post" action="{% url 'add_to_cart' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="product_id" value="{{ product.id }}">
+                                <div class="input-group">
+                                    <input type="number" name="quantity" value="1" min="1" max="{{ product.stock }}" class="form-control form-control-sm border-0 bg-light text-center">
+                                    <button class="btn btn-primary btn-sm px-3 fw-bold" type="submit">Add to Cart</button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </div>
+                {% empty %}
+                <div class="col-12 text-center py-5">
+                    <p class="text-muted">No products match your criteria.</p>
+                </div>
+                {% endfor %}
             </div>
-            {% empty %}
-            <div class="col-12 text-center py-5">
-                <p class="text-muted">No products found matching those filters.</p>
-                <a href="{% url 'product_list' %}" class="btn btn-link">Clear all filters</a>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 mb-4 p-2">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3">Recent Orders</h6>
+                    {% for order in user_orders %}
+                        <div class="mb-3 border-bottom pb-2">
+                            <div class="d-flex justify-content-between">
+                                <span class="small fw-bold">Order #{{ order.id }}</span>
+                                <span class="badge bg-light text-dark status-badge">{{ order.status }}</span>
+                            </div>
+                            <p class="text-muted small mb-0">Total: RM {{ order.total_amount }}</p>
+                        </div>
+                    {% empty %}
+                        <p class="small text-muted">No orders found.</p>
+                    {% endfor %}
+                </div>
             </div>
-            {% endfor %}
+
+            <div class="card bg-danger text-white border-0 shadow-sm rounded-4">
+                <div class="card-body text-center p-4">
+                    <h6 class="fw-bold">Report an Issue</h6>
+                    <p class="small opacity-75">File a complaint based on a validated receipt.</p>
+                    <button class="btn btn-light btn-sm fw-bold w-100 mt-2" data-bs-toggle="modal" data-bs-target="#complaintModal">New Complaint</button>
+                </div>
+            </div>
         </div>
     </div>
+</div>
 
-    <div class="col-md-3">
-        <div class="card shadow-sm border-0">
-            <div class="card-body">
-                <h5 class="card-title">Recent Orders</h5>
-                {% if not user.is_authenticated %}
-                    <p class="small text-muted">Please <a href="{% url 'login' %}">login</a> to see your orders.</p>
-                {% elif not user_orders %}
-                    <p class="small text-muted">No recent orders found.</p>
-                {% else %}
-                    {% for order in user_orders %}
-                        <div class="border-bottom mb-2 pb-2">
-                            <p class="mb-0 small fw-bold">Order #{{ order.id }}</p>
-                            <p class="mb-0 text-muted" style="font-size: 0.8rem;">RM {{ order.total_amount }} - {{ order.status|capfirst }}</p>
-                            <a href="{% url 'order_success' order.id %}" class="small text-decoration-none">View Details</a>
-                        </div>
-                    {% endfor %}
-                {% endif %}
+<div class="modal fade" id="complaintModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 rounded-4 shadow">
+            <div class="modal-header border-0 bg-light">
+                <h5 class="fw-bold m-0">Customer Complaint Form</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
+            <form method="POST" action="{% url 'submit_complaint' %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Select Validated Order</label>
+                        <select name="order_id" class="form-select border-0 bg-light" required>
+                            <option value="">-- Choose a Valid Order --</option>
+                            {% for o in completed_orders %}
+                                <option value="{{ o.id }}">Order #{{ o.id }} (RM {{ o.total_amount }})</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text small">Only approved orders with a valid receipt can be reported.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Subject</label>
+                        <input type="text" name="subject" class="form-control border-0 bg-light" placeholder="e.g. Damage Items" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Message</label>
+                        <textarea name="message" class="form-control border-0 bg-light" rows="4" placeholder="Describe the issue..." required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Evidence Image</label>
+                        <input type="file" name="evidence_image" class="form-control border-0 bg-light">
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="submit" class="btn btn-danger w-100 fw-bold py-2">Submit Report</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

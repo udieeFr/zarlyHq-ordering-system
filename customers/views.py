@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
 from django.contrib import messages
 from .models import Product, Category, Allergy
-from admins.models import Order, OrderItem
+from admins.models import Order, OrderItem, Complaint
 from decimal import Decimal
 
 def get_cart_from_session(request):
@@ -28,40 +28,36 @@ def get_cart_from_session(request):
     return cart_items, total_price
 
 def product_list(request):
-    """Memaparkan semua produk dengan tapis dan pesanan terkini pengguna"""
+    """Main Home: Product Catalog + Filtering + Recent Orders"""
     products = Product.objects.all()
     
-    # Ambil nilai tapis dari URL
+    # 1. English Filtering Logic
     cat_id = request.GET.get('category')
     allergy_id = request.GET.get('allergy')
 
-    # Logik Tapis Kategori
     if cat_id:
         products = products.filter(category_id=cat_id)
         
-    # --- LOGIK BARU: TAPIS TIADA ALERGI ---
     if allergy_id == 'none':
-        # Cari produk yang tidak mempunyai sebarang alergi
         products = products.filter(allergies__isnull=True)
     elif allergy_id:
         products = products.filter(allergies__id=allergy_id).distinct()
 
-    cart = request.session.get('cart', {})
-    cart_count = sum(cart.values())
-
+    # 2. Data for the English Sidebar and Complaint Modal
     user_orders = []
+    completed_orders = []
     if request.user.is_authenticated:
-        user_orders = Order.objects.filter(
-            customer=request.user,
-            status__in=['pending', 'approved', 'pending_payment']
-        ).select_related('digital_signature').order_by('-created_at')[:5]
+        # Display latest status in sidebar
+        user_orders = Order.objects.filter(customer=request.user).order_by('-created_at')[:5]
+        # Receipt validation: Only orders that were 'approved' can have complaints
+        completed_orders = Order.objects.filter(customer=request.user, status='approved')
 
     return render(request, 'customers/product_list.html', {
         'products': products,
         'categories': Category.objects.all(),
         'allergies': Allergy.objects.all(),
-        'cart_count': cart_count,
         'user_orders': user_orders,
+        'completed_orders': completed_orders, # Passed to the template for validation
     })
 
 @login_required
@@ -250,3 +246,19 @@ def logout_view(request):
     messages.success(request, "You have been logged out.")
     return redirect('product_list')
 
+@login_required
+def submit_complaint(request):
+    """Handles the complaint submission form"""
+    if request.method == 'POST':
+        order_id = request.POST.get('order_id')
+        order = get_object_or_404(Order, id=order_id, customer=request.user)
+        
+        Complaint.objects.create(
+            order=order,
+            customer=request.user,
+            subject=request.POST.get('subject'),
+            message=request.POST.get('message'),
+            evidence_image=request.FILES.get('evidence_image')
+        )
+        messages.success(request, "Your complaint has been submitted successfully.")
+        return redirect('product_list')

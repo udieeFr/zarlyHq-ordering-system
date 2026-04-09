@@ -6,7 +6,7 @@ from admins import views as admin_views
 urlpatterns = [
     # This now handles everything: viewing, filtering, and the product grid
     path('', views.product_list, name='product_list'),
-
+    path('submit-complaint/', views.submit_complaint, name='submit_complaint'),
     path('login/', admin_views.custom_login, name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('add-to-cart/', views.add_to_cart, name='add_to_cart'),
