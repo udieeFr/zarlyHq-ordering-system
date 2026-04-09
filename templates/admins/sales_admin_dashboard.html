@@ -1,94 +1,78 @@
 {% extends 'base.html' %}
-
 {% block content %}
-
-
-
-<div class="dashboard-container">
-    <!-- Header -->
-    <div class="header">
-        <div class="logo">ZARLY</div>
-        <div class="slogan"></div>
-        <div class="greeting">
-            Hello, sales admin #{{ request.user.id|default:"001" }}
-            {% if request.user.is_superuser %}
-                <a href="{% url 'admin:index' %}" class="btn btn-sm btn-warning ms-3">Django Admin Panel</a>
-            {% endif %}
+<div class="container-fluid py-4 bg-light min-vh-100">
+    <div class="d-flex justify-content-between align-items-center mb-4 px-3">
+        <h1 class="h3 fw-bold">Admin dashboard</h1>
+        <div class="d-flex gap-2">
+            <a href="{% url 'admin_complaints_list' %}" class="btn btn-danger fw-bold">Manage Complaints ⚠️</a>
+            <a href="{% url 'product_list' %}" class="btn btn-dark">Storefront</a>
         </div>
     </div>
 
-    <div class="main-content">
-        <!-- Left: Pending Orders -->
-        <div class="pending-section">
-            <h2>Pending order:</h2>
-            {% for order in pending_orders %}
-            <div class="order-card pending">
-                <div class="order-info">
-                    Order #{{ order.id }}<br>
-                    Customer: {{ order.customer.username }}<br>
-                    Total: RM {{ order.total_price }}<br>
-                    Time: {{ order.created_at|date:"d/m/Y H:i" }}
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm p-4">
+                <h5 class="fw-bold mb-4">Pending Requests</h5>
+                
+                {% for order in pending_orders %}
+                <div class="p-3 mb-3 border rounded-3 bg-white d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="fw-bold">Order #{{ order.id }}</span>
+                        <p class="small mb-0 text-muted">RM {{ order.total_amount }} • {{ order.customer.username }}</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'admin_order_detail' order.id %}" class="btn btn-sm btn-outline-dark">Review</a>
+                        <a href="{% url 'set_pending_payment' order.id %}" class="btn btn-sm btn-success">Accept & Req. Pay</a>
+                    </div>
                 </div>
-                <div class="actions">
-                    <a href="{% url 'admin_order_detail' order.id %}" class="btn detail">View detail</a>
-                    
-                    {% if order.payment_proof %}
-                        <a href="{% url 'approve_order' order.id %}" class="btn approve">Approve</a>
-                    {% else %}
-                        <a href="{% url 'set_pending_payment' order.id %}" class="btn" style="background-color: #17a2b8; color: white;">Accept (Wait Pay)</a>
-                    {% endif %}
+                {% endfor %}
 
-                    <a href="{% url 'reject_order' order.id %}" class="btn reject">Reject</a>
+                <h5 class="fw-bold my-4 border-top pt-4">Awaiting Payment/Verification</h5>
+                {% for order in pending_payment_orders %}
+                <div class="p-3 mb-3 border rounded-3 bg-white d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="fw-bold text-info">Order #{{ order.id }}</span>
+                        <p class="small mb-0 text-muted">{% if order.payment_proof %}✅ Proof Uploaded{% else %}⏳ Waiting for customer{% endif %}</p>
+                    </div>
+                    <a href="{% url 'admin_order_detail' order.id %}" class="btn btn-sm btn-dark">View & Sign</a>
                 </div>
+                {% endfor %}
             </div>
-            {% empty %}
-            <p class="no-data">No pending orders at the moment.</p>
-            {% endfor %}
         </div>
 
-        <!-- Right: Accepted & Processing -->
-        <div class="accepted-section">
-            <h2>Accepted order</h2>
-            {% for order in accepted_orders %}
-            <div class="order-card accepted">
-                <div class="order-info">
-                    Order #{{ order.id }}<br>
-                    Total: RM {{ order.total_price }}<br>
-                    Approved: {{ order.approved_at|date:"d/m/Y H:i" }}
-                </div>
-                <div class="actions">
-                    <a href="{% url 'admin_order_detail' order.id %}" class="btn detail">View detail</a>
-                </div>
+        <div class="col-lg-5">
+    <div class="card border-0 shadow-sm p-4 rounded-4 bg-white">
+        <h5 class="fw-bold mb-3 text-muted">Recent Completions</h5>
+        {% for order in accepted_orders %}
+        <div class="d-flex justify-content-between align-items-center p-3 mb-2 bg-white border rounded">
+            <div>
+                <span class="small fw-bold d-block">Order #{{ order.id }}</span>
+                <span class="text-muted" style="font-size: 0.75rem;">RM {{ order.total_amount }} • {{ order.customer.username }}</span>
             </div>
-            {% empty %}
-            <p class="no-data">No accepted orders yet.</p>
-            {% endfor %}
+            
+            <div class="d-flex gap-2">
+                <a href="{% url 'admin_order_detail' order.id %}" class="btn btn-xs btn-outline-dark py-1 px-2" style="font-size: 0.7rem;">
+                    Details
+                </a>
 
-            <h3>Accepted, but pending payment</h3>
-            {% for order in pending_payment_orders %}
-            <div class="order-card pending-payment">
-                <div class="order-info">
-                    Order #{{ order.id }}<br>
-                    Total: RM {{ order.total_price }}
-                </div>
-                <div class="actions">
-                    <a href="{% url 'admin_order_detail' order.id %}" class="btn detail">View detail</a>
-                    {% if order.payment_proof %}
-                        <a href="{% url 'approve_order' order.id %}" class="btn approve">Approve</a>
-                    {% endif %}
-                    <a href="{% url 'reject_order' order.id %}" class="btn reject">Reject</a>
-                </div>
+                {% if order.digital_signature %}
+                    <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-xs btn-outline-success py-1 px-2" style="font-size: 0.7rem;" download>
+                        Receipt 📄
+                    </a>
+                {% endif %}
             </div>
-            {% empty %}
-            <p class="no-data">No pending payment orders.</p>
-            {% endfor %}
         </div>
+        {% empty %}
+        <p class="text-center text-muted py-4 small">No recently completed orders.</p>
+        {% endfor %}
+    </div>
 
-        <!-- Edit Menu Button -->
-        <div class="edit-menu">
-            <a href="{% url 'product_list' %}" class="btn edit-menu-btn">Go to Menu</a>
-        </div>
+    <div class="card bg-dark text-white p-4 mt-4 border-0 shadow-sm rounded-4">
+        <h6 class="fw-bold mb-2">Security Engine Status</h6>
+        <p class="small opacity-75 mb-0">Digital Signature (SHA-256): <span class="text-success">Active</span></p>
+        <p class="small opacity-75">Non-Repudiation Logs: <span class="text-success">Synchronized</span></p>
     </div>
 </div>
-
+    </div>
+</div>
 {% endblock %}

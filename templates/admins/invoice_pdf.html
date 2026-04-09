@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        @page { size: A4; margin: 1.5cm; }
+        body { font-family: 'Helvetica', sans-serif; color: #333; line-height: 1.4; }
+        .header { border-bottom: 3px solid #f39c12; padding-bottom: 20px; margin-bottom: 30px; }
+        .company-name { font-size: 28px; font-weight: bold; color: #f39c12; }
+        .doc-type { font-size: 18px; color: #7f8c8d; text-transform: uppercase; letter-spacing: 2px; }
+        .info-grid { width: 100%; margin-bottom: 30px; }
+        .info-grid td { vertical-align: top; width: 50%; font-size: 12px; }
+        .section-label { font-weight: bold; color: #7f8c8d; text-transform: uppercase; font-size: 10px; margin-bottom: 5px; }
+        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        .items-table th { background: #f8f9fa; border-bottom: 2px solid #dee2e6; padding: 12px 8px; font-size: 11px; text-align: left; }
+        .items-table td { padding: 12px 8px; border-bottom: 1px solid #eee; font-size: 12px; }
+        .total-box { float: right; width: 40%; background: #f8f9fa; padding: 15px; border-radius: 5px; text-align: right; }
+        .total-amount { font-size: 20px; font-weight: bold; color: #2c3e50; }
+        .security-footer { margin-top: 100px; border-top: 1px dashed #ccc; padding-top: 20px; }
+        .signature-box { font-size: 9px; color: #95a5a6; font-family: monospace; word-wrap: break-word; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <table style="width: 100%;">
+            <tr>
+                <td>
+                    <div class="company-name">ZARLY.CO</div>
+                    <div class="doc-type">{% if order.status == 'approved' %}Official Receipt{% else %}Pro-Forma Invoice{% endif %}</div>
+                </td>
+                <td style="text-align: right; font-size: 12px;">
+                    <strong>Document ID:</strong> #ZRL-{{ order.id }}-2026<br>
+                    <strong>Date:</strong> {{ order.created_at|date:"d F Y" }}<br>
+                    <strong>Status:</strong> {{ order.status|upper }}
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <table class="info-grid">
+        <tr>
+            <td>
+                <div class="section-label">Customer Details</div>
+                <strong>{{ order.full_name }}</strong><br>
+                Phone: {{ order.phone_number }}<br>
+                ID: {{ order.customer.username }}
+            </td>
+            <td>
+                <div class="section-label">Shipping Address</div>
+                {{ order.shipping_address|linebreaksbr }}
+                {% if order.order_notes %}<br><strong>Note:</strong> {{ order.order_notes }}{% endif %}
+            </td>
+        </tr>
+    </table>
+
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th>Product Description</th>
+                <th style="text-align: center;">Qty</th>
+                <th style="text-align: right;">Price</th>
+                <th style="text-align: right;">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in order.items.all %}
+            <tr>
+                <td>{{ item.product.name }}</td>
+                <td style="text-align: center;">{{ item.quantity }}</td>
+                <td style="text-align: right;">RM {{ item.product.price }}</td>
+                <td style="text-align: right;">RM {{ item.subtotal }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="total-box">
+        <span style="font-size: 12px;">Grand Total</span><br>
+        <span class="total-amount">RM {{ order.total_amount }}</span>
+    </div>
+
+    <div class="security-footer">
+        <div class="section-label">Cryptographic Integrity Signature</div>
+        <div class="signature-box">
+            {% if order.digital_signature %}
+                <strong>SHA-256 HASH:</strong> {{ order.digital_signature.signature_hash }}<br>
+                <strong>Timestamp:</strong> {{ order.digital_signature.timestamp|date:"Y-m-d H:i:s" }}
+            {% else %}
+                <span style="color: #e74c3c;">PENDING SIGNATURE: This document is not yet verified.</span>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

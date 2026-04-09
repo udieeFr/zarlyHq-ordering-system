@@ -8,15 +8,26 @@
         filter: grayscale(1);
         opacity: 0.6;
         cursor: not-allowed;
+        position: relative;
     }
     .out-of-stock .btn {
         pointer-events: none;
     }
-    .stock-label {
+    .stock-badge {
         position: absolute;
         top: 15px;
         right: 15px;
         z-index: 5;
+    }
+    /* Product Card Hover Effects */
+    .product-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        border-radius: 15px;
+        overflow: hidden;
+    }
+    .product-card:hover:not(.out-of-stock) {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
     }
 </style>
 
@@ -25,7 +36,7 @@
         <div class="col-lg-9">
             <h2 class="fw-bold mb-4">Our Menu</h2>
 
-            <div class="card p-3 mb-4 border-0 shadow-sm bg-light">
+            <div class="card p-3 mb-4 border-0 shadow-sm bg-light" style="border-radius: 15px;">
                 <form method="get" class="row g-2 align-items-end">
                     <div class="col-md-5">
                         <label class="form-label small fw-bold">By Category</label>
@@ -54,9 +65,9 @@
             <div class="row g-4">
                 {% for p in products %}
                 <div class="col-md-4">
-                    <div class="card h-100 border-0 shadow-sm {% if p.stock <= 0 %}out-of-stock{% endif %}" style="border-radius: 15px; overflow: hidden;">
+                    <div class="card h-100 border-0 shadow-sm product-card {% if p.stock <= 0 %}out-of-stock{% endif %}">
                         {% if p.stock <= 0 %}
-                            <span class="badge bg-danger stock-label">SOLD OUT</span>
+                            <span class="badge bg-danger stock-badge">SOLD OUT</span>
                         {% endif %}
 
                         <img src="{% if p.image %}{{ p.image.url }}{% else %}{% static 'images/products/promo1.jpg' %}{% endif %}" class="card-img-top" style="height: 200px; object-fit: cover;">
@@ -91,20 +102,40 @@
 
         <div class="col-lg-3">
             <div class="card bg-primary text-white p-3 mb-4 shadow-sm border-0" style="border-radius: 15px;">
-                <h5 class="fw-bold mb-1">Your Cart 🛒</h5>
-                <p class="small opacity-75 mb-3">You have {{ cart_count|default:"0" }} items.</p>
+                <h5 class="fw-bold mb-1 text-center">Your Cart 🛒</h5>
+                <p class="small text-center opacity-75 mb-3">You have **{{ cart_count|default:"0" }}** items.</p>
                 <a href="{% url 'cart' %}" class="btn btn-light btn-sm w-100 fw-bold py-2">View My Cart</a>
             </div>
 
             <div class="card p-3 shadow-sm border-0 mb-4" style="border-radius: 15px;">
-                <h6 class="fw-bold border-bottom pb-2 mb-3">Latest Orders</h6>
+                <h6 class="fw-bold border-bottom pb-2 mb-3">My Recent Orders</h6>
                 {% for o in user_orders %}
-                    <div class="mb-2 d-flex justify-content-between align-items-center">
-                        <span class="small fw-bold">#{{ o.id }}</span>
-                        <span class="badge bg-light text-dark" style="font-size: 0.6rem;">{{ o.status }}</span>
+                    <div class="mb-3 small border-bottom pb-2">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold text-primary">#{{ o.id }}</span>
+                            <span class="badge {% if o.status == 'approved' %}bg-success text-white{% elif o.status == 'pending_payment' %}bg-info text-white{% else %}bg-secondary text-white{% endif %}" style="font-size: 0.6rem;">
+                                {{ o.status|capfirst }}
+                            </span>
+                        </div>
+                        
+                        <div class="mt-2 d-grid gap-1">
+                            <a href="{% url 'order_success' o.id %}" class="btn btn-xs btn-outline-dark w-100" style="font-size: 0.7rem;">
+                                {% if o.status == 'pending_payment' %}Pay Now & Details{% else %}View Details{% endif %}
+                            </a>
+                            
+                            {% if o.status == 'approved' and o.digital_signature %}
+                                <a href="{{ o.digital_signature.pdf_path.url }}" class="btn btn-sm btn-success w-100" style="font-size: 0.7rem;" download>
+                                     Download Receipt 📄
+                                </a>
+                            {% elif o.status == 'pending_payment' %}
+                                <a href="{% url 'download_invoice' o.id %}" class="btn btn-sm btn-info text-white w-100" style="font-size: 0.7rem;">
+                                    Download Invoice 🧾
+                                </a>
+                            {% endif %}
+                        </div>
                     </div>
                 {% empty %}
-                    <p class="small text-muted">No orders yet.</p>
+                    <p class="small text-muted text-center py-3">No orders yet.</p>
                 {% endfor %}
             </div>
 
@@ -126,24 +157,25 @@
                 {% csrf_token %}
                 <div class="modal-body p-4">
                     <div class="mb-3">
-                        <label class="form-label small fw-bold">Choose Validated Receipt</label>
+                        <label class="form-label small fw-bold">Select Order (Receipt Validation)</label>
                         <select name="order_id" class="form-select" required>
                             <option value="">-- Choose Order --</option>
                             {% for o in completed_orders %}
                                 <option value="{{ o.id }}">Order #{{ o.id }} (RM {{ o.total_amount }})</option>
                             {% endfor %}
                         </select>
+                        <p class="text-muted" style="font-size: 0.7rem; margin-top: 5px;">Only orders with a signed receipt can be reported for security and audit purposes.</p>
                     </div>
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Subject</label>
-                        <input type="text" name="subject" class="form-control" placeholder="What's the issue?" required>
+                        <input type="text" name="subject" class="form-control" placeholder="Briefly describe the issue" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Message</label>
-                        <textarea name="message" class="form-control" rows="4" required></textarea>
+                        <textarea name="message" class="form-control" rows="4" placeholder="Explain the problem in detail..." required></textarea>
                     </div>
                     <div class="mb-0">
-                        <label class="form-label small fw-bold">Evidence (Optional)</label>
+                        <label class="form-label small fw-bold">Upload Evidence (Image)</label>
                         <input type="file" name="evidence_image" class="form-control">
                     </div>
                 </div>

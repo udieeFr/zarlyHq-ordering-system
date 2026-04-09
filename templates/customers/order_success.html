@@ -1,30 +1,69 @@
 {% extends 'base.html' %}
+{% load static %}
+
 {% block content %}
-<main class="container" style="max-width: 600px; margin-top: 3rem;">
-  <div class="card text-center" style="padding: 2.5rem;">
-    <div style="font-size: 4rem; margin-bottom: 1rem;">✅</div>
-    <h1 class="mb-2">Order Submitted!</h1>
-    <p class="text-muted mb-3">Order #{{ order.id }} • Total: <span class="font-bold text-dark">RM {{ order.total_amount }}</span></p>
-    
-    <div class="alert alert-success">
-      ⏳ <strong>Awaiting Approval</strong><br>
-      <span style="font-weight: normal;">Your order has been sent to our admin for approval. You will be notified once it's processed.</span>
-    </div>
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="fw-bold mb-0">Order Summary #{{ order.id }}</h2>
+                <span class="badge {% if order.status == 'approved' %}bg-success{% elif order.status == 'pending_payment' %}bg-info text-white{% else %}bg-secondary{% endif %} px-3 py-2">
+                    {{ order.status|capfirst }}
+                </span>
+            </div>
 
-    <h3 class="mb-2">Order Details:</h3>
-    <ul class="data-list mb-3">
-      {% for item in order.items.all %}
-      <li class="data-item">
-        <span>{{ item.product.name }} x{{ item.quantity }}</span>
-        <span class="font-bold">RM {{ item.subtotal }}</span>
-      </li>
-      {% endfor %}
-    </ul>
+            <div class="card shadow-sm border-0 mb-4" style="border-radius: 15px;">
+                <div class="card-body p-4">
+                    <h6 class="fw-bold mb-3 border-bottom pb-2">Purchased Items</h6>
+                    {% for item in order.items.all %}
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>{{ item.product.name }} (x{{ item.quantity }})</span>
+                        <span class="fw-bold">RM {{ item.subtotal }}</span>
+                    </div>
+                    {% endfor %}
+                    <hr>
+                    <div class="d-flex justify-content-between h5 fw-bold text-primary">
+                        <span>Grand Total</span>
+                        <span>RM {{ order.total_amount }}</span>
+                    </div>
+                </div>
+            </div>
 
-    <div class="flex gap-2 flex-col md:flex-row mt-3">
-      <a href="{% url 'product_list' %}" class="btn btn-outline flex-1">Browse Menu</a>
-      <a href="/" class="btn btn-primary flex-1">Back to Home</a>
+            <div class="card shadow-sm border-0 mb-4" style="border-radius: 15px;">
+                <div class="card-body p-4">
+                    <h6 class="fw-bold mb-3 border-bottom pb-2 text-muted">Delivery Details</h6>
+                    <p class="mb-1"><strong>Receiver:</strong> {{ order.full_name }}</p>
+                    <p class="mb-1"><strong>Contact:</strong> {{ order.phone_number }}</p>
+                    <p class="mb-0"><strong>Address:</strong><br>{{ order.shipping_address }}</p>
+                </div>
+            </div>
+
+            {% if order.status == 'pending_payment' %}
+            <div class="card shadow-sm border-0 bg-light p-4 mb-4 text-center" style="border-radius: 15px; border: 2px dashed #0dcaf0 !important;">
+                <h5 class="fw-bold text-info">Payment Required</h5>
+                <p class="small text-muted mb-4">Please transfer **RM {{ order.total_amount }}** and upload your receipt below.</p>
+                <img src="{% static 'images/duitnow-qr.jpg' %}" style="max-width: 180px;" class="rounded shadow-sm mb-4">
+                <form method="post" action="{% url 'upload_payment_proof' order.id %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="file" name="payment_proof" class="form-control mb-3" required>
+                    <button type="submit" class="btn btn-info w-100 text-white fw-bold py-2">Submit Payment Receipt</button>
+                </form>
+            </div>
+            {% endif %}
+
+            <div class="d-grid gap-2">
+                {% if order.status == 'approved' and order.digital_signature %}
+                    <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-success py-3 fw-bold" download>
+                        Download Signed Receipt (Proof of Integrity) 📄
+                    </a>
+                {% elif order.status == 'pending_payment' %}
+                    <a href="{% url 'download_invoice' order.id %}" class="btn btn-outline-info py-3 fw-bold">
+                        Download Payment Invoice 🧾
+                    </a>
+                {% endif %}
+                <a href="{% url 'product_list' %}" class="btn btn-link text-muted mt-2">Return to Catalog</a>
+            </div>
+        </div>
     </div>
-  </div>
-</main>
+</div>
 {% endblock %}

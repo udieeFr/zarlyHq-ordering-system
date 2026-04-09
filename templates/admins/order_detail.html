@@ -1,81 +1,63 @@
 {% extends 'base.html' %}
-
 {% block content %}
-<div class="container" style="max-width: 800px; margin-top: 50px;">
-    
-    <div class="card shadow">
-        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-            <h3 class="mb-0">Order Details #{{ order.id }}</h3>
-            <span class="badge bg-warning text-dark">{{ order.get_status_display }}</span>
-        </div>
-        
-        <div class="card-body">
-            <h5 class="text-primary">Customer Information</h5>
-            <p><strong>Name:</strong> {{ order.customer.username }}</p>
-            <p><strong>Order Date:</strong> {{ order.created_at|date:"d M Y, H:i" }}</p>
-            <hr>
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold">Order Details #{{ order.id }}</h2>
+        <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">&larr; Back</a>
+    </div>
 
-            <h5 class="text-primary">Order Items</h5>
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Product</th>
-                        <th>Price</th>
-                        <th>Qty</th>
-                        <th>Subtotal</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in order.items.all %}
-                    <tr>
-                        <td>{{ item.product.name }}</td>
-                        <td>RM {{ item.product.price }}</td>
-                        <td>x{{ item.quantity }}</td>
-                        <td>RM {{ item.subtotal }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-                <tfoot>
-                    <tr>
-                        <td colspan="3" class="text-end"><strong>Total Amount:</strong></td>
-                        <td><strong>RM {{ order.total_amount }}</strong></td>
-                    </tr>
-                </tfoot>
-            </table>
-            <hr>
-
-            <h5 class="text-primary">Payment Proof</h5>
-            {% if order.payment_proof %}
-                <div style="text-align: center; background: #f8f9fa; padding: 10px; border-radius: 8px;">
-                    <img src="{{ order.payment_proof.url }}" alt="Payment Receipt" style="max-width: 100%; max-height: 500px; border: 1px solid #ddd;">
-                    <br>
-                    <a href="{{ order.payment_proof.url }}" target="_blank" class="btn btn-sm btn-outline-secondary mt-2">View Full Size</a>
+    <div class="row g-4">
+        <div class="col-md-7">
+            <div class="card shadow-sm border-0 mb-4 p-4">
+                <h5 class="fw-bold border-bottom pb-2 mb-3">Customer Information</h5>
+                <div class="row small">
+                    <div class="col-6 mb-2"><strong>Name:</strong> {{ order.full_name }}</div>
+                    <div class="col-6 mb-2"><strong>Phone:</strong> {{ order.phone_number }}</div>
+                    <div class="col-12 mb-2"><strong>Address:</strong><br>{{ order.shipping_address }}</div>
+                    <div class="col-12"><strong>Notes:</strong> {{ order.order_notes|default:"None" }}</div>
                 </div>
-            {% else %}
-                <div class="alert alert-warning">
-                    ⚠️ No payment proof uploaded yet.
-                </div>
-            {% endif %}
-
-            {% if order.status == 'approved' and order.digital_signature %}
-            <hr>
-            <div class="alert alert-success">
-                <strong>✅ Digitally Signed</strong><br>
-                Hash: <small>{{ order.digital_signature.signature_hash }}</small><br>
-                <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-success btn-sm mt-2" target="_blank">Download Signed Receipt</a>
             </div>
-            {% endif %}
+
+            <div class="card shadow-sm border-0 p-4">
+                <h5 class="fw-bold border-bottom pb-2 mb-3">Order Items</h5>
+                <table class="table table-sm">
+                    <thead><tr><th>Product</th><th>Qty</th><th class="text-end">Subtotal</th></tr></thead>
+                    <tbody>
+                        {% for item in order.items.all %}
+                        <tr>
+                            <td>{{ item.product.name }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td class="text-end fw-bold">RM {{ item.subtotal }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr><td colspan="2" class="text-end fw-bold">Grand Total:</td>
+                            <td class="text-end fw-bold text-primary">RM {{ order.total_amount }}</td></tr>
+                    </tfoot>
+                </table>
+            </div>
         </div>
 
-        <div class="card-footer text-end">
-            <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
-            
-            {% if order.status == 'pending' %}
-                <a href="{% url 'set_pending_payment' order.id %}" class="btn btn-info text-white">Accept (Wait Payment)</a>
-            {% endif %}
-            
-            {% if order.payment_proof and order.status != 'approved' %}
-                <a href="{% url 'approve_order' order.id %}" class="btn btn-success">Final Approve & Sign</a>
+        <div class="col-md-5">
+            <div class="card shadow-sm border-0 mb-4 p-4 bg-light">
+                <h5 class="fw-bold border-bottom pb-2 mb-3">Payment Verification</h5>
+                {% if order.payment_proof %}
+                    <img src="{{ order.payment_proof.url }}" class="img-fluid rounded border mb-3" style="max-height: 300px; cursor: zoom-in;" onclick="window.open(this.src)">
+                    {% if order.status != 'approved' %}
+                        <a href="{% url 'approve_order' order.id %}" class="btn btn-success w-100 fw-bold py-2">Approve & Generate Signed Receipt</a>
+                    {% endif %}
+                {% else %}
+                    <p class="text-muted text-center py-4">Waiting for customer to upload proof...</p>
+                {% endif %}
+            </div>
+
+            {% if order.digital_signature %}
+            <div class="card border-success p-4 shadow-sm text-center">
+                <h6 class="text-success fw-bold">Digitally Signed ✅</h6>
+                <p class="small text-muted mb-3">Hash: {{ order.digital_signature.signature_hash|truncatechars:20 }}</p>
+                <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-outline-success w-100" download>Download Signed Receipt</a>
+            </div>
             {% endif %}
         </div>
     </div>
