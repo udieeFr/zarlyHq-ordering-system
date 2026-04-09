@@ -11,7 +11,11 @@ class Order(models.Model):
     )
     
     customer = models.ForeignKey(User, on_delete=models.CASCADE, limit_choices_to={'role': 'customer'})
-    
+    full_name = models.CharField(max_length=255, null=True, blank=True)
+    phone_number = models.CharField(max_length=20, null=True, blank=True)
+    shipping_address = models.TextField(null=True, blank=True)
+    order_notes = models.TextField(null=True, blank=True)
+
     # RENAMED: 'total_price' -> 'total_amount' to match PDF Table 4.5.3 [cite: 351]
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     

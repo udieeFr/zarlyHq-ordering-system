@@ -2,161 +2,85 @@
 {% load static %}
 
 {% block content %}
-
-<div class="menu-header">
-    <h1>Check Out Now</h1>
-</div>
-
-<div class="checkout-container">
-    <div class="checkout-main">
-        <h2 style="color: var(--zarly-orange);">Payment Options</h2>
+<main class="container py-5">
+    <form method="post" enctype="multipart/form-data" action="{% url 'submit_order' %}">
+        {% csrf_token %}
         
-        <form method="post" action="{% url 'submit_order' %}" enctype="multipart/form-data" id="checkoutForm">
-            {% csrf_token %}
-            
-            <div class="payment-options">
-                <div class="payment-option" id="option1" onclick="selectPayment('pay_now')">
-                    <input type="radio" name="payment_method" value="pay_now" id="pay_now" required>
-                    <label for="pay_now">
-                        <h4>1. Pay now, upload your payment proof</h4>
-                        <p>Upload bukti bayaran sekarang untuk pemprosesan segera</p>
-                    </label>
-                </div>
-                
-                <div class="payment-option" id="option2" onclick="selectPayment('pay_later')">
-                    <input type="radio" name="payment_method" value="pay_later" id="pay_later" required>
-                    <label for="pay_later">
-                        <h4>2. Pay later after order has been approved</h4>
-                        <p>Bayar selepas pesanan anda diluluskan oleh admin</p>
-                    </label>
-                </div>
-            </div>
-            
-            <!-- QR Code Section (shown when pay_now is selected) -->
-            <div class="qr-section" id="qrSection" style="display: none;">
-                <h3 style="color: var(--zarly-dark); margin-bottom: 20px;">
-                    <img src="{% static 'images/duitnow-logo.jpg' %}" alt="DuitNow" style="height: 40px; vertical-align: middle;" onerror="this.style.display='none';">
-                    MALAYSIA NATIONAL QR
-                </h3>
-                
-                <div class="qr-placeholder">
-                    <img src="{% static 'images/duitnow-qr.jpg' %}" alt="DuitNow QR Code" style="width: 100%; height: 100%; object-fit: contain;">
-                    <div style="position: absolute; bottom: 10px; width: 100%; text-align: center; background: rgba(255,255,255,0.9); padding: 8px;">
-                        <img src="{% static 'images/bsn-logo.jpg' %}" alt="BSN" style="height: 30px;" onerror="this.outerHTML='<strong>BANK SIMPANAN NASIONAL</strong>';">
+        <div class="row g-5">
+            <div class="col-md-7">
+                <h4 class="fw-bold mb-4">1. Shipping Information</h4>
+                <div class="card p-4 shadow-sm border-0 mb-4">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label small fw-bold">Full Name</label>
+                            <input type="text" name="full_name" class="form-control" placeholder="Recipient's Name" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-bold">Phone Number</label>
+                            <input type="text" name="phone_number" class="form-control" placeholder="012-XXXXXXX" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-bold">Shipping Address</label>
+                            <textarea name="shipping_address" class="form-control" rows="3" placeholder="Street name, City, Postcode" required></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-bold">Order Notes (Optional)</label>
+                            <input type="text" name="order_notes" class="form-control" placeholder="Special delivery instructions">
+                        </div>
                     </div>
                 </div>
-                
-                <p style="margin-top: 20px; color: #7f8c8d;">
-                    <strong>DON TRADER</strong><br>
-                    Accepted by participating Banks and eWallets<br>
-                    <small>Instant Payment | Powered by PayNet</small>
-                </p>
-                
-                <div class="upload-section">
-                    <h4 style="color: var(--zarly-orange); margin-bottom: 15px;">Upload your payment proof here</h4>
-                    <input type="file" name="payment_proof" id="paymentProof" accept="image/*,.pdf" 
-                           style="display: block; margin: 0 auto 20px; padding: 10px; border: 2px dashed var(--zarly-orange); border-radius: 8px; width: 100%; max-width: 400px;">
-                    <button type="button" class="btn-upload" onclick="document.getElementById('paymentProof').click()">
-                        📁 Choose File
-                    </button>
-                    <p id="fileName" style="margin-top: 10px; color: #27ae60; font-weight: bold;"></p>
+
+                <h4 class="fw-bold mb-4">2. Payment Method</h4>
+                <div class="card p-4 shadow-sm border-0">
+                    <div class="form-check mb-3 p-3 border rounded">
+                        <input class="form-check-input ms-1" type="radio" name="payment_method" value="now" id="payNow" checked onchange="toggleUpload(true)">
+                        <label class="form-check-label fw-bold ms-2" for="payNow">Pay Now (DuitNow / Bank Transfer)</label>
+                    </div>
+                    <div class="form-check mb-4 p-3 border rounded">
+                        <input class="form-check-input ms-1" type="radio" name="payment_method" value="later" id="payLater" onchange="toggleUpload(false)">
+                        <label class="form-check-label fw-bold ms-2" for="payLater">Pay Later (Cash on Delivery / After Approval)</label>
+                    </div>
+
+                    <div id="upload-section" class="bg-light p-3 rounded text-center">
+                        <p class="small fw-bold">Scan to Pay</p>
+                        <img src="{% static 'images/duitnow-qr.jpg' %}" style="max-width: 150px;" class="mb-3 rounded border">
+                        <input type="file" name="payment_proof" class="form-control">
+                    </div>
                 </div>
             </div>
-            
-            <div style="margin-top: 30px; text-align: center;">
-                <button type="submit" class="btn-submit-order" id="submitBtn">
-                    Submit order for approval
-                </button>
+
+            <div class="col-md-5">
+                <div class="card p-4 shadow-sm border-0 sticky-top" style="top: 20px;">
+                    <h4 class="fw-bold mb-3">Order Summary</h4>
+                    {% for item in cart_items %}
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>{{ item.product.name }} (x{{ item.quantity }})</span>
+                        <span class="fw-bold">RM {{ item.subtotal }}</span>
+                    </div>
+                    {% endfor %}
+                    <hr>
+                    <div class="d-flex justify-content-between h4 fw-bold text-primary">
+                        <span>Total</span>
+                        <span>RM {{ total_price }}</span>
+                    </div>
+
+                    <div class="form-check mt-4 mb-3">
+                        <input class="form-check-input" type="checkbox" required id="terms">
+                        <label class="form-check-label small" for="terms">
+                            I confirm that my details are correct and I agree to Zarly.co's Terms of Service.
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 py-3 fw-bold">Confirm Order & Generate Invoice</button>
+                </div>
             </div>
-        </form>
-    </div>
-    
-    <!-- Cart Summary -->
-    <div class="cart-summary">
-        <h2>My Cart</h2>
-        
-        {% for item in cart_items %}
-        <div class="cart-item">
-            <div class="cart-item-info">
-                <h5>{{ loop.index }}. {{ item.product.name }}</h5>
-                <p class="quantity">{{ item.quantity }}x RM {{ item.product.price }}</p>
-            </div>
-            <div class="cart-item-price">RM {{ item.subtotal }}</div>
         </div>
-        {% endfor %}
-        
-        <div class="cart-total">
-            <h3>
-                <span>Subtotal:</span>
-                <span class="amount">RM {{ total_price }}</span>
-            </h3>
-        </div>
-        
-        <p style="margin-top: 20px; font-size: 14px; color: #7f8c8d; text-align: center;">
-            Your order will be sent for admin approval after submission
-        </p>
-    </div>
-</div>
+    </form>
+</main>
 
 <script>
-function selectPayment(method) {
-    // Remove all selected classes
-    document.querySelectorAll('.payment-option').forEach(opt => {
-        opt.classList.remove('selected');
-    });
-    
-    // Add selected class to clicked option
-    const option = document.getElementById(method === 'pay_now' ? 'option1' : 'option2');
-    option.classList.add('selected');
-    
-    // Check the radio button
-    document.getElementById(method).checked = true;
-    
-    // Show/hide QR section
-    const qrSection = document.getElementById('qrSection');
-    const paymentProof = document.getElementById('paymentProof');
-    
-    if (method === 'pay_now') {
-        qrSection.style.display = 'block';
-        paymentProof.required = true;
-    } else {
-        qrSection.style.display = 'none';
-        paymentProof.required = false;
-        paymentProof.value = '';
-        document.getElementById('fileName').textContent = '';
+    function toggleUpload(show) {
+        document.getElementById('upload-section').style.display = show ? 'block' : 'none';
     }
-}
-
-// Show selected file name
-document.getElementById('paymentProof').addEventListener('change', function() {
-    const fileName = this.files[0] ? this.files[0].name : '';
-    document.getElementById('fileName').textContent = fileName ? `✓ Selected: ${fileName}` : '';
-});
-
-// Form validation
-document.getElementById('checkoutForm').addEventListener('submit', function(e) {
-    const paymentMethod = document.querySelector('input[name="payment_method"]:checked');
-    
-    if (!paymentMethod) {
-        e.preventDefault();
-        alert('Please select a payment method');
-        return;
-    }
-    
-    if (paymentMethod.value === 'pay_now') {
-        const paymentProof = document.getElementById('paymentProof');
-        if (!paymentProof.files.length) {
-            e.preventDefault();
-            alert('Please upload your payment proof');
-            return;
-        }
-    }
-    
-    // Show loading state
-    const submitBtn = document.getElementById('submitBtn');
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Submitting order...';
-});
 </script>
-
 {% endblock %}

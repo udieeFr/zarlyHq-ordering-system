@@ -1,42 +1,30 @@
 {% extends 'base.html' %}
-
 {% block content %}
+<main class="container" style="max-width: 600px; margin-top: 3rem;">
+  <div class="card text-center" style="padding: 2.5rem;">
+    <div style="font-size: 4rem; margin-bottom: 1rem;">✅</div>
+    <h1 class="mb-2">Order Submitted!</h1>
+    <p class="text-muted mb-3">Order #{{ order.id }} • Total: <span class="font-bold text-dark">RM {{ order.total_amount }}</span></p>
+    
+    <div class="alert alert-success">
+      ⏳ <strong>Awaiting Approval</strong><br>
+      <span style="font-weight: normal;">Your order has been sent to our admin for approval. You will be notified once it's processed.</span>
+    </div>
 
-<div style="text-align: center; padding: 60px 20px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 600px; margin: 0 auto;">
-    <div style="font-size: 100px; margin-bottom: 20px;">✅</div>
-    
-    <h1 style="color: var(--zarly-orange); margin-bottom: 15px;">Order Submitted!</h1>
-    
-    <div style="background: var(--zarly-yellow); padding: 20px; border-radius: 12px; margin: 30px 0;">
-        <h2 style="color: var(--zarly-dark); margin: 0 0 10px 0;">Order #{{ order.id }}</h2>
-        <p style="color: #7f8c8d; margin: 0;">Total: <strong style="color: var(--zarly-orange); font-size: 24px;">RM {{ order.total_amount }}</strong></p>
-    </div>
-    
-    <div style="background: #f8f9fa; padding: 25px; border-radius: 12px; margin-bottom: 30px; text-align: left;">
-        <h3 style="color: var(--zarly-dark); margin-top: 0;">Order Details:</h3>
-        {% for item in order.items.all %}
-        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #ddd;">
-            <span>{{ item.product.name }} x{{ item.quantity }}</span>
-            <span style="font-weight: bold;">RM {{ item.subtotal }}</span>
-        </div>
-        {% endfor %}
-    </div>
-    
-    <div style="background: #fff3cd; border-left: 4px solid var(--zarly-orange); padding: 20px; margin-bottom: 30px; text-align: left;">
-        <h4 style="margin-top: 0; color: var(--zarly-orange);">⏳ Awaiting Approval</h4>
-        <p style="margin: 0; color: #856404;">
-            Your order has been sent to our admin for approval. You will be notified once it's processed.
-        </p>
-    </div>
-    
-    <div style="display: flex; gap: 15px; justify-content: center;">
-        <a href="{% url 'product_list' %}" class="btn" style="background: var(--zarly-orange); color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; display: inline-block;">
-            Browse Menu
-        </a>
-        <a href="/" class="btn" style="background: #95a5a6; color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; display: inline-block;">
-            Back to Home
-        </a>
-    </div>
-</div>
+    <h3 class="mb-2">Order Details:</h3>
+    <ul class="data-list mb-3">
+      {% for item in order.items.all %}
+      <li class="data-item">
+        <span>{{ item.product.name }} x{{ item.quantity }}</span>
+        <span class="font-bold">RM {{ item.subtotal }}</span>
+      </li>
+      {% endfor %}
+    </ul>
 
+    <div class="flex gap-2 flex-col md:flex-row mt-3">
+      <a href="{% url 'product_list' %}" class="btn btn-outline flex-1">Browse Menu</a>
+      <a href="/" class="btn btn-primary flex-1">Back to Home</a>
+    </div>
+  </div>
+</main>
 {% endblock %}
