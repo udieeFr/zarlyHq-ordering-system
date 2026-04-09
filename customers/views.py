@@ -28,18 +28,23 @@ def get_cart_from_session(request):
     return cart_items, total_price
 
 def product_list(request):
-    """Display all products with filtering, and user's recent orders"""
+    """Memaparkan semua produk dengan tapis dan pesanan terkini pengguna"""
     products = Product.objects.all()
     
-    # --- NEW FILTERING LOGIC ---
+    # Ambil nilai tapis dari URL
     cat_id = request.GET.get('category')
     allergy_id = request.GET.get('allergy')
 
+    # Logik Tapis Kategori
     if cat_id:
         products = products.filter(category_id=cat_id)
-    if allergy_id:
+        
+    # --- LOGIK BARU: TAPIS TIADA ALERGI ---
+    if allergy_id == 'none':
+        # Cari produk yang tidak mempunyai sebarang alergi
+        products = products.filter(allergies__isnull=True)
+    elif allergy_id:
         products = products.filter(allergies__id=allergy_id).distinct()
-    # ---------------------------
 
     cart = request.session.get('cart', {})
     cart_count = sum(cart.values())
@@ -53,8 +58,8 @@ def product_list(request):
 
     return render(request, 'customers/product_list.html', {
         'products': products,
-        'categories': Category.objects.all(), # Added for the template dropdowns
-        'allergies': Allergy.objects.all(),   # Added for the template dropdowns
+        'categories': Category.objects.all(),
+        'allergies': Allergy.objects.all(),
         'cart_count': cart_count,
         'user_orders': user_orders,
     })
@@ -245,19 +250,3 @@ def logout_view(request):
     messages.success(request, "You have been logged out.")
     return redirect('product_list')
 
-def menu(request):
-    products = Product.objects.all()
-    
-    cat_id = request.GET.get('category')
-    allergy_id = request.GET.get('allergy')
-
-    if cat_id:
-        products = products.filter(category_id=cat_id)
-    if allergy_id:
-        products = products.filter(allergies__id=allergy_id).distinct()
-
-    return render(request, 'customers/menu.html', {
-        'products': products,
-        'categories': Category.objects.all(),
-        'allergies': Allergy.objects.all(),
-    })

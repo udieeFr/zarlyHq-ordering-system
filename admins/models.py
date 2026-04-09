@@ -57,3 +57,4 @@ class DigitalSignature(models.Model):
 
     # Helper field (Good to keep for debug, even if not in PDF)
     signature_value = models.TextField()
+
