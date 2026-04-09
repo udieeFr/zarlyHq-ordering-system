@@ -73,7 +73,7 @@ def approve_order(request, order_id):
             pdf_path=relative_path,
         )
         
-        # 4. Update Status
+        # 4. Update Status and timestamp
         order.status = 'approved'
         order.approved_at = timezone.now()
         order.approved_by = request.user

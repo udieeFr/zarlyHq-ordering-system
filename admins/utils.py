@@ -1,4 +1,4 @@
-# admins/utils.py
+
 import os
 import hashlib
 from reportlab.pdfgen import canvas
@@ -41,9 +41,7 @@ def generate_invoice_pdf(order):
     return file_path
 
 def sign_pdf_digitally(input_pdf_path, order_id):
-    """
-    Signs the PDF using pyHanko's built-in loader.
-    """
+ 
     # 1. Define Paths
     key_path = os.path.join(settings.BASE_DIR, 'secure_keys', 'zarly_key.pem')
     cert_path = os.path.join(settings.BASE_DIR, 'secure_keys', 'zarly_cert.pem')
@@ -52,27 +50,29 @@ def sign_pdf_digitally(input_pdf_path, order_id):
     signed_path = os.path.join(settings.MEDIA_ROOT, 'signed_pdfs', signed_filename)
     os.makedirs(os.path.dirname(signed_path), exist_ok=True)
 
-    # 2. Load Identity (The Clean Way)
-    # This automatically handles the keys and certificates for us
+    # 2. Load Identity
+    # load key daripada certificate
     signer = signers.SimpleSigner.load(
         key_file=key_path,
         cert_file=cert_path
     )
 
     # 3. Sign the PDF
+    # find space untuk embed by creating a container
     with open(input_pdf_path, 'rb') as inf:
         w = IncrementalPdfFileWriter(inf)
         fields.append_signature_field(
             w, sig_field_spec=fields.SigFieldSpec(sig_field_name='Signature1')
         )
-        
+        # fill container with hash
+        # pyhanko handle : hash -> encrypt dengan private key -> embed
         with open(signed_path, 'wb') as outf:
             signers.sign_pdf(
                 w, signers.PdfSignatureMetadata(field_name='Signature1'),
                 signer=signer, output=outf,
             )
 
-    # 4. Calculate Hash
+    # 4. Calculate Hash untuk simpan dalam database & comparison
     sha256_hash = hashlib.sha256()
     with open(signed_path, "rb") as f:
         for byte_block in iter(lambda: f.read(4096), b""):

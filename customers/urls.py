@@ -25,4 +25,6 @@ urlpatterns = [
 
     path('order-success/<int:order_id>/', views.order_success, name='order_success'),
     path('upload-proof/<int:order_id>/', views.upload_payment_proof, name='upload_payment_proof'),
+
+    path('menu/', views.menu, name='menu'),
 ]

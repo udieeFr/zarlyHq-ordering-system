@@ -15,14 +15,15 @@ def verify_pdf_integrity(pdf_path):
 
     # 1. Check if PDF file exists
     if not os.path.exists(pdf_path):
-        print(f"❌ ERROR: File not found at {pdf_path}")
+        print(f" ERROR: File not found at {pdf_path}")
         return
 
     # 2. Define the 'Trusted Authority'
+    # cari certificates
     cert_path = os.path.join('secure_keys', 'zarly_cert.pem')
     
     if not os.path.exists(cert_path):
-        print("❌ CRITICAL: 'zarly_cert.pem' not found in secure_keys folder.")
+        print(" CRITICAL: 'zarly_cert.pem' not found in secure_keys folder.")
         return
 
     # 3. Load the Certificate (Robust PEM/DER handling)
@@ -39,10 +40,11 @@ def verify_pdf_integrity(pdf_path):
                 trusted_cert = x509.Certificate.load(cert_data)
                 
     except Exception as e:
-        print(f"❌ ERROR: Could not load the certificate file. {e}")
+        print(f" ERROR: Could not load the certificate file. {e}")
         return
 
-    # 4. Create a Trust Context
+    # 4. Create a Trust Context 
+    # get public key daripada certificate
     trust_context = ValidationContext(trust_roots=[trusted_cert])
 
     try:
@@ -52,10 +54,10 @@ def verify_pdf_integrity(pdf_path):
             # 5. Find all signatures
             sig_positions = r.embedded_signatures
             if not sig_positions:
-                print("⚠️  RESULT: No digital signature found in this PDF.")
+                print("  RESULT: No digital signature found in this PDF.")
                 return
 
-            print(f"ℹ️  Found {len(sig_positions)} signature(s). Verifying...\n")
+            print(f"ℹ  Found {len(sig_positions)} signature(s). Verifying...\n")
 
             for i, sig in enumerate(sig_positions):
                 # 6. Validate (UPDATED PARAMETER NAME)
@@ -65,6 +67,8 @@ def verify_pdf_integrity(pdf_path):
                 )
                 
                 print(f"--- Signature #{i+1} Analysis ---")
+
+                #check signature siapa
                 try:
                     # Safely get the name
                     signer_name = status.signing_cert.subject.human_friendly
@@ -74,28 +78,28 @@ def verify_pdf_integrity(pdf_path):
                 print(f"   • Signed By: {signer_name}")
                 print(f"   • Timestamp: {status.signer_reported_dt}")
                 
-                # CHECK A: Crypto
+                # CHECK can decrypt or not
                 if status.valid:
-                    print("   • Crypto Check: ✅ VALID (Signature matches Public Key)")
+                    print("   • Crypto Check:  VALID (Signature matches Public Key)")
                 else:
-                    print("   • Crypto Check: ❌ INVALID (Fake or Broken Signature)")
+                    print("   • Crypto Check:  INVALID (Fake or Broken Signature)")
 
-                # CHECK B: Integrity
+                # CHECK temper status
                 if status.intact:
-                    print("   • Integrity:    ✅ INTACT (Document has NOT been modified)")
+                    print("   • Integrity:     INTACT (Document has NOT been modified)")
                 else:
-                    print("   • Integrity:    ❌ TAMPERED (Document was changed after signing!)")
+                    print("   • Integrity:     TAMPERED (Document was changed after signing!)")
 
                 print("-" * 30)
                 
                 # Final Verdict
                 if status.valid and status.intact:
-                    print(f"\n✅ VERDICT: This is an AUTHENTIC Zarly Receipt.")
+                    print(f"\n VERDICT: This is an AUTHENTIC Zarly Receipt.")
                 else:
-                    print(f"\n❌ VERDICT: This receipt is INVALID or TAMPERED.")
+                    print(f"\n VERDICT: This receipt is INVALID or TAMPERED.")
 
     except Exception as e:
-        print(f"❌ ERROR during verification: {e}")
+        print(f" ERROR during verification: {e}")
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:

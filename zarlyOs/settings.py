@@ -132,7 +132,7 @@ STATICFILES_DIRS = [                        # Where Django looks for your own st
 ]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# use own cutome user model, bukan default
+# use own cutom user model, bukan default
 AUTH_USER_MODEL = 'customers.User'
 
 # setting utk authentication
