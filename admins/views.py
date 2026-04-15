@@ -4,14 +4,18 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import login
 from django.utils import timezone
 from django.contrib import messages
+from django.http import JsonResponse
 from .models import Order, DigitalSignature, Complaint
 from .utils import generate_invoice_pdf, sign_pdf_digitally
 import os
+from customers.models import Product, Category, Allergy
 
 def is_sales_admin(user):
+    """Checks if the user has administrative permissions."""
     return user.is_authenticated and user.role in ['sales_admin', 'manager']
 
 def custom_login(request):
+    """Handles admin and manager login redirection."""
     if request.method == 'POST':
         form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
@@ -24,9 +28,109 @@ def custom_login(request):
         form = AuthenticationForm()
     return render(request, 'registration/login.html', {'form': form})
 
+# --- INVENTORY MANAGEMENT (STAGED CHANGES) ---
+
+@login_required
+@user_passes_test(is_sales_admin, login_url='/')
+def inventory_list(request):
+    """View to list all products and manage stock levels with automatic staging."""
+    products = Product.objects.all().order_by('category', 'name')
+    staging = request.session.get('stock_staging', {})
+    
+    inventory_data = []
+    for p in products:
+        staged_val = staging.get(str(p.id))
+        inventory_data.append({
+            'product': p,
+            'staged_stock': staged_val,
+            'has_change': staged_val is not None and int(staged_val) != p.stock
+        })
+        
+    return render(request, 'admins/inventory.html', {
+        'inventory_data': inventory_data,
+        'has_staging': len(staging) > 0,
+        'staging_count': len(staging)
+    })
+
+@login_required
+@user_passes_test(is_sales_admin, login_url='/')
+def stage_stock_update(request, product_id):
+    """Automatically saves a proposed stock change to the session via AJAX."""
+    if request.method == 'POST':
+        new_stock = request.POST.get('stock')
+        staging = request.session.get('stock_staging', {})
+        if new_stock is not None:
+            staging[str(product_id)] = new_stock
+            request.session['stock_staging'] = staging
+            # Return JSON for background requests
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({'status': 'success', 'message': 'Staged'})
+            messages.info(request, "Change updated in summary.")
+    return redirect('inventory_list')
+
+@login_required
+@user_passes_test(is_sales_admin, login_url='/')
+def confirm_stock_changes(request):
+    """Applies all staged changes from the session to the actual database."""
+    staging = request.session.get('stock_staging', {})
+    if request.method == 'POST' and staging:
+        updated_count = 0
+        for p_id, new_val in staging.items():
+            try:
+                product = Product.objects.get(id=p_id)
+                product.stock = int(new_val)
+                product.save()
+                updated_count += 1
+            except Product.DoesNotExist:
+                continue
+        
+        request.session['stock_staging'] = {}
+        messages.success(request, f"Successfully updated {updated_count} items in the inventory.")
+    return redirect('inventory_list')
+
+@login_required
+@user_passes_test(is_sales_admin, login_url='/')
+def clear_stock_staging(request):
+    """Clears the staging area without saving changes."""
+    request.session['stock_staging'] = {}
+    messages.info(request, "All pending changes have been cleared.")
+    return redirect('inventory_list')
+
+@login_required
+@user_passes_test(is_sales_admin, login_url='/')
+def add_product(request):
+    """Form and logic to add a new item to the inventory."""
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        price = request.POST.get('price')
+        stock = request.POST.get('stock')
+        category_id = request.POST.get('category')
+        
+        product = Product.objects.create(
+            name=name,
+            price=price,
+            stock=stock,
+            category_id=category_id
+        )
+        
+        allergy_ids = request.POST.getlist('allergies')
+        if allergy_ids:
+            product.allergies.set(allergy_ids)
+        
+        messages.success(request, f"Product '{name}' added successfully.")
+        return redirect('inventory_list')
+
+    return render(request, 'admins/add_product.html', {
+        'categories': Category.objects.all(),
+        'allergies': Allergy.objects.all()
+    })
+
+# --- DASHBOARD AND ORDERS ---
+
 @login_required
 @user_passes_test(is_sales_admin, login_url='/')
 def sales_admin_dashboard(request):
+    """Main landing page for admins."""
     return render(request, 'admins/sales_admin_dashboard.html', {
         'pending_orders': Order.objects.filter(status='pending').order_by('-created_at'),
         'pending_payment_orders': Order.objects.filter(status='pending_payment').order_by('-created_at'),
@@ -35,13 +139,69 @@ def sales_admin_dashboard(request):
 
 @login_required
 @user_passes_test(is_sales_admin, login_url='/')
+def admin_order_detail(request, order_id):
+    """View complete order info, shipping, and items."""
+    order = get_object_or_404(Order, id=order_id)
+    return render(request, 'admins/order_detail.html', {'order': order})
+
+@login_required
+@user_passes_test(is_sales_admin, login_url='/')
+def set_pending_payment(request, order_id):
+    """Marks order as accepted and requests payment from customer."""
+    order = get_object_or_404(Order, id=order_id)
+    order.status = 'pending_payment'
+    order.save()
+    messages.success(request, f"Order #{order.id} marked as Accepted and Waiting for Payment.")
+    return redirect('sales_admin_dashboard')
+
+@login_required
+@user_passes_test(is_sales_admin, login_url='/')
+def approve_order(request, order_id):
+    """Generates PDF receipt and applies digital signature upon approval."""
+    order = get_object_or_404(Order, id=order_id)
+    if not order.payment_proof:
+        messages.error(request, "Cannot approve: Payment proof missing.")
+        return redirect('admin_order_detail', order_id=order.id)
+    try:
+        raw_pdf = generate_invoice_pdf(order)
+        signed_path, doc_hash = sign_pdf_digitally(raw_pdf, order.id)
+        DigitalSignature.objects.create(
+            order=order, 
+            signature_hash=doc_hash, 
+            pdf_path=os.path.join('signed_pdfs', os.path.basename(signed_path)),
+        )
+        order.status = 'approved'
+        order.approved_at = timezone.now()
+        order.approved_by = request.user
+        order.save()
+        messages.success(request, f"Order #{order.id} Approved and Digitally Signed.")
+    except Exception as e:
+        messages.error(request, f"Error signing document: {str(e)}")
+    return redirect('sales_admin_dashboard')
+
+@login_required
+@user_passes_test(is_sales_admin, login_url='/')
+def reject_order(request, order_id):
+    """Rejects the order."""
+    order = get_object_or_404(Order, id=order_id)
+    order.status = 'rejected'
+    order.save()
+    messages.warning(request, f"Order #{order.id} Rejected.")
+    return redirect('sales_admin_dashboard')
+
+# --- COMPLAINTS ---
+
+@login_required
+@user_passes_test(is_sales_admin, login_url='/')
 def admin_complaints_list(request):
+    """Lists all customer complaints."""
     complaints = Complaint.objects.all().order_by('-created_at')
     return render(request, 'admins/complaint_list.html', {'complaints': complaints})
 
 @login_required
 @user_passes_test(is_sales_admin, login_url='/')
 def admin_complaint_detail(request, complaint_id):
+    """Detailed view for specific complaint validation."""
     complaint = get_object_or_404(Complaint, id=complaint_id)
     return render(request, 'admins/complaint_detail.html', {
         'complaint': complaint,
@@ -52,9 +212,9 @@ def admin_complaint_detail(request, complaint_id):
 @login_required
 @user_passes_test(is_sales_admin, login_url='/')
 def resolve_complaint(request, complaint_id):
+    """Applies resolution action to a complaint."""
     complaint = get_object_or_404(Complaint, id=complaint_id)
     if request.method == 'POST':
-        # Retrieve the specific action chosen from the dropdown
         action = request.POST.get('action_taken')
         if action:
             complaint.action_taken = action
@@ -65,49 +225,3 @@ def resolve_complaint(request, complaint_id):
             messages.error(request, "Please select an action before resolving.")
         return redirect('admin_complaints_list')
     return redirect('admin_complaint_detail', complaint_id=complaint.id)
-
-@login_required
-@user_passes_test(is_sales_admin, login_url='/')
-def approve_order(request, order_id):
-    order = get_object_or_404(Order, id=order_id)
-    if not order.payment_proof:
-        messages.error(request, "Cannot approve: Payment proof missing.")
-        return redirect('sales_admin_dashboard')
-    try:
-        raw_pdf = generate_invoice_pdf(order)
-        signed_path, doc_hash = sign_pdf_digitally(raw_pdf, order.id)
-        DigitalSignature.objects.create(
-            order=order, signature_hash=doc_hash, pdf_path=os.path.join('signed_pdfs', os.path.basename(signed_path)),
-        )
-        order.status = 'approved'
-        order.approved_at = timezone.now()
-        order.approved_by = request.user
-        order.save()
-        messages.success(request, f"Order #{order.id} Approved & Digitally Signed!")
-    except Exception as e:
-        messages.error(request, f"Error signing document: {str(e)}")
-    return redirect('sales_admin_dashboard')
-
-@login_required
-@user_passes_test(is_sales_admin, login_url='/')
-def reject_order(request, order_id):
-    order = get_object_or_404(Order, id=order_id)
-    order.status = 'rejected'
-    order.save()
-    messages.warning(request, f"Order #{order.id} Rejected.")
-    return redirect('sales_admin_dashboard')
-
-@login_required
-@user_passes_test(is_sales_admin, login_url='/')
-def admin_order_detail(request, order_id):
-    order = get_object_or_404(Order, id=order_id)
-    return render(request, 'admins/order_detail.html', {'order': order})
-
-@login_required
-@user_passes_test(is_sales_admin, login_url='/')
-def set_pending_payment(request, order_id):
-    order = get_object_or_404(Order, id=order_id)
-    order.status = 'pending_payment'
-    order.save()
-    messages.success(request, f"Order #{order.id} marked as 'Accepted & Waiting for Payment'")
-    return redirect('sales_admin_dashboard')

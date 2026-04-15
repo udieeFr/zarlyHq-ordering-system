@@ -48,9 +48,9 @@
                         </select>
                     </div>
                     <div class="col-md-5">
-                        <label class="form-label small fw-bold">Allergies</label>
+                        <label class="form-label small fw-bold">Allergies concern</label>
                         <select name="allergy" class="form-select" onchange="this.form.submit()">
-                            <option value="">All Products ✅ Safe</option>
+                            <option value="">None</option>
                             {% for al in allergies %}
                                 <option value="{{ al.id }}" {% if request.GET.allergy == al.id|stringformat:"s" %}selected{% endif %}>Contains {{ al.name }} ⚠️</option>
                             {% endfor %}
@@ -140,7 +140,7 @@
             </div>
 
             <button class="btn btn-danger w-100 py-3 fw-bold shadow-sm" style="border-radius: 15px;" data-bs-toggle="modal" data-bs-target="#compModal">
-                Report Issue ⚠️
+                File a complaint
             </button>
         </div>
     </div>

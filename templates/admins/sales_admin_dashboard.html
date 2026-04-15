@@ -4,9 +4,9 @@
     <div class="d-flex justify-content-between align-items-center mb-4 px-3">
         <h1 class="h3 fw-bold">Admin dashboard</h1>
         <div class="d-flex gap-2">
-            <a href="{% url 'admin_complaints_list' %}" class="btn btn-danger fw-bold">Manage Complaints ⚠️</a>
-            <a href="{% url 'product_list' %}" class="btn btn-dark">Storefront</a>
-        </div>
+    <a href="{% url 'admin_complaints_list' %}" class="btn btn-danger fw-bold">Manage Complaints </a>
+    <a href="{% url 'inventory_list' %}" class="btn btn-dark">Manage Inventory</a>
+</div>
     </div>
 
     <div class="row g-4">
@@ -42,7 +42,7 @@
 
         <div class="col-lg-5">
     <div class="card border-0 shadow-sm p-4 rounded-4 bg-white">
-        <h5 class="fw-bold mb-3 text-muted">Recent Completions</h5>
+        <h5 class="fw-bold mb-3 text-muted">Accepted Orders</h5>
         {% for order in accepted_orders %}
         <div class="d-flex justify-content-between align-items-center p-3 mb-2 bg-white border rounded">
             <div>
@@ -67,11 +67,7 @@
         {% endfor %}
     </div>
 
-    <div class="card bg-dark text-white p-4 mt-4 border-0 shadow-sm rounded-4">
-        <h6 class="fw-bold mb-2">Security Engine Status</h6>
-        <p class="small opacity-75 mb-0">Digital Signature (SHA-256): <span class="text-success">Active</span></p>
-        <p class="small opacity-75">Non-Repudiation Logs: <span class="text-success">Synchronized</span></p>
-    </div>
+    
 </div>
     </div>
 </div>
