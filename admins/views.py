@@ -14,19 +14,41 @@ def is_sales_admin(user):
     """Checks if the user has administrative permissions."""
     return user.is_authenticated and user.role in ['sales_admin', 'manager']
 
-def custom_login(request):
-    """Handles admin and manager login redirection."""
+def admin_login(request):
+    """Handles admin login."""
     if request.method == 'POST':
         form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
-            login(request, user)
             if user.role in ['sales_admin', 'manager']:
+                login(request, user)
                 return redirect('sales_admin_dashboard')
-            return redirect('product_list')
+            else:
+                form.add_error(None, "You do not have admin privileges.")
+        return render(request, 'registration/admin_login.html', {'form': form})
     else:
         form = AuthenticationForm()
-    return render(request, 'registration/login.html', {'form': form})
+    return render(request, 'registration/admin_login.html', {'form': form})
+
+def customer_login(request):
+    """Handles customer login."""
+    if request.method == 'POST':
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            if user.role == 'customer':
+                login(request, user)
+                return redirect('product_list')
+            else:
+                form.add_error(None, "Invalid customer credentials.")
+        return render(request, 'registration/customer_login.html', {'form': form})
+    else:
+        form = AuthenticationForm()
+    return render(request, 'registration/customer_login.html', {'form': form})
+
+def custom_login(request):
+    """Legacy login - redirects to appropriate login page."""
+    return redirect('customer_login')
 
 # --- INVENTORY MANAGEMENT (STAGED CHANGES) ---
 

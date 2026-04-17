@@ -171,3 +171,72 @@ body {
     text-align: center;
     padding: 40px 0;
 }
+
+/* ==============================================
+   Login Page Styles
+   ============================================== */
+
+/* Login Container */
+.login-container {
+    max-width: 500px;
+    margin-top: 50px;
+}
+
+/* Login Selection Container */
+.login-selection-container {
+    margin-top: 50px;
+}
+
+/* Login Card Styles */
+.login-card {
+    border-radius: 15px;
+}
+
+.login-card .card-header {
+    border-radius: 15px 15px 0 0 !important;
+}
+
+/* Admin Login Specific */
+.admin-login .card {
+    border-color: #ffc107;
+}
+
+.admin-login .btn-warning {
+    background-color: #ffc107;
+    border-color: #ffc107;
+}
+
+.admin-login .btn-warning:hover {
+    background-color: #e0a800;
+    border-color: #d39e00;
+}
+
+.admin-login .form-control:focus {
+    border-color: #ffc107;
+    box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
+}
+
+/* Customer Login Specific */
+.customer-login .card {
+    border-color: #007bff;
+}
+
+.customer-login .btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.customer-login .btn-primary:hover {
+    background-color: #0056b3;
+    border-color: #004085;
+}
+
+.customer-login .form-control:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.customer-login .btn-outline-secondary:hover {
+    background-color: #6c757d;
+    border-color: #6c757d;
+}

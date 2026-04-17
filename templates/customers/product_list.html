@@ -2,93 +2,90 @@
 {% load static %}
 
 {% block content %}
-<style>
-    /* Styling to grey out out-of-stock items */
-    .out-of-stock {
-        filter: grayscale(1);
-        opacity: 0.6;
-        cursor: not-allowed;
-        position: relative;
-    }
-    .out-of-stock .btn {
-        pointer-events: none;
-    }
-    .stock-badge {
-        position: absolute;
-        top: 15px;
-        right: 15px;
-        z-index: 5;
-    }
-    /* Product Card Hover Effects */
-    .product-card {
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-        border-radius: 15px;
-        overflow: hidden;
-    }
-    .product-card:hover:not(.out-of-stock) {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
-    }
-</style>
+<div class="container py-4 menu-page">
+    <div class="menu-heading mb-4">
+        <div>
+            <p class="eyebrow">Food Menu</p>
+            <h1>Popular Delicious Foods</h1>
+        </div>
+        <div class="menu-pill-row">
+            <a href="{% url 'product_list' %}" class="pill {% if not request.GET.category %}pill-active{% endif %}">All Menu</a>
+            {% for cat in categories %}
+                <a href="?category={{ cat.id }}" class="pill {% if request.GET.category == cat.id|stringformat:"s" %}pill-active{% endif %}">{{ cat.name }}</a>
+            {% endfor %}
+        </div>
+    </div>
 
-<div class="container py-4">
-    <div class="row">
-        <div class="col-lg-9">
-            <h2 class="fw-bold mb-4">Our Menu</h2>
-
-            <div class="card p-3 mb-4 border-0 shadow-sm bg-light" style="border-radius: 15px;">
-                <form method="get" class="row g-2 align-items-end">
-                    <div class="col-md-5">
-                        <label class="form-label small fw-bold">By Category</label>
-                        <select name="category" class="form-select" onchange="this.form.submit()">
-                            <option value="">All Categories</option>
-                            {% for cat in categories %}
-                                <option value="{{ cat.id }}" {% if request.GET.category == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-5">
-                        <label class="form-label small fw-bold">Allergies concern</label>
-                        <select name="allergy" class="form-select" onchange="this.form.submit()">
-                            <option value="">None</option>
-                            {% for al in allergies %}
-                                <option value="{{ al.id }}" {% if request.GET.allergy == al.id|stringformat:"s" %}selected{% endif %}>Contains {{ al.name }} ⚠️</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <a href="{% url 'product_list' %}" class="btn btn-outline-secondary w-100">Reset</a>
-                    </div>
-                </form>
+    <div class="card filter-card mb-4">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-5">
+                <label class="form-label small fw-bold">By Category</label>
+                <select name="category" class="form-select" onchange="this.form.submit()">
+                    <option value="">All Categories</option>
+                    {% for cat in categories %}
+                        <option value="{{ cat.id }}" {% if request.GET.category == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
             </div>
+            <div class="col-md-5">
+                <label class="form-label small fw-bold">Allergies concern</label>
+                <select name="allergy" class="form-select" onchange="this.form.submit()">
+                    <option value="">None</option>
+                    {% for al in allergies %}
+                        <option value="{{ al.id }}" {% if request.GET.allergy == al.id|stringformat:"s" %}selected{% endif %}>Contains {{ al.name }} ⚠️</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <a href="{% url 'product_list' %}" class="btn btn-outline-secondary w-100">Reset</a>
+            </div>
+        </form>
+    </div>
 
-            <div class="row g-4">
+    <div class="row g-4">
                 {% for p in products %}
                 <div class="col-md-4">
                     <div class="card h-100 border-0 shadow-sm product-card {% if p.stock <= 0 %}out-of-stock{% endif %}">
                         {% if p.stock <= 0 %}
                             <span class="badge bg-danger stock-badge">SOLD OUT</span>
                         {% endif %}
-
-                        <img src="{% if p.image %}{{ p.image.url }}{% else %}{% static 'images/products/promo1.jpg' %}{% endif %}" class="card-img-top" style="height: 200px; object-fit: cover;">
-                        
-                        <div class="card-body">
-                            <h5 class="fw-bold">{{ p.name }}</h5>
-                            <p class="text-primary fw-bold mb-1">RM {{ p.price }}</p>
-                            <p class="small text-muted mb-3">Available: {{ p.stock }} units</p>
-                            
-                            {% if p.stock > 0 %}
-                                <form method="post" action="{% url 'add_to_cart' %}">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="product_id" value="{{ p.id }}">
-                                    <div class="input-group input-group-sm">
-                                        <input type="number" name="quantity" value="1" min="1" max="{{ p.stock }}" class="form-control text-center">
-                                        <button type="submit" class="btn btn-primary">Add to Cart</button>
-                                    </div>
-                                </form>
-                            {% else %}
-                                <button class="btn btn-secondary w-100 btn-sm" disabled>Out of Stock</button>
+                        <div class="product-image">
+                            <img src="{% if p.image %}{{ p.image.url }}{% else %}{% static 'images/products/promo1.jpg' %}{% endif %}" alt="{{ p.name }}">
+                            {% if p.category %}
+                                <span class="category-chip">{{ p.category.name }}</span>
                             {% endif %}
+                        </div>
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="product-title">{{ p.name }}</h5>
+                            <div class="product-rating">
+                                <span class="stars">★★★★★</span>
+                                <span class="rating-count">({{ p.stock|add:20 }})</span>
+                            </div>
+                            <div class="product-details">
+                                <p class="price">RM {{ p.price }}</p>
+                                {% if p.stock > 0 %}
+                                    <p class="text-muted">Available: {{ p.stock }} units</p>
+                                {% else %}
+                                    <p class="text-muted">Currently unavailable</p>
+                                {% endif %}
+                            </div>
+
+                            <div class="product-actions mt-auto">
+                                {% if p.stock > 0 %}
+                                    <form method="post" action="{% url 'add_to_cart' %}" class="d-flex gap-2 align-items-center">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="product_id" value="{{ p.id }}">
+                                        <input type="number" name="quantity" value="1" min="1" max="{{ p.stock }}" class="form-control quantity-input">
+                                        <button type="submit" class="btn btn-primary add-cart-btn">Add To Cart</button>
+                                    </form>
+                                {% else %}
+                                    <button class="btn btn-secondary w-100 btn-sm" disabled>Out of Stock</button>
+                                {% endif %}
+                                <div class="icon-actions mt-3 d-flex gap-2 justify-content-center">
+                                    <button type="button" class="icon-btn">♡</button>
+                                    <button type="button" class="icon-btn">👁</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -101,34 +98,34 @@
         </div>
 
         <div class="col-lg-3">
-            <div class="card bg-primary text-white p-3 mb-4 shadow-sm border-0" style="border-radius: 15px;">
+            <div class="card sidebar-widget bg-primary text-white mb-4">
                 <h5 class="fw-bold mb-1 text-center">Your Cart 🛒</h5>
                 <p class="small text-center opacity-75 mb-3">You have **{{ cart_count|default:"0" }}** items.</p>
                 <a href="{% url 'cart' %}" class="btn btn-light btn-sm w-100 fw-bold py-2">View My Cart</a>
             </div>
 
-            <div class="card p-3 shadow-sm border-0 mb-4" style="border-radius: 15px;">
+            <div class="card sidebar-widget mb-4">
                 <h6 class="fw-bold border-bottom pb-2 mb-3">My Recent Orders</h6>
                 {% for o in user_orders %}
-                    <div class="mb-3 small border-bottom pb-2">
+                    <div class="mb-3 small border-bottom pb-2 recent-order">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <span class="fw-bold text-primary">#{{ o.id }}</span>
-                            <span class="badge {% if o.status == 'approved' %}bg-success text-white{% elif o.status == 'pending_payment' %}bg-info text-white{% else %}bg-secondary text-white{% endif %}" style="font-size: 0.6rem;">
+                            <span class="badge order-status-badge {% if o.status == 'approved' %}bg-success text-white{% elif o.status == 'pending_payment' %}bg-info text-white{% else %}bg-secondary text-white{% endif %}">
                                 {{ o.status|capfirst }}
                             </span>
                         </div>
                         
                         <div class="mt-2 d-grid gap-1">
-                            <a href="{% url 'order_success' o.id %}" class="btn btn-xs btn-outline-dark w-100" style="font-size: 0.7rem;">
+                            <a href="{% url 'order_success' o.id %}" class="btn btn-sm btn-outline-dark w-100 order-link">
                                 {% if o.status == 'pending_payment' %}Pay Now & Details{% else %}View Details{% endif %}
                             </a>
                             
                             {% if o.status == 'approved' and o.digital_signature %}
-                                <a href="{{ o.digital_signature.pdf_path.url }}" class="btn btn-sm btn-success w-100" style="font-size: 0.7rem;" download>
+                                <a href="{{ o.digital_signature.pdf_path.url }}" class="btn btn-sm btn-success w-100 order-link" download>
                                      Download Receipt 📄
                                 </a>
                             {% elif o.status == 'pending_payment' %}
-                                <a href="{% url 'download_invoice' o.id %}" class="btn btn-sm btn-info text-white w-100" style="font-size: 0.7rem;">
+                                <a href="{% url 'download_invoice' o.id %}" class="btn btn-sm btn-info text-white w-100 order-link">
                                     Download Invoice 🧾
                                 </a>
                             {% endif %}
@@ -139,7 +136,7 @@
                 {% endfor %}
             </div>
 
-            <button class="btn btn-danger w-100 py-3 fw-bold shadow-sm" style="border-radius: 15px;" data-bs-toggle="modal" data-bs-target="#compModal">
+            <button class="btn btn-danger w-100 py-3 fw-bold shadow-sm rounded-4" data-bs-toggle="modal" data-bs-target="#compModal">
                 File a complaint
             </button>
         </div>
@@ -148,7 +145,7 @@
 
 <div class="modal fade" id="compModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content border-0 shadow" style="border-radius: 20px;">
+        <div class="modal-content border-0 shadow rounded-4">
             <div class="modal-header bg-danger text-white border-0">
                 <h5 class="modal-title fw-bold">Customer Complaint</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -164,7 +161,7 @@
                                 <option value="{{ o.id }}">Order #{{ o.id }} (RM {{ o.total_amount }})</option>
                             {% endfor %}
                         </select>
-                        <p class="text-muted" style="font-size: 0.7rem; margin-top: 5px;">Only orders with a signed receipt can be reported for security and audit purposes.</p>
+                        <p class="text-muted small order-note">Only orders with a signed receipt can be reported for security and audit purposes.</p>
                     </div>
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Subject</label>

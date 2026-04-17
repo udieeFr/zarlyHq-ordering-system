@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.shortcuts import redirect
-from admins.views import custom_login
+from admins.views import admin_login, customer_login, custom_login
 from django.conf import settings               # <--- Add this
 from django.conf.urls.static import static
 
@@ -34,7 +34,9 @@ def home_redirect(request):
 urlpatterns = [
     path('admin/', admin.site.urls),  # Django admin stays here
     path('', home_redirect, name='home'),  # Root redirects based on role
-    path('login/', custom_login, name='login'),
+    path('login/admin/', admin_login, name='admin_login'),
+    path('login/customer/', customer_login, name='customer_login'),
+    path('login/', custom_login, name='login'),  # Legacy redirect
     path('dashboard/', include('admins.urls')),  # All admin URLs under /dashboard/
     path('menu/', include('customers.urls')),  # All customer URLs under /menu/
 ]
