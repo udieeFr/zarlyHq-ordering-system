@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
 from django.contrib import messages
 from django.http import HttpResponse  # Required for PDF downloads
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from .models import Product, Category, Allergy
 from admins.models import Order, OrderItem, Complaint
 from admins.utils import generate_invoice_pdf  # The PDF generation engine
@@ -61,7 +62,17 @@ def product_list(request):
     elif allergy_id:
         products = products.filter(allergies__id=allergy_id).distinct()
 
-    # 2. Sidebar and UI Data
+    # 2. Pagination
+    paginator = Paginator(products.order_by('name'), 12)
+    page_number = request.GET.get('page', 1)
+    try:
+        product_page = paginator.page(page_number)
+    except PageNotAnInteger:
+        product_page = paginator.page(1)
+    except EmptyPage:
+        product_page = paginator.page(paginator.num_pages)
+
+    # 3. Sidebar and UI Data
     cart = request.session.get('cart', {})
     cart_count = sum(cart.values())
 
@@ -74,7 +85,9 @@ def product_list(request):
         completed_orders = Order.objects.filter(customer=request.user, status='approved')
 
     return render(request, 'customers/product_list.html', {
-        'products': products,
+        'products': product_page,
+        'page_obj': product_page,
+        'paginator': paginator,
         'categories': Category.objects.all(),
         'allergies': Allergy.objects.all(),
         'cart_count': cart_count,

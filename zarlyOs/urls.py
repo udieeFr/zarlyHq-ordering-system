@@ -17,28 +17,42 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.shortcuts import redirect
-from admins.views import admin_login, customer_login, custom_login
+from admins.views import unified_login, logout_view, dashboard_home, admin_login, customer_login, custom_login
 from django.conf import settings               # <--- Add this
 from django.conf.urls.static import static
 
 def home_redirect(request):
     """Redirect based on user role after accessing root"""
     if request.user.is_authenticated:
-        if request.user.role in ['sales_admin', 'manager']:
+        if request.user.role == 'customer':
+            return redirect('product_list')
+        elif request.user.role in ['sales_admin', 'manager'] or request.user.is_superuser:
             return redirect('sales_admin_dashboard')
         else:
-            return redirect('product_list')
+            return redirect('login')
     else:
         return redirect('login')
 
 urlpatterns = [
-    path('admin/', admin.site.urls),  # Django admin stays here
-    path('', home_redirect, name='home'),  # Root redirects based on role
+    # Admin
+    path('admin/', admin.site.urls),
+    
+    # Root redirects based on auth status
+    path('', home_redirect, name='home'),
+    
+    # Unified Authentication (New)
+    path('login/', unified_login, name='login'),
+    path('logout/', logout_view, name='logout'),
+    path('home/', dashboard_home, name='dashboard_home'),
+    
+    # Legacy login URLs (kept for backwards compatibility)
     path('login/admin/', admin_login, name='admin_login'),
     path('login/customer/', customer_login, name='customer_login'),
-    path('login/', custom_login, name='login'),  # Legacy redirect
+    path('login/legacy/', custom_login, name='legacy_login'),
+    
+    # App URLs
     path('dashboard/', include('admins.urls')),  # All admin URLs under /dashboard/
-    path('menu/', include('customers.urls')),  # All customer URLs under /menu/
+    path('menu/', include('customers.urls')),    # All customer URLs under /menu/
 ]
 
 if settings.DEBUG:

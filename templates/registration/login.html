@@ -1,20 +1,173 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
-<div class="container text-center login-selection-container">
-    <div class="card shadow">
-        <div class="card-body">
-            <h3>Choose Login Type</h3>
-            <p>Please select how you would like to log in:</p>
-            <div class="d-grid gap-2 col-6 mx-auto">
-                <a href="{% url 'customer_login' %}" class="btn btn-primary btn-lg">
-                    <i class="fas fa-utensils"></i> Customer Login
-                </a>
-                <a href="{% url 'admin_login' %}" class="btn btn-warning btn-lg">
-                    <i class="fas fa-user-shield"></i> Admin Login
-                </a>
+<div class="container py-5">
+    <div class="row justify-content-center min-vh-100 align-items-center">
+        <div class="col-md-5">
+            <!-- Login Card -->
+            <div class="card border-0 shadow-lg">
+                <div class="card-body p-5">
+                    <!-- Header -->
+                    <div class="text-center mb-4">
+                        <div class="mb-3">
+                            <span style="font-size: 3rem;">🍊</span>
+                        </div>
+                        <h2 class="fw-bold mb-2">Zarly BigFood</h2>
+                        <p class="text-muted mb-4">Welcome to our ordering system</p>
+                    </div>
+
+                    <!-- Error Messages -->
+                    {% if form.errors or form.non_field_errors %}
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <strong>Login Failed</strong>
+                        {% for field, errors in form.errors.items %}
+                            {% for error in errors %}
+                                <div>{{ error }}</div>
+                            {% endfor %}
+                        {% endfor %}
+                        {% if form.non_field_errors %}
+                            {% for error in form.non_field_errors %}
+                                <div>{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endif %}
+
+                    <!-- Login Form -->
+                    <form method="post" class="mb-4">
+                        {% csrf_token %}
+                        
+                        <!-- Hidden next parameter -->
+                        <input type="hidden" name="next" value="{{ request.GET.next|default:'/' }}">
+
+                        <!-- Username Field -->
+                        <div class="mb-3">
+                            <label for="{{ form.username.id_for_label }}" class="form-label fw-bold small">
+                                Username or Email
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-end-0">👤</span>
+                                {{ form.username }}
+                            </div>
+                        </div>
+
+                        <!-- Password Field -->
+                        <div class="mb-4">
+                            <label for="{{ form.password.id_for_label }}" class="form-label fw-bold small">
+                                Password
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-end-0">🔒</span>
+                                {{ form.password }}
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold mb-3">
+                            <span>Sign In</span>
+                        </button>
+                    </form>
+
+                    <!-- Divider -->
+                    <div class="position-relative mb-4">
+                        <hr class="text-muted">
+                        <span class="position-absolute top-50 start-50 translate-middle bg-white px-2 text-muted small">or</span>
+                    </div>
+
+                    <!-- Guest Access -->
+                    <a href="{% url 'product_list' %}" class="btn btn-outline w-100 py-2 fw-bold mb-3">
+                        <span>👁️ Browse as Guest</span>
+                    </a>
+
+                    <!-- Role Information -->
+                    <div class="row g-2 mt-4 pt-3 border-top">
+                        <div class="col-6">
+                            <div class="p-3 bg-light rounded text-center small">
+                                <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">👥</div>
+                                <strong>Customer?</strong>
+                                <p class="text-muted mb-0" style="font-size: 0.85rem;">Order food & track status</p>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="p-3 bg-light rounded text-center small">
+                                <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">⚙️</div>
+                                <strong>Staff?</strong>
+                                <p class="text-muted mb-0" style="font-size: 0.85rem;">Access your dashboard</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Register Link -->
+                    <div class="text-center mt-4 pt-3 border-top">
+                        <p class="text-muted small mb-0">
+                            Don't have an account? <br>
+                            Contact staff to register
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Info -->
+            <div class="text-center mt-4">
+                <p class="text-muted small">
+                    Protected access • Role-based system • Secure login
+                </p>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    .form-control, .input-group-text {
+        border-radius: 8px;
+        border: 2px solid #e2e8f0;
+        font-size: 0.95rem;
+    }
+
+    .form-control:focus {
+        border-color: #0f172a;
+        box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.1);
+    }
+
+    .input-group-text {
+        background: white;
+        border-right: none;
+    }
+
+    .input-group .form-control {
+        border-left: none;
+    }
+
+    .btn-primary {
+        background-color: #0f172a;
+        border-color: #0f172a;
+    }
+
+    .btn-primary:hover {
+        background-color: #1e293b;
+        border-color: #1e293b;
+    }
+
+    .btn-outline {
+        background: transparent;
+        border: 2px solid #e2e8f0;
+        color: #0f172a;
+    }
+
+    .btn-outline:hover {
+        background-color: #f8fafc;
+        border-color: #0f172a;
+        color: #0f172a;
+    }
+
+    .min-vh-100 {
+        min-height: 100vh;
+    }
+
+    .card {
+        border-radius: 12px;
+    }
+</style>
 {% endblock %}

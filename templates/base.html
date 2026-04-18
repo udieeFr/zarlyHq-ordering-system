@@ -10,19 +10,151 @@
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container">
-            <a class="navbar-brand" href="/">Zarly BigFood</a>
-            <div>
-                {% if user.is_authenticated %}
-                    Welcome, {{ user.username }} | 
-                    <a href="{% url 'logout' %}" class="text-white">Logout</a>
+    <nav class="navbar-custom">
+        <div class="container-fluid navbar-content">
+            <a class="navbar-logo" href="/">
+                <span class="logo-icon">🍊</span>
+                <span class="logo-text">Zarly BigFood</span>
+            </a>
+            <div class="navbar-menu">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/" class="nav-link">About</a>
+                <a href="{% url 'product_list' %}" class="nav-link active-nav">Menu</a>
+                <a href="/" class="nav-link">Chefs</a>
+                <a href="/" class="nav-link">Pages</a>
+                <a href="/" class="nav-link">Blog</a>
+                <a href="/" class="nav-link">Contact</a>
+            </div>
+            <div class="navbar-right">
+                <div class="cart-badge">
+                    <a href="{% url 'cart' %}" class="cart-link">🛒</a>
+                    <span class="badge-count">05</span>
+                </div>
+                
+                <!-- User Authentication Menu -->
+                {% if request.user.is_authenticated %}
+                <div class="user-dropdown">
+                    <button class="user-link" type="button" id="userMenuBtn" style="background: none; border: none; cursor: pointer; font-size: 1.35rem;">
+                        👤
+                    </button>
+                    <div class="user-dropdown-menu">
+                        <div class="dropdown-header">
+                            <strong>{{ request.user.username }}</strong><br>
+                            <small class="text-muted">
+                                {% if request.user.is_superuser %}
+                                    Superuser
+                                {% elif request.user.role == 'customer' %}
+                                    Customer
+                                {% elif request.user.role == 'sales_admin' %}
+                                    Sales Admin
+                                {% elif request.user.role == 'manager' %}
+                                    Manager
+                                {% endif %}
+                            </small>
+                        </div>
+                        <hr style="margin: 0.5rem 0;">
+                        
+                        {% if request.user.role == 'customer' %}
+                            <a href="{% url 'product_list' %}" class="dropdown-item">📦 Browse Menu</a>
+                            <a href="{% url 'cart' %}" class="dropdown-item">🛒 Cart</a>
+                        {% elif request.user.is_superuser or request.user.role in 'manager|sales_admin' %}
+                            <a href="{% url 'sales_admin_dashboard' %}" class="dropdown-item">📊 Dashboard</a>
+                            {% if request.user.is_superuser or request.user.role == 'manager' %}
+                                <a href="{% url 'manager_analytics_view' %}" class="dropdown-item">📈 Analytics</a>
+                                <a href="{% url 'admin:index' %}" class="dropdown-item">⚙️ Django Admin</a>
+                            {% endif %}
+                            <a href="{% url 'inventory_list' %}" class="dropdown-item">📦 Inventory</a>
+                            <a href="{% url 'admin_complaints_list' %}" class="dropdown-item">🚨 Complaints</a>
+                        {% endif %}
+                        
+                        <hr style="margin: 0.5rem 0;">
+                        <a href="{% url 'logout' %}" class="dropdown-item text-danger">🚪 Logout</a>
+                    </div>
+                </div>
                 {% else %}
-                    <a href="{% url 'login' %}?next={{ request.path }}" class="text-white">Login</a>
+                <a href="{% url 'login' %}" class="user-link" title="Login">👤</a>
                 {% endif %}
             </div>
         </div>
     </nav>
+
+    <!-- User Dropdown Menu Styles and Script -->
+    <style>
+        .user-dropdown {
+            position: relative;
+        }
+
+        .user-dropdown-menu {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 100%;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            min-width: 200px;
+            z-index: 1000;
+            margin-top: 0.5rem;
+        }
+
+        .user-dropdown-menu.active {
+            display: block;
+        }
+
+        .dropdown-header {
+            padding: 0.75rem 1rem;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .dropdown-item {
+            display: block;
+            padding: 0.75rem 1rem;
+            color: #0f172a;
+            text-decoration: none;
+            transition: all 0.2s;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+        }
+
+        .dropdown-item:hover {
+            background-color: #f1f5f9;
+            padding-left: 1.25rem;
+        }
+
+        .dropdown-item.text-danger {
+            color: #ef4444;
+        }
+
+        .dropdown-item.text-danger:hover {
+            background-color: #fef2f2;
+        }
+    </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const userMenuBtn = document.getElementById('userMenuBtn');
+            const userDropdownMenu = document.querySelector('.user-dropdown-menu');
+            
+            if (userMenuBtn && userDropdownMenu) {
+                userMenuBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    userDropdownMenu.classList.toggle('active');
+                });
+                
+                document.addEventListener('click', function(e) {
+                    if (!e.target.closest('.user-dropdown')) {
+                        userDropdownMenu.classList.remove('active');
+                    }
+                });
+            }
+        });
+    </script>
+
     <div class="container mt-4">
         {% comment %}
         {% if messages %}

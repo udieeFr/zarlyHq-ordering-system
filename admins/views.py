@@ -1,59 +1,117 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import AuthenticationForm
-from django.contrib.auth import login
+from django.contrib.auth import login, logout
 from django.utils import timezone
 from django.contrib import messages
 from django.http import JsonResponse
 from .models import Order, DigitalSignature, Complaint
 from .utils import generate_invoice_pdf, sign_pdf_digitally
+from customers.auth_utils import (
+    sales_admin_required, 
+    manager_required, 
+    role_required, 
+    get_user_dashboard_url
+)
 import os
 from customers.models import Product, Category, Allergy
 
 def is_sales_admin(user):
     """Checks if the user has administrative permissions."""
-    return user.is_authenticated and user.role in ['sales_admin', 'manager']
+    return user.is_authenticated and (user.role in ['sales_admin', 'manager'] or user.is_superuser)
+
+def unified_login(request):
+    """
+    Unified login view that redirects users to appropriate dashboard based on role.
+    Serves as the main login endpoint for the system.
+    """
+    if request.user.is_authenticated:
+        # Already logged in, redirect to dashboard
+        return redirect(get_user_dashboard_url(request.user))
+    
+    if request.method == 'POST':
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            
+            # Redirect based on user role
+            next_url = request.POST.get('next') or request.GET.get('next')
+            if next_url and next_url != '/':
+                return redirect(next_url)
+            
+            # Role-based redirect
+            dashboard_url = get_user_dashboard_url(user)
+            return redirect(dashboard_url)
+        else:
+            messages.error(request, "Invalid username or password.")
+    else:
+        form = AuthenticationForm()
+    
+    return render(request, 'registration/login.html', {'form': form})
 
 def admin_login(request):
-    """Handles admin login."""
-    if request.method == 'POST':
-        form = AuthenticationForm(request, data=request.POST)
-        if form.is_valid():
-            user = form.get_user()
-            if user.role in ['sales_admin', 'manager']:
-                login(request, user)
-                return redirect('sales_admin_dashboard')
-            else:
-                form.add_error(None, "You do not have admin privileges.")
-        return render(request, 'registration/admin_login.html', {'form': form})
-    else:
-        form = AuthenticationForm()
-    return render(request, 'registration/admin_login.html', {'form': form})
+    """Legacy admin login - redirects to unified login."""
+    if request.user.is_authenticated:
+        return redirect('dashboard_home')
+    return redirect('login')
 
 def customer_login(request):
-    """Handles customer login."""
-    if request.method == 'POST':
-        form = AuthenticationForm(request, data=request.POST)
-        if form.is_valid():
-            user = form.get_user()
-            if user.role == 'customer':
-                login(request, user)
-                return redirect('product_list')
-            else:
-                form.add_error(None, "Invalid customer credentials.")
-        return render(request, 'registration/customer_login.html', {'form': form})
-    else:
-        form = AuthenticationForm()
-    return render(request, 'registration/customer_login.html', {'form': form})
+    """Legacy customer login - redirects to unified login."""
+    if request.user.is_authenticated:
+        return redirect('product_list')
+    return redirect('login')
 
 def custom_login(request):
-    """Legacy login - redirects to appropriate login page."""
-    return redirect('customer_login')
+    """Legacy login - redirects to unified login."""
+    return redirect('login')
+
+@login_required
+def logout_view(request):
+    """Handles user logout."""
+    logout(request)
+    messages.success(request, "You have been logged out successfully.")
+    return redirect('product_list')
+
+# --- DASHBOARD ROUTING ---
+
+@login_required
+def dashboard_home(request):
+    """
+    Universal dashboard home that routes to appropriate dashboard based on role.
+    This is the main entry point after login.
+    """
+    if request.user.role == 'customer':
+        return redirect('product_list')
+    elif request.user.role in ['sales_admin', 'manager'] or request.user.is_superuser:
+        return redirect('sales_admin_dashboard')
+    else:
+        messages.error(request, "Your role is not configured. Please contact support.")
+        return redirect('product_list')
+
+@login_required
+@role_required('manager', 'sales_admin')
+def manager_analytics_view(request):
+    """
+    Manager analytics dashboard showing business metrics.
+    Accessible to: Manager, Superuser
+    """
+    # TODO: Implement manager analytics with charts and metrics
+    total_orders = Order.objects.count()
+    approved_orders = Order.objects.filter(status='approved').count()
+    pending_orders = Order.objects.filter(status='pending').count()
+    total_revenue = sum(o.total_amount for o in Order.objects.filter(status='approved'))
+    
+    return render(request, 'admins/manager_analytics.html', {
+        'total_orders': total_orders,
+        'approved_orders': approved_orders,
+        'pending_orders': pending_orders,
+        'total_revenue': total_revenue,
+    })
 
 # --- INVENTORY MANAGEMENT (STAGED CHANGES) ---
 
-@login_required
-@user_passes_test(is_sales_admin, login_url='/')
+@sales_admin_required
 def inventory_list(request):
     """View to list all products and manage stock levels with automatic staging."""
     products = Product.objects.all().order_by('category', 'name')
@@ -74,8 +132,7 @@ def inventory_list(request):
         'staging_count': len(staging)
     })
 
-@login_required
-@user_passes_test(is_sales_admin, login_url='/')
+@sales_admin_required
 def stage_stock_update(request, product_id):
     """Automatically saves a proposed stock change to the session via AJAX."""
     if request.method == 'POST':
@@ -90,8 +147,7 @@ def stage_stock_update(request, product_id):
             messages.info(request, "Change updated in summary.")
     return redirect('inventory_list')
 
-@login_required
-@user_passes_test(is_sales_admin, login_url='/')
+@sales_admin_required
 def confirm_stock_changes(request):
     """Applies all staged changes from the session to the actual database."""
     staging = request.session.get('stock_staging', {})
@@ -110,16 +166,14 @@ def confirm_stock_changes(request):
         messages.success(request, f"Successfully updated {updated_count} items in the inventory.")
     return redirect('inventory_list')
 
-@login_required
-@user_passes_test(is_sales_admin, login_url='/')
+@sales_admin_required
 def clear_stock_staging(request):
     """Clears the staging area without saving changes."""
     request.session['stock_staging'] = {}
     messages.info(request, "All pending changes have been cleared.")
     return redirect('inventory_list')
 
-@login_required
-@user_passes_test(is_sales_admin, login_url='/')
+@sales_admin_required
 def add_product(request):
     """Form and logic to add a new item to the inventory."""
     if request.method == 'POST':
@@ -149,8 +203,7 @@ def add_product(request):
 
 # --- DASHBOARD AND ORDERS ---
 
-@login_required
-@user_passes_test(is_sales_admin, login_url='/')
+@sales_admin_required
 def sales_admin_dashboard(request):
     """Main landing page for admins."""
     return render(request, 'admins/sales_admin_dashboard.html', {
@@ -159,15 +212,13 @@ def sales_admin_dashboard(request):
         'accepted_orders': Order.objects.filter(status='approved').order_by('-approved_at')[:10],
     })
 
-@login_required
-@user_passes_test(is_sales_admin, login_url='/')
+@sales_admin_required
 def admin_order_detail(request, order_id):
     """View complete order info, shipping, and items."""
     order = get_object_or_404(Order, id=order_id)
     return render(request, 'admins/order_detail.html', {'order': order})
 
-@login_required
-@user_passes_test(is_sales_admin, login_url='/')
+@sales_admin_required
 def set_pending_payment(request, order_id):
     """Marks order as accepted and requests payment from customer."""
     order = get_object_or_404(Order, id=order_id)
@@ -176,8 +227,7 @@ def set_pending_payment(request, order_id):
     messages.success(request, f"Order #{order.id} marked as Accepted and Waiting for Payment.")
     return redirect('sales_admin_dashboard')
 
-@login_required
-@user_passes_test(is_sales_admin, login_url='/')
+@sales_admin_required
 def approve_order(request, order_id):
     """Generates PDF receipt and applies digital signature upon approval."""
     order = get_object_or_404(Order, id=order_id)
@@ -201,8 +251,7 @@ def approve_order(request, order_id):
         messages.error(request, f"Error signing document: {str(e)}")
     return redirect('sales_admin_dashboard')
 
-@login_required
-@user_passes_test(is_sales_admin, login_url='/')
+@sales_admin_required
 def reject_order(request, order_id):
     """Rejects the order."""
     order = get_object_or_404(Order, id=order_id)
@@ -213,15 +262,13 @@ def reject_order(request, order_id):
 
 # --- COMPLAINTS ---
 
-@login_required
-@user_passes_test(is_sales_admin, login_url='/')
+@sales_admin_required
 def admin_complaints_list(request):
     """Lists all customer complaints."""
     complaints = Complaint.objects.all().order_by('-created_at')
     return render(request, 'admins/complaint_list.html', {'complaints': complaints})
 
-@login_required
-@user_passes_test(is_sales_admin, login_url='/')
+@sales_admin_required
 def admin_complaint_detail(request, complaint_id):
     """Detailed view for specific complaint validation."""
     complaint = get_object_or_404(Complaint, id=complaint_id)
@@ -231,8 +278,7 @@ def admin_complaint_detail(request, complaint_id):
         'customer': complaint.customer
     })
 
-@login_required
-@user_passes_test(is_sales_admin, login_url='/')
+@sales_admin_required
 def resolve_complaint(request, complaint_id):
     """Applies resolution action to a complaint."""
     complaint = get_object_or_404(Complaint, id=complaint_id)

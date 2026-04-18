@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid py-4 bg-light min-vh-100">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 px-3">
+        <div>
+            <h1 class="h3 fw-bold">Manager Analytics Dashboard</h1>
+            <p class="text-muted mb-0">Business insights and metrics</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-dark">Back to Orders</a>
+            <a href="{% url 'admin:index' %}" class="btn btn-dark">Django Admin</a>
+        </div>
+    </div>
+
+    <!-- Key Metrics -->
+    <div class="row g-3 mb-4">
+        <!-- Total Orders -->
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted small mb-1">Total Orders</p>
+                            <h3 class="fw-bold mb-0">{{ total_orders }}</h3>
+                        </div>
+                        <span style="font-size: 2rem;">📦</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Approved Orders -->
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted small mb-1">Approved Orders</p>
+                            <h3 class="fw-bold mb-0 text-success">{{ approved_orders }}</h3>
+                        </div>
+                        <span style="font-size: 2rem;">✅</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pending Orders -->
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted small mb-1">Pending Orders</p>
+                            <h3 class="fw-bold mb-0 text-warning">{{ pending_orders }}</h3>
+                        </div>
+                        <span style="font-size: 2rem;">⏳</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Revenue -->
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted small mb-1">Total Revenue</p>
+                            <h3 class="fw-bold mb-0 text-primary">RM {{ total_revenue }}</h3>
+                        </div>
+                        <span style="font-size: 2rem;">💰</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Placeholder sections for future features -->
+    <div class="row g-3">
+        <!-- Charts Section -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm p-4">
+                <h5 class="fw-bold mb-3">Sales Trends</h5>
+                <div class="bg-light p-5 rounded text-center text-muted">
+                    <p style="font-size: 3rem;">📊</p>
+                    <p class="mb-0">Chart visualization coming soon...</p>
+                    <small class="text-muted">Daily/Weekly/Monthly sales data</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Products Section -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm p-4">
+                <h5 class="fw-bold mb-3">Top Products</h5>
+                <div class="bg-light p-5 rounded text-center text-muted">
+                    <p style="font-size: 3rem;">🏆</p>
+                    <p class="mb-0">Product rankings coming soon...</p>
+                    <small class="text-muted">By sales volume</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Additional Analytics Sections -->
+    <div class="row g-3 mt-3">
+        <!-- Customer Activity -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm p-4">
+                <h5 class="fw-bold mb-3">Customer Activity</h5>
+                <div class="bg-light p-5 rounded text-center text-muted">
+                    <p style="font-size: 3rem;">👥</p>
+                    <p class="mb-0">Customer insights coming soon...</p>
+                    <small class="text-muted">Active users, repeat orders, etc.</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inventory Status -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm p-4">
+                <h5 class="fw-bold mb-3">Inventory Status</h5>
+                <div class="bg-light p-5 rounded text-center text-muted">
+                    <p style="font-size: 3rem;">📦</p>
+                    <p class="mb-0">Stock analysis coming soon...</p>
+                    <small class="text-muted">Low stock items, fast-moving products</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manager-Only Access Info -->
+    <div class="alert alert-info mt-4 mb-0">
+        <strong>Manager Access:</strong> This dashboard is only accessible to managers and superusers. It provides insights into business performance, sales trends, and operational metrics.
+    </div>
+</div>
+{% endblock %}

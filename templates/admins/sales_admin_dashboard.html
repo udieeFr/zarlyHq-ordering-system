@@ -1,14 +1,35 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="container-fluid py-4 bg-light min-vh-100">
+    <!-- Header with Role-Based Navigation -->
     <div class="d-flex justify-content-between align-items-center mb-4 px-3">
-        <h1 class="h3 fw-bold">Admin dashboard</h1>
+        <div>
+            <h1 class="h3 fw-bold">Sales Administration Dashboard</h1>
+            <p class="text-muted small mb-0">
+                {% if request.user.is_superuser %}
+                    Superuser • Full System Access
+                {% elif request.user.role == 'manager' %}
+                    Manager • Analytics & Order Management
+                {% else %}
+                    Sales Administrator • Order Management
+                {% endif %}
+            </p>
+        </div>
         <div class="d-flex gap-2">
-    <a href="{% url 'admin_complaints_list' %}" class="btn btn-danger fw-bold">Manage Complaints </a>
-    <a href="{% url 'inventory_list' %}" class="btn btn-dark">Manage Inventory</a>
-</div>
+            {% if request.user.is_superuser or request.user.role == 'manager' %}
+                <a href="{% url 'manager_analytics_view' %}" class="btn btn-info fw-bold" title="Manager Analytics">
+                    📊 Analytics
+                </a>
+                <a href="{% url 'admin:index' %}" class="btn btn-secondary fw-bold" title="Django Administration">
+                    ⚙️ Admin Panel
+                </a>
+            {% endif %}
+            <a href="{% url 'admin_complaints_list' %}" class="btn btn-danger fw-bold">🚨 Complaints</a>
+            <a href="{% url 'inventory_list' %}" class="btn btn-dark fw-bold">📦 Inventory</a>
+        </div>
     </div>
 
+    <!-- Main Content -->
     <div class="row g-4">
         <div class="col-lg-7">
             <div class="card border-0 shadow-sm p-4">
@@ -25,6 +46,8 @@
                         <a href="{% url 'set_pending_payment' order.id %}" class="btn btn-sm btn-success">Accept & Req. Pay</a>
                     </div>
                 </div>
+                {% empty %}
+                <p class="text-center text-muted py-4">No pending orders.</p>
                 {% endfor %}
 
                 <h5 class="fw-bold my-4 border-top pt-4">Awaiting Payment/Verification</h5>
@@ -36,39 +59,62 @@
                     </div>
                     <a href="{% url 'admin_order_detail' order.id %}" class="btn btn-sm btn-dark">View & Sign</a>
                 </div>
+                {% empty %}
+                <p class="text-center text-muted py-3">No orders awaiting payment.</p>
                 {% endfor %}
             </div>
         </div>
 
         <div class="col-lg-5">
-    <div class="card border-0 shadow-sm p-4 rounded-4 bg-white">
-        <h5 class="fw-bold mb-3 text-muted">Accepted Orders</h5>
-        {% for order in accepted_orders %}
-        <div class="d-flex justify-content-between align-items-center p-3 mb-2 bg-white border rounded">
-            <div>
-                <span class="small fw-bold d-block">Order #{{ order.id }}</span>
-                <span class="text-muted" style="font-size: 0.75rem;">RM {{ order.total_amount }} • {{ order.customer.username }}</span>
-            </div>
-            
-            <div class="d-flex gap-2">
-                <a href="{% url 'admin_order_detail' order.id %}" class="btn btn-xs btn-outline-dark py-1 px-2" style="font-size: 0.7rem;">
-                    Details
-                </a>
+            <!-- Accepted Orders Card -->
+            <div class="card border-0 shadow-sm p-4 rounded-4 bg-white mb-3">
+                <h5 class="fw-bold mb-3 text-muted">Accepted Orders</h5>
+                {% for order in accepted_orders %}
+                <div class="d-flex justify-content-between align-items-center p-3 mb-2 bg-white border rounded">
+                    <div>
+                        <span class="small fw-bold d-block">Order #{{ order.id }}</span>
+                        <span class="text-muted" style="font-size: 0.75rem;">RM {{ order.total_amount }} • {{ order.customer.username }}</span>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'admin_order_detail' order.id %}" class="btn btn-xs btn-outline-dark py-1 px-2" style="font-size: 0.7rem;">
+                            Details
+                        </a>
 
-                {% if order.digital_signature %}
-                    <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-xs btn-outline-success py-1 px-2" style="font-size: 0.7rem;" download>
-                        Receipt 📄
-                    </a>
-                {% endif %}
+                        {% if order.digital_signature %}
+                            <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-xs btn-outline-success py-1 px-2" style="font-size: 0.7rem;" download>
+                                Receipt 📄
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-center text-muted py-4 small">No recently completed orders.</p>
+                {% endfor %}
+            </div>
+
+            <!-- Role Information Card -->
+            <div class="card border-0 shadow-sm p-3 bg-light">
+                <small class="text-muted">
+                    <strong>Your Role Access:</strong><br>
+                    {% if request.user.is_superuser %}
+                        ✓ Full system access<br>
+                        ✓ User management<br>
+                        ✓ Analytics dashboard<br>
+                        ✓ Django administration
+                    {% elif request.user.role == 'manager' %}
+                        ✓ Order management<br>
+                        ✓ Inventory management<br>
+                        ✓ Complaint resolution<br>
+                        ✓ Analytics dashboard
+                    {% else %}
+                        ✓ Order management<br>
+                        ✓ Inventory management<br>
+                        ✓ Complaint resolution
+                    {% endif %}
+                </small>
             </div>
         </div>
-        {% empty %}
-        <p class="text-center text-muted py-4 small">No recently completed orders.</p>
-        {% endfor %}
-    </div>
-
-    
-</div>
     </div>
 </div>
 {% endblock %}
