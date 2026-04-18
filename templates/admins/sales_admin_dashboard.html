@@ -19,48 +19,188 @@
 
 <!-- Main Content -->
 <div class="row g-4">
+    <div class="col-12">
+        <div class="content-card mb-4">
+            <div class="d-flex flex-column flex-md-row gap-3 align-items-start">
+                <div class="d-flex gap-3 flex-wrap">
+                    <div class="p-3 rounded-3 bg-white border shadow-sm" style="min-width: 160px;">
+                        <div class="text-muted small mb-2">Pending review</div>
+                        <div class="fw-bold fs-4">{{ dashboard_metrics.pending_count }}</div>
+                    </div>
+                    <div class="p-3 rounded-3 bg-white border shadow-sm" style="min-width: 160px;">
+                        <div class="text-muted small mb-2">Awaiting payment</div>
+                        <div class="fw-bold fs-4">{{ dashboard_metrics.pending_payment_count }}</div>
+                    </div>
+                    <div class="p-3 rounded-3 bg-white border shadow-sm" style="min-width: 160px;">
+                        <div class="text-muted small mb-2">Approved</div>
+                        <div class="fw-bold fs-4">{{ dashboard_metrics.approved_count }}</div>
+                    </div>
+                    <div class="p-3 rounded-3 bg-white border shadow-sm" style="min-width: 160px;">
+                        <div class="text-muted small mb-2">Rejected</div>
+                        <div class="fw-bold fs-4">{{ dashboard_metrics.rejected_count }}</div>
+                    </div>
+                </div>
+                <form method="get" class="d-flex gap-2 align-items-center ms-auto">
+                    <input type="text" name="q" value="{{ search_query }}" class="form-control form-control-sm" placeholder="Search order #, customer, phone">
+                    <button type="submit" class="btn btn-sm btn-primary">Search</button>
+                    {% if search_query %}
+                    <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-sm btn-outline-secondary">Reset</a>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+        {% if notifications %}
+        <div class="content-card mb-4" style="background: #f8fafc;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold mb-0">Notifications</h6>
+                <span class="badge bg-info text-dark">{{ notifications|length }} alerts</span>
+            </div>
+            <ul class="list-unstyled mb-0">
+                {% for note in notifications %}
+                <li class="mb-2 small"><span class="badge bg-warning text-dark me-2">!</span>{{ note }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+
     <div class="col-lg-8">
-        <!-- Pending Orders Card -->
+        <!-- Pending Orders Table -->
         <div class="content-card">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h5 class="fw-bold mb-0">📋 Pending Requests</h5>
-                <small class="text-muted">Orders awaiting review</small>
-            </div>
-            
-            {% for order in pending_orders %}
-            <div class="p-3 mb-3 border rounded-3 bg-light d-flex justify-content-between align-items-center">
-                <div>
-                    <span class="fw-bold">Order #{{ order.id }}</span>
-                    <p class="small mb-0 text-muted">RM {{ order.total_amount }} • {{ order.customer.username }}</p>
+            <form method="post" action="{% url 'bulk_accept_orders' %}" id="bulk-accept-form">
+                {% csrf_token %}
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-3 gap-3">
+                    <div>
+                        <h5 class="fw-bold mb-0">📋 Pending Requests</h5>
+                        <small class="text-muted">Orders awaiting review</small>
+                    </div>
+                    <div class="d-flex gap-2 align-items-center">
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="checkbox" id="select-all-orders">
+                            <label class="form-check-label">Select all</label>
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-success">Accept selected</button>
+                        <button type="button" class="btn btn-sm btn-outline-danger">Reject selected</button>
+                    </div>
                 </div>
-                <div class="d-flex gap-2">
-                    <a href="{% url 'admin_order_detail' order.id %}" class="btn btn-sm btn-outline-dark">Review</a>
-                    <a href="{% url 'set_pending_payment' order.id %}" class="btn btn-sm btn-success">Accept & Req. Pay</a>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;"></th>
+                                <th>Order</th>
+                                <th>Customer</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in pending_orders %}
+                            <tr class="{% if order.id in high_value_pending_ids %}table-warning{% endif %}">
+                                <td>
+                                    <div class="form-check mb-0">
+                                        <input class="form-check-input order-checkbox" type="checkbox" name="order_ids" value="{{ order.id }}" id="order-{{ order.id }}">
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="fw-bold">Order #{{ order.id }}</div>
+                                    <small class="text-muted">Placed {{ order.created_at|date:"d M Y H:i" }}</small>
+                                </td>
+                                <td>{{ order.customer.username }}</td>
+                                <td>RM {{ order.total_amount }}</td>
+                                <td>
+                                    {% if order.id in urgent_pending_ids %}
+                                    <span class="badge bg-danger">New</span>
+                                    {% endif %}
+                                    {% if order.id in high_value_pending_ids %}
+                                    <span class="badge bg-warning text-dark">High value</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <a href="{% url 'admin_order_detail' order.id %}" class="btn btn-sm btn-outline-dark">Review</a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">No pending orders.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-            </div>
-            {% empty %}
-            <p class="text-center text-muted py-4">No pending orders.</p>
-            {% endfor %}
+            </form>
         </div>
 
-        <!-- Awaiting Payment Card -->
+        <!-- Awaiting Payment Table -->
         <div class="content-card">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h5 class="fw-bold mb-0">💳 Awaiting Payment/Verification</h5>
-                <small class="text-muted">Orders pending payment proof</small>
-            </div>
-            
-            {% for order in pending_payment_orders %}
-            <div class="p-3 mb-3 border rounded-3 bg-light d-flex justify-content-between align-items-center">
+            <div class="d-flex justify-content-between align-items-center mb-3">
                 <div>
-                    <span class="fw-bold text-info">Order #{{ order.id }}</span>
-                    <p class="small mb-0 text-muted">{% if order.payment_proof %}✅ Proof Uploaded{% else %}⏳ Waiting for customer{% endif %}</p>
+                    <h5 class="fw-bold mb-0">💳 Awaiting Payment/Verification</h5>
+                    <small class="text-muted">Orders pending payment proof</small>
                 </div>
-                <a href="{% url 'admin_order_detail' order.id %}" class="btn btn-sm btn-dark">View & Sign</a>
+                <div class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" id="select-all-payment-orders">
+                    <label class="form-check-label">Select all</label>
+                </div>
             </div>
-            {% empty %}
-            <p class="text-center text-muted py-4">No orders awaiting payment.</p>
-            {% endfor %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;"></th>
+                            <th>Order</th>
+                            <th>Proof</th>
+                            <th>Status</th>
+                            <th class="text-end">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in pending_payment_orders %}
+                        <tr>
+                            <td>
+                                <div class="form-check mb-0">
+                                    <input class="form-check-input payment-checkbox" type="checkbox" value="{{ order.id }}" id="payment-order-{{ order.id }}">
+                                </div>
+                            </td>
+                            <td>
+                                <div class="fw-bold">Order #{{ order.id }}</div>
+                                <small class="text-muted">Placed {{ order.created_at|date:"d M Y H:i" }}</small>
+                            </td>
+                            <td>
+                                {% if order.payment_proof %}
+                                <span class="badge bg-success">Uploaded</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Waiting</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if order.payment_proof %}
+                                <span class="text-success">Ready for review</span>
+                                {% else %}
+                                <span class="text-muted">Awaiting customer</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <div class="position-relative order-proof-hover d-inline-block">
+                                    <a href="{% url 'admin_order_detail' order.id %}" class="btn btn-sm btn-dark">View & Sign</a>
+                                    {% if order.payment_proof %}
+                                    <div class="payment-proof-tooltip shadow-sm">
+                                        <img src="{{ order.payment_proof.url }}" alt="Payment proof for order {{ order.id }}">
+                                        <div class="tooltip-note">Proof preview</div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">No orders awaiting payment.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -117,4 +257,65 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<style>
+    .order-proof-hover {
+        display: inline-block;
+    }
+    .payment-proof-tooltip {
+        display: none;
+        position: absolute;
+        top: 110%;
+        right: 0;
+        width: 260px;
+        max-width: 320px;
+        background: white;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        border-radius: 12px;
+        padding: 0.75rem;
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
+        z-index: 50;
+    }
+    .payment-proof-tooltip img {
+        width: 100%;
+        height: auto;
+        border-radius: 10px;
+        display: block;
+    }
+    .tooltip-note {
+        margin-top: 0.5rem;
+        font-size: 0.8rem;
+        color: #475569;
+        text-align: center;
+    }
+    .order-proof-hover:hover .payment-proof-tooltip {
+        display: block;
+    }
+</style>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const selectAll = document.getElementById('select-all-orders');
+        const orderCheckboxes = document.querySelectorAll('.order-checkbox');
+        const selectAllPayment = document.getElementById('select-all-payment-orders');
+        const paymentCheckboxes = document.querySelectorAll('.payment-checkbox');
+
+        if (selectAll) {
+            selectAll.addEventListener('change', function () {
+                orderCheckboxes.forEach(function (checkbox) {
+                    checkbox.checked = selectAll.checked;
+                });
+            });
+        }
+
+        if (selectAllPayment) {
+            selectAllPayment.addEventListener('change', function () {
+                paymentCheckboxes.forEach(function (checkbox) {
+                    checkbox.checked = selectAllPayment.checked;
+                });
+            });
+        }
+    });
+</script>
 {% endblock %}

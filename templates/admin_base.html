@@ -341,7 +341,11 @@
                 <div class="sidebar-section-title" style="margin-top: 1.5rem;">Orders</div>
                 <a href="{% url 'sales_admin_dashboard' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'sales_admin_dashboard' %}active{% endif %}">
                     <span class="sidebar-menu-item-icon">📦</span>
-                    <span class="sidebar-menu-item-text">Transactions</span>
+                    <span class="sidebar-menu-item-text">Dashboard</span>
+                </a>
+                <a href="{% url 'approved_orders_list' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'approved_orders_list' %}active{% endif %}">
+                    <span class="sidebar-menu-item-icon">✅</span>
+                    <span class="sidebar-menu-item-text">Approved Orders</span>
                 </a>
 
                 <!-- Inventory Section -->
@@ -426,5 +430,6 @@
             });
         });
     </script>
+    {% block extra_scripts %}{% endblock %}
 </body>
 </html>

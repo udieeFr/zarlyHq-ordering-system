@@ -8,7 +8,9 @@ urlpatterns = [
     path('order/<int:order_id>/detail/', views.admin_order_detail, name='admin_order_detail'),
     path('order/<int:order_id>/approve/', views.approve_order, name='approve_order'),
     path('order/<int:order_id>/reject/', views.reject_order, name='reject_order'),
-    path('order/<int:order_id>/set_pending_payment/', views.set_pending_payment, name='set_pending_payment'),
+    path('order/multi-accept/', views.bulk_accept_orders, name='bulk_accept_orders'),
+    path('approved-orders/', views.approved_orders_list, name='approved_orders_list'),
+    path('order/<int:order_id>/print-summary/', views.print_order_summary, name='print_order_summary'),
     
     # Inventory and Product Management
     path('inventory/', views.inventory_list, name='inventory_list'),

@@ -117,8 +117,25 @@
                         ❌ Rejected
                     {% endif %}
                 </small>
+                {% if order.status == 'rejected' and order.rejection_reason %}
+                <p class="small mt-2 text-danger"><strong>Reason:</strong> {{ order.rejection_reason }}</p>
+                {% endif %}
             </div>
         </div>
+
+        {% if order.status == 'pending' %}
+        <div class="content-card">
+            <h6 class="fw-bold mb-3">❌ Reject Order</h6>
+            <form method="post" action="{% url 'reject_order' order.id %}">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="rejection_reason" class="form-label">Rejection Reason</label>
+                    <textarea name="rejection_reason" id="rejection_reason" class="form-control" rows="3" placeholder="Enter the reason for rejecting this order" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-outline-danger w-100">Reject Order</button>
+            </form>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

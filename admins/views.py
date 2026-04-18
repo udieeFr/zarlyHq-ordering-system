@@ -4,7 +4,9 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import login, logout
 from django.utils import timezone
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
+from django.db.models import Q, Sum
+from datetime import timedelta
 from .models import Order, DigitalSignature, Complaint
 from .utils import generate_invoice_pdf, sign_pdf_digitally
 from customers.auth_utils import (
@@ -204,19 +206,126 @@ def add_product(request):
 # --- DASHBOARD AND ORDERS ---
 
 @sales_admin_required
-def sales_admin_dashboard(request):
-    """Main landing page for admins."""
-    return render(request, 'admins/sales_admin_dashboard.html', {
-        'pending_orders': Order.objects.filter(status='pending').order_by('-created_at'),
-        'pending_payment_orders': Order.objects.filter(status='pending_payment').order_by('-created_at'),
-        'accepted_orders': Order.objects.filter(status='approved').order_by('-approved_at')[:10],
-    })
-
-@sales_admin_required
 def admin_order_detail(request, order_id):
     """View complete order info, shipping, and items."""
     order = get_object_or_404(Order, id=order_id)
     return render(request, 'admins/order_detail.html', {'order': order})
+
+@sales_admin_required
+def sales_admin_dashboard(request):
+    """Main sales admin dashboard with order management and metrics."""
+    search_query = request.GET.get('q', '').strip()
+
+    base_pending = Order.objects.filter(status='pending')
+    base_pending_payment = Order.objects.filter(status='pending_payment')
+
+    if search_query:
+        search_filter = Q(customer__username__icontains=search_query) | Q(full_name__icontains=search_query) | Q(phone_number__icontains=search_query) | Q(id__exact=search_query)
+        pending_orders = base_pending.filter(search_filter)
+        pending_payment_orders = base_pending_payment.filter(search_filter)
+    else:
+        pending_orders = base_pending
+        pending_payment_orders = base_pending_payment
+
+    approved_orders_qs = Order.objects.filter(status='approved')
+    approved_orders = approved_orders_qs.order_by('-approved_at')[:10]
+
+    urgent_pending_ids = list(base_pending.filter(created_at__gte=timezone.now() - timedelta(hours=1)).values_list('id', flat=True))
+    high_value_pending_ids = list(base_pending.filter(total_amount__gte=150).values_list('id', flat=True))
+
+    dashboard_metrics = {
+        'pending_count': base_pending.count(),
+        'pending_payment_count': base_pending_payment.count(),
+        'approved_count': approved_orders_qs.count(),
+        'rejected_count': Order.objects.filter(status='rejected').count(),
+        'today_revenue': Order.objects.filter(status='approved', approved_at__date=timezone.now().date()).aggregate(total=Sum('total_amount'))['total'] or 0,
+        'urgent_pending_count': len(urgent_pending_ids),
+        'high_value_pending_count': len(high_value_pending_ids),
+        'overdue_payment_count': base_pending_payment.filter(created_at__lte=timezone.now() - timedelta(hours=24)).count(),
+    }
+
+    notifications = []
+    if dashboard_metrics['urgent_pending_count']:
+        notifications.append(f"{dashboard_metrics['urgent_pending_count']} pending order(s) received in the last hour")
+    if dashboard_metrics['high_value_pending_count']:
+        notifications.append(f"{dashboard_metrics['high_value_pending_count']} high-value order(s) need quick review")
+    if dashboard_metrics['overdue_payment_count']:
+        notifications.append(f"{dashboard_metrics['overdue_payment_count']} orders still awaiting payment proof after 24h")
+
+    return render(request, 'admins/sales_admin_dashboard.html', {
+        'pending_orders': pending_orders.order_by('-created_at'),
+        'pending_payment_orders': pending_payment_orders.order_by('-created_at'),
+        'accepted_orders': approved_orders,
+        'search_query': search_query,
+        'dashboard_metrics': dashboard_metrics,
+        'notifications': notifications,
+        'urgent_pending_ids': urgent_pending_ids,
+        'high_value_pending_ids': high_value_pending_ids,
+    })
+
+@sales_admin_required
+def approved_orders_list(request):
+    """List all approved orders with filtering and search."""
+    queryset = Order.objects.filter(status='approved').select_related('customer', 'approved_by')
+
+    # Search
+    search_query = request.GET.get('q', '').strip()
+    if search_query:
+        queryset = queryset.filter(
+            Q(id__exact=search_query) |
+            Q(customer__username__icontains=search_query) |
+            Q(full_name__icontains=search_query) |
+            Q(phone_number__icontains=search_query)
+        )
+
+    # Filters
+    days_filter = request.GET.get('days', '')
+    if days_filter:
+        try:
+            days = int(days_filter)
+            cutoff_date = timezone.now() - timedelta(days=days)
+            queryset = queryset.filter(approved_at__gte=cutoff_date)
+        except ValueError:
+            pass
+
+    order_count_filter = request.GET.get('count', '')
+    if order_count_filter:
+        try:
+            count = int(order_count_filter)
+            queryset = queryset[:count]
+        except ValueError:
+            pass
+
+    # Ordering
+    order_by = request.GET.get('order_by', '-approved_at')
+    if order_by in ['approved_at', '-approved_at', 'total_amount', '-total_amount', 'customer__username']:
+        queryset = queryset.order_by(order_by)
+
+    approved_orders = queryset
+
+    return render(request, 'admins/approved_orders.html', {
+        'approved_orders': approved_orders,
+        'search_query': search_query,
+        'days_filter': days_filter,
+        'order_count_filter': order_count_filter,
+        'order_by': order_by,
+    })
+
+@sales_admin_required
+def print_order_summary(request, order_id):
+    """Generate a printable order summary PDF."""
+    order = get_object_or_404(Order, id=order_id, status='approved')
+    # Reuse existing PDF generation logic
+    try:
+        pdf_path = generate_invoice_pdf(order)
+        with open(pdf_path, 'rb') as f:
+            response = HttpResponse(f.read(), content_type='application/pdf')
+            response['Content-Disposition'] = f'inline; filename="order_{order.id}_summary.pdf"'
+            return response
+    except Exception as e:
+        messages.error(request, f"Error generating PDF: {str(e)}")
+        return redirect('approved_orders_list')
+
 
 @sales_admin_required
 def set_pending_payment(request, order_id):
@@ -225,6 +334,19 @@ def set_pending_payment(request, order_id):
     order.status = 'pending_payment'
     order.save()
     messages.success(request, f"Order #{order.id} marked as Accepted and Waiting for Payment.")
+    return redirect('sales_admin_dashboard')
+
+@sales_admin_required
+def bulk_accept_orders(request):
+    """Accepts multiple pending orders in one action."""
+    if request.method == 'POST':
+        order_ids = request.POST.getlist('order_ids')
+        pending_orders = Order.objects.filter(id__in=order_ids, status='pending')
+        count = pending_orders.update(status='pending_payment')
+        if count:
+            messages.success(request, f"{count} order(s) accepted and moved to pending payment.")
+        else:
+            messages.warning(request, 'No pending orders were selected or eligible for acceptance.')
     return redirect('sales_admin_dashboard')
 
 @sales_admin_required
@@ -253,8 +375,11 @@ def approve_order(request, order_id):
 
 @sales_admin_required
 def reject_order(request, order_id):
-    """Rejects the order."""
+    """Rejects the order while saving administrative reasoning."""
     order = get_object_or_404(Order, id=order_id)
+    if request.method != 'POST':
+        return redirect('admin_order_detail', order_id=order.id)
+    order.rejection_reason = request.POST.get('rejection_reason', '').strip() or None
     order.status = 'rejected'
     order.save()
     messages.warning(request, f"Order #{order.id} Rejected.")
