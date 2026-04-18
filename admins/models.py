@@ -7,6 +7,9 @@ class Order(models.Model):
         ('pending', 'Pending'),
         ('approved', 'Approved'),
         ('prepared', 'Prepared'),
+        ('ready_for_delivery', 'Ready for Delivery'),
+        ('out_for_delivery', 'Out for Delivery'),
+        ('delivered', 'Delivered'),
         ('rejected', 'Rejected'),
         ('pending_payment', 'Approved but pending payment'),
     )
@@ -34,6 +37,15 @@ class Order(models.Model):
     prepared_at = models.DateTimeField(null=True, blank=True)
     prepared_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
                                     related_name='prepared_orders', limit_choices_to={'role__in': ['sales_admin', 'manager']})
+    ready_for_delivery_at = models.DateTimeField(null=True, blank=True)
+    ready_for_delivery_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                              related_name='ready_for_delivery_orders', limit_choices_to={'role__in': ['sales_admin', 'manager']})
+    courier_name = models.CharField(max_length=50, null=True, blank=True)
+    tracking_number = models.CharField(max_length=100, null=True, blank=True)
+    delivery_assigned_at = models.DateTimeField(null=True, blank=True)
+    delivery_assigned_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                             related_name='delivery_assigned_orders', limit_choices_to={'role__in': ['sales_admin', 'manager']})
+    delivered_at = models.DateTimeField(null=True, blank=True)
 
     @property
     def address_summary(self):

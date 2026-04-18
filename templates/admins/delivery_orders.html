@@ -1,0 +1,111 @@
+{% extends 'admin_base.html' %}
+
+{% block page_title %}Delivery Orders{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header">
+    <h1>Delivery Orders</h1>
+    <p>Orders that are ready for delivery, out for delivery, or already delivered.</p>
+</div>
+
+<!-- Navigation -->
+<div class="mb-4">
+    <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
+    <a href="{% url 'approved_orders_list' %}" class="btn btn-outline-primary">Approved Orders</a>
+    <a href="{% url 'prepared_orders_list' %}" class="btn btn-outline-primary">Prep Groups</a>
+</div>
+
+<!-- Filters and Search -->
+<div class="content-card mb-4">
+    <form method="get" class="row g-3">
+        <div class="col-md-3">
+            <label for="q" class="form-label">Search</label>
+            <input type="text" name="q" id="q" value="{{ search_query }}" class="form-control" placeholder="Order #, customer, phone, tracking">
+        </div>
+        <div class="col-md-2">
+            <label for="status" class="form-label">Status</label>
+            <select name="status" id="status" class="form-select">
+                <option value="">All</option>
+                <option value="ready_for_delivery" {% if status_filter == 'ready_for_delivery' %}selected{% endif %}>Ready for Delivery</option>
+                <option value="out_for_delivery" {% if status_filter == 'out_for_delivery' %}selected{% endif %}>Out for Delivery</option>
+                <option value="delivered" {% if status_filter == 'delivered' %}selected{% endif %}>Delivered</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label for="days" class="form-label">Recent days</label>
+            <input type="number" name="days" id="days" value="{{ days_filter }}" class="form-control" placeholder="e.g. 7">
+        </div>
+        <div class="col-md-2">
+            <label for="count" class="form-label">Limit results</label>
+            <input type="number" name="count" id="count" value="{{ order_count_filter }}" class="form-control" placeholder="e.g. 50">
+        </div>
+        <div class="col-md-2">
+            <label for="order_by" class="form-label">Sort by</label>
+            <select name="order_by" id="order_by" class="form-select">
+                <option value="-ready_for_delivery_at" {% if order_by == '-ready_for_delivery_at' %}selected{% endif %}>Newest assigned</option>
+                <option value="ready_for_delivery_at" {% if order_by == 'ready_for_delivery_at' %}selected{% endif %}>Oldest assigned</option>
+                <option value="-total_amount" {% if order_by == '-total_amount' %}selected{% endif %}>Highest amount</option>
+                <option value="total_amount" {% if order_by == 'total_amount' %}selected{% endif %}>Lowest amount</option>
+                <option value="customer__username" {% if order_by == 'customer__username' %}selected{% endif %}>Customer</option>
+            </select>
+        </div>
+        <div class="col-md-1 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary w-100">Filter</button>
+        </div>
+    </form>
+</div>
+
+<!-- Delivery Orders Table -->
+<div class="content-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold mb-0">Delivery Orders ({{ delivery_orders|length }})</h5>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Order #</th>
+                    <th>Customer</th>
+                    <th>Delivery Contact</th>
+                    <th>Courier / Tracking</th>
+                    <th>Status</th>
+                    <th>Amount</th>
+                    <th>Assigned</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in delivery_orders %}
+                <tr>
+                    <td><a href="{% url 'admin_order_detail' order.id %}">#{{ order.id }}</a></td>
+                    <td>{{ order.customer.username }}<br>{{ order.full_name }}</td>
+                    <td>{{ order.phone_number }}</td>
+                    <td>
+                        {% if order.courier_name %}<strong>{{ order.courier_name }}</strong><br>{% endif %}
+                        {% if order.tracking_number %}{{ order.tracking_number }}{% else %}<span class="text-muted">No tracking</span>{% endif %}
+                    </td>
+                    <td>{{ order.get_status_display }}</td>
+                    <td>{{ order.total_amount|floatformat:2 }}</td>
+                    <td>{% if order.delivery_assigned_at %}{{ order.delivery_assigned_at|date:'M d, Y H:i' }}{% else %}-{% endif %}</td>
+                    <td>
+                        {% if order.status == 'ready_for_delivery' %}
+                        <a href="{% url 'mark_order_out_for_delivery' order.id %}" class="btn btn-sm btn-warning mb-1">Out for Delivery</a>
+                        {% elif order.status == 'out_for_delivery' %}
+                        <a href="{% url 'mark_order_delivered' order.id %}" class="btn btn-sm btn-success mb-1">Delivered</a>
+                        {% else %}
+                        <span class="text-muted">Completed</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-4">No delivery orders found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -21,6 +21,25 @@
     <button onclick="window.print()" class="btn btn-primary ms-2">🖨️ Print Prep List</button>
 </div>
 
+<!-- Delivery Assignment -->
+<div class="content-card mb-4">
+    <h5 class="fw-bold mb-3">Delivery Preparation</h5>
+    <form method="post" action="{% url 'mark_prep_group_ready' prep_group.group_id %}" class="row g-3">
+        {% csrf_token %}
+        <div class="col-md-4">
+            <label for="courier_name" class="form-label">Courier</label>
+            <input type="text" class="form-control" name="courier_name" id="courier_name" placeholder="J&T, Lalamove, etc.">
+        </div>
+        <div class="col-md-4">
+            <label for="tracking_number" class="form-label">Tracking Number</label>
+            <input type="text" class="form-control" name="tracking_number" id="tracking_number" placeholder="Enter tracking number if available">
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+            <button type="submit" class="btn btn-success">Mark Group Ready for Delivery</button>
+        </div>
+    </form>
+</div>
+
 <!-- Group Summary -->
 <div class="content-card mb-4">
     <div class="row">

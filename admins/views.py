@@ -428,6 +428,104 @@ def prep_group_detail(request, group_id):
     })
 
 @sales_admin_required
+def mark_prep_group_ready(request, group_id):
+    """Mark an entire prep group as ready for delivery."""
+    prep_group = get_object_or_404(PrepGroup, group_id=group_id)
+    if request.method == 'POST':
+        courier_name = request.POST.get('courier_name', '').strip() or None
+        tracking_number = request.POST.get('tracking_number', '').strip() or None
+        orders = prep_group.orders.filter(status='prepared')
+
+        if not orders.exists():
+            messages.error(request, 'No prepared orders are available in this prep group.')
+            return redirect('prep_group_detail', group_id=prep_group.group_id)
+
+        orders.update(
+            status='ready_for_delivery',
+            ready_for_delivery_at=timezone.now(),
+            ready_for_delivery_by=request.user,
+            courier_name=courier_name,
+            tracking_number=tracking_number,
+            delivery_assigned_at=timezone.now(),
+            delivery_assigned_by=request.user
+        )
+
+        messages.success(request, f'Prep group {prep_group.group_id} marked as ready for delivery.')
+        return redirect('delivery_orders_list')
+
+    return redirect('prep_group_detail', group_id=prep_group.group_id)
+
+@sales_admin_required
+def mark_order_out_for_delivery(request, order_id):
+    """Move a single order from ready_for_delivery to out_for_delivery."""
+    order = get_object_or_404(Order, id=order_id, status='ready_for_delivery')
+    order.status = 'out_for_delivery'
+    order.save()
+    messages.success(request, f"Order #{order.id} marked as Out for Delivery.")
+    return redirect('delivery_orders_list')
+
+@sales_admin_required
+def mark_order_delivered(request, order_id):
+    """Mark a single order as delivered."""
+    order = get_object_or_404(Order, id=order_id, status='out_for_delivery')
+    order.status = 'delivered'
+    order.delivered_at = timezone.now()
+    order.save()
+    messages.success(request, f"Order #{order.id} marked as Delivered.")
+    return redirect('delivery_orders_list')
+
+@sales_admin_required
+def delivery_orders_list(request):
+    """List orders in the delivery workflow."""
+    queryset = Order.objects.filter(status__in=['ready_for_delivery', 'out_for_delivery', 'delivered']).select_related('customer', 'ready_for_delivery_by', 'delivery_assigned_by').prefetch_related('items__product')
+
+    # Search
+    search_query = request.GET.get('q', '').strip()
+    if search_query:
+        queryset = queryset.filter(
+            Q(id__exact=search_query) |
+            Q(customer__username__icontains=search_query) |
+            Q(full_name__icontains=search_query) |
+            Q(phone_number__icontains=search_query) |
+            Q(tracking_number__icontains=search_query)
+        )
+
+    # Filters
+    status_filter = request.GET.get('status', '')
+    if status_filter in ['ready_for_delivery', 'out_for_delivery', 'delivered']:
+        queryset = queryset.filter(status=status_filter)
+
+    days_filter = request.GET.get('days', '')
+    if days_filter:
+        try:
+            days = int(days_filter)
+            cutoff_date = timezone.now() - timedelta(days=days)
+            queryset = queryset.filter(ready_for_delivery_at__gte=cutoff_date)
+        except ValueError:
+            pass
+
+    order_count_filter = request.GET.get('count', '')
+    if order_count_filter:
+        try:
+            count = int(order_count_filter)
+            queryset = queryset[:count]
+        except ValueError:
+            pass
+
+    order_by = request.GET.get('order_by', '-ready_for_delivery_at')
+    if order_by in ['ready_for_delivery_at', '-ready_for_delivery_at', 'total_amount', '-total_amount', 'customer__username']:
+        queryset = queryset.order_by(order_by)
+
+    return render(request, 'admins/delivery_orders.html', {
+        'delivery_orders': queryset,
+        'search_query': search_query,
+        'status_filter': status_filter,
+        'days_filter': days_filter,
+        'order_count_filter': order_count_filter,
+        'order_by': order_by,
+    })
+
+@sales_admin_required
 def mark_orders_prepared(request):
     """Mark selected orders as prepared and create a prep group."""
     if request.method == 'POST':
