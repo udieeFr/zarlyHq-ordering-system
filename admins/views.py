@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Q, Sum
 from datetime import timedelta
-from .models import Order, DigitalSignature, Complaint
+from .models import Order, DigitalSignature, Complaint, PrepGroup
 from .utils import generate_invoice_pdf, sign_pdf_digitally
 from customers.auth_utils import (
     sales_admin_required, 
@@ -266,7 +266,7 @@ def sales_admin_dashboard(request):
 @sales_admin_required
 def approved_orders_list(request):
     """List all approved orders with filtering and search."""
-    queryset = Order.objects.filter(status='approved').select_related('customer', 'approved_by')
+    queryset = Order.objects.filter(status='approved').select_related('customer', 'approved_by').prefetch_related('items__product')
 
     # Search
     search_query = request.GET.get('q', '').strip()
@@ -326,6 +326,140 @@ def print_order_summary(request, order_id):
         messages.error(request, f"Error generating PDF: {str(e)}")
         return redirect('approved_orders_list')
 
+@sales_admin_required
+def print_prep_list(request):
+    """Generate a printable prep list for selected orders."""
+    order_ids = request.GET.getlist('order_ids')
+    if not order_ids:
+        messages.error(request, "No orders selected for prep list.")
+        return redirect('approved_orders_list')
+
+    orders = Order.objects.filter(id__in=order_ids, status='approved').prefetch_related('items__product')
+    if not orders:
+        messages.error(request, "No valid approved orders found.")
+        return redirect('approved_orders_list')
+
+    # Aggregate items across all orders
+    item_summary = {}
+    total_amount = 0
+    order_count = orders.count()
+
+    for order in orders:
+        total_amount += order.total_amount
+        for item in order.items.all():
+            key = item.product.name
+            subtotal = item.product.price * item.quantity
+            if key in item_summary:
+                item_summary[key]['quantity'] += item.quantity
+                item_summary[key]['subtotal'] += subtotal
+                item_summary[key]['orders'].append(order.id)
+            else:
+                item_summary[key] = {
+                    'quantity': item.quantity,
+                    'price': item.product.price,
+                    'subtotal': subtotal,
+                    'orders': [order.id]
+                }
+
+    # Sort by quantity descending
+    sorted_items = sorted(item_summary.items(), key=lambda x: x[1]['quantity'], reverse=True)
+
+    return render(request, 'admins/prep_list.html', {
+        'orders': orders,
+        'item_summary': sorted_items,
+        'total_amount': total_amount,
+        'order_count': order_count,
+        'group_id': f"GRP{timezone.now().strftime('%Y%m%d%H%M%S')}",
+    })
+
+@sales_admin_required
+def prepared_orders_list(request):
+    """List all prep groups with prepared orders."""
+    prep_groups = PrepGroup.objects.all().select_related('created_by').order_by('-created_at')
+
+    # Search
+    search_query = request.GET.get('q', '').strip()
+    if search_query:
+        prep_groups = prep_groups.filter(
+            Q(group_id__icontains=search_query) |
+            Q(created_by__username__icontains=search_query)
+        )
+
+    # Filters
+    days_filter = request.GET.get('days', '')
+    if days_filter:
+        try:
+            days = int(days_filter)
+            cutoff_date = timezone.now() - timedelta(days=days)
+            prep_groups = prep_groups.filter(created_at__gte=cutoff_date)
+        except ValueError:
+            pass
+
+    order_count_filter = request.GET.get('count', '')
+    if order_count_filter:
+        try:
+            count = int(order_count_filter)
+            prep_groups = prep_groups[:count]
+        except ValueError:
+            pass
+
+    # Ordering
+    order_by = request.GET.get('order_by', '-created_at')
+    if order_by in ['created_at', '-created_at', 'total_orders', '-total_orders', 'total_amount', '-total_amount']:
+        prep_groups = prep_groups.order_by(order_by)
+
+    return render(request, 'admins/prepared_orders.html', {
+        'prep_groups': prep_groups,
+        'search_query': search_query,
+        'days_filter': days_filter,
+        'order_count_filter': order_count_filter,
+        'order_by': order_by,
+    })
+
+@sales_admin_required
+def prep_group_detail(request, group_id):
+    """View details of a specific prep group."""
+    prep_group = get_object_or_404(PrepGroup, group_id=group_id)
+    orders = prep_group.orders.all().prefetch_related('items__product')
+
+    return render(request, 'admins/prep_group_detail.html', {
+        'prep_group': prep_group,
+        'orders': orders,
+    })
+
+@sales_admin_required
+def mark_orders_prepared(request):
+    """Mark selected orders as prepared and create a prep group."""
+    if request.method == 'POST':
+        order_ids = request.POST.getlist('order_ids')
+        if not order_ids:
+            messages.error(request, "No orders selected.")
+            return redirect('approved_orders_list')
+
+        orders = Order.objects.filter(id__in=order_ids, status='approved')
+        if not orders:
+            messages.error(request, "No valid approved orders found.")
+            return redirect('approved_orders_list')
+
+        # Create prep group
+        prep_group = PrepGroup.objects.create(
+            created_by=request.user,
+            total_orders=orders.count(),
+            total_amount=sum(order.total_amount for order in orders)
+        )
+        prep_group.orders.set(orders)
+
+        # Mark orders as prepared
+        orders.update(
+            status='prepared',
+            prepared_at=timezone.now(),
+            prepared_by=request.user
+        )
+
+        messages.success(request, f"Created prep group {prep_group.group_id} with {prep_group.total_orders} orders.")
+        return redirect('prep_group_detail', group_id=prep_group.group_id)
+
+    return redirect('approved_orders_list')
 
 @sales_admin_required
 def set_pending_payment(request, order_id):

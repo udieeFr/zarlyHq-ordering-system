@@ -347,6 +347,10 @@
                     <span class="sidebar-menu-item-icon">✅</span>
                     <span class="sidebar-menu-item-text">Approved Orders</span>
                 </a>
+                <a href="{% url 'prepared_orders_list' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'prepared_orders_list' %}active{% endif %}">
+                    <span class="sidebar-menu-item-icon">📦</span>
+                    <span class="sidebar-menu-item-text">Prep Groups</span>
+                </a>
 
                 <!-- Inventory Section -->
                 <div class="sidebar-section-title" style="margin-top: 1.5rem;">Management</div>

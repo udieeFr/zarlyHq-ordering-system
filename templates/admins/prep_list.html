@@ -1,0 +1,137 @@
+{% extends 'admin_base.html' %}
+
+{% block page_title %}Prep List - Group {{ group_id }}{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header">
+    <h1>Prep List - Group {{ group_id }}</h1>
+    <p>Items needed for {{ order_count }} selected order{{ order_count|pluralize }}</p>
+</div>
+
+<!-- Navigation -->
+<div class="mb-4">
+    <a href="{% url 'approved_orders_list' %}" class="btn btn-outline-secondary">← Back to Approved Orders</a>
+    <button onclick="window.print()" class="btn btn-primary ms-2">🖨️ Print Prep List</button>
+    <form method="post" action="{% url 'mark_orders_prepared' %}" class="d-inline ms-2" id="mark-prepared-form">
+        {% csrf_token %}
+        {% for order in orders %}
+        <input type="hidden" name="order_ids" value="{{ order.id }}">
+        {% endfor %}
+        <button type="submit" class="btn btn-success" onclick="return confirm('Mark these {{ order_count }} orders as prepared?')">✅ Mark as Prepared</button>
+    </form>
+</div>
+
+<!-- Group Summary -->
+<div class="content-card mb-4 print-hide">
+    <div class="row">
+        <div class="col-md-4">
+            <h6 class="fw-bold">Group ID</h6>
+            <p class="mb-0">{{ group_id }}</p>
+        </div>
+        <div class="col-md-4">
+            <h6 class="fw-bold">Orders Included</h6>
+            <p class="mb-0">{{ order_count }} order{{ order_count|pluralize }}</p>
+        </div>
+        <div class="col-md-4">
+            <h6 class="fw-bold">Total Value</h6>
+            <p class="mb-0 fw-bold text-success">RM {{ total_amount }}</p>
+        </div>
+    </div>
+</div>
+
+<!-- Items to Prepare -->
+<div class="content-card">
+    <h5 class="fw-bold mb-3">Items to Prepare</h5>
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead class="table-dark">
+                <tr>
+                    <th>Item</th>
+                    <th class="text-center">Quantity Needed</th>
+                    <th class="text-center">Unit Price</th>
+                    <th class="text-center">Subtotal</th>
+                    <th>Order IDs</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item_name, item_data in item_summary %}
+                <tr>
+                    <td class="fw-bold">{{ item_name }}</td>
+                    <td class="text-center">
+                        <span class="badge bg-primary fs-6">{{ item_data.quantity }}</span>
+                    </td>
+                    <td class="text-center">RM {{ item_data.price }}</td>
+                    <td class="text-center fw-bold">RM {{ item_data.subtotal }}</td>
+                    <td>
+                        <small class="text-muted">
+                            {% for order_id in item_data.orders %}
+                                #{{ order_id }}{% if not forloop.last %}, {% endif %}
+                            {% endfor %}
+                        </small>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Order Details -->
+<div class="content-card mt-4 print-hide">
+    <h5 class="fw-bold mb-3">Order Details</h5>
+    <div class="row">
+        {% for order in orders %}
+        <div class="col-md-6 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-title">Order #{{ order.id }}</h6>
+                    <p class="card-text mb-1"><strong>Customer:</strong> {{ order.customer.username }}</p>
+                    <p class="card-text mb-1"><strong>Name:</strong> {{ order.full_name }}</p>
+                    <p class="card-text mb-1"><strong>Phone:</strong> {{ order.phone_number }}</p>
+                    <p class="card-text mb-1"><strong>Amount:</strong> RM {{ order.total_amount }}</p>
+                    <p class="card-text mb-0"><strong>Approved:</strong> {{ order.approved_at|date:"d M Y H:i" }}</p>
+                    <hr>
+                    <h6 class="mt-3">Items</h6>
+                    <ul class="list-group list-group-flush">
+                        {% for item in order.items.all %}
+                        <li class="list-group-item px-0 py-2">
+                            <div class="d-flex justify-content-between">
+                                <span>{{ item.product.name }}</span>
+                                <span class="text-muted">x{{ item.quantity }}</span>
+                            </div>
+                            <div class="small text-muted">RM {{ item.product.price }} each — RM {{ item.subtotal }}</div>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item px-0 py-2 text-muted">No items found for this order.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+@media print {
+    .btn, .page-header, .mb-4, .print-hide {
+        display: none !important;
+    }
+    .content-card {
+        border: 1px solid #ddd !important;
+        margin-bottom: 20px !important;
+    }
+    .table {
+        font-size: 12px !important;
+    }
+    .table th:nth-child(n+3),
+    .table td:nth-child(n+3) {
+        display: none !important;
+    }
+    .table thead th {
+        text-align: left !important;
+    }
+}
+</style>
+{% endblock %}

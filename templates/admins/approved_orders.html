@@ -1,0 +1,282 @@
+{% extends 'admin_base.html' %}
+
+{% block page_title %}Approved Orders{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header">
+    <h1>Approved Orders</h1>
+    <p>Complete list of approved orders with filtering and search</p>
+</div>
+
+<!-- Navigation -->
+<div class="mb-4">
+    <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
+</div>
+
+<!-- Filters and Search -->
+<div class="content-card mb-4">
+    <form method="get" class="row g-3">
+        <div class="col-md-4">
+            <label for="q" class="form-label">Search</label>
+            <input type="text" name="q" id="q" value="{{ search_query }}" class="form-control" placeholder="Order #, customer, phone">
+        </div>
+        <div class="col-md-2">
+            <label for="days" class="form-label">Days since approval</label>
+            <input type="number" name="days" id="days" value="{{ days_filter }}" class="form-control" placeholder="e.g. 7">
+        </div>
+        <div class="col-md-2">
+            <label for="count" class="form-label">Limit results</label>
+            <input type="number" name="count" id="count" value="{{ order_count_filter }}" class="form-control" placeholder="e.g. 50">
+        </div>
+        <div class="col-md-2">
+            <label for="order_by" class="form-label">Sort by</label>
+            <select name="order_by" id="order_by" class="form-select">
+                <option value="-approved_at" {% if order_by == '-approved_at' %}selected{% endif %}>Newest first</option>
+                <option value="approved_at" {% if order_by == 'approved_at' %}selected{% endif %}>Oldest first</option>
+                <option value="-total_amount" {% if order_by == '-total_amount' %}selected{% endif %}>Highest amount</option>
+                <option value="total_amount" {% if order_by == 'total_amount' %}selected{% endif %}>Lowest amount</option>
+                <option value="customer__username" {% if order_by == 'customer__username' %}selected{% endif %}>Customer A-Z</option>
+            </select>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary me-2">Filter</button>
+            <a href="{% url 'approved_orders_list' %}" class="btn btn-outline-secondary">Reset</a>
+        </div>
+    </form>
+</div>
+
+<!-- Approved Orders Table -->
+<div class="content-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold mb-0">Approved Orders ({{ approved_orders|length }})</h5>
+        <small class="text-muted">Click order # for details</small>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>
+                        <input type="checkbox" id="select-all" class="form-check-input">
+                    </th>
+                    <th>Order #</th>
+                    <th>Customer</th>
+                    <th>Amount</th>
+                    <th>Approved</th>
+                    <th>Approved By</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in approved_orders %}
+                <tr>
+                    <td>
+                        <input type="checkbox" class="order-checkbox form-check-input" value="{{ order.id }}" data-order-id="{{ order.id }}">
+                    </td>
+                    <td>
+                        <a href="{% url 'admin_order_detail' order.id %}" class="text-decoration-none fw-bold">
+                            #{{ order.id }}
+                        </a>
+                    </td>
+                    <td>
+                        <div>{{ order.customer.username }}</div>
+                        <small class="text-muted">{{ order.full_name }}</small>
+                    </td>
+                    <td class="fw-bold">RM {{ order.total_amount }}</td>
+                    <td>
+                        <div>{{ order.approved_at|date:"d M Y" }}</div>
+                        <small class="text-muted">{{ order.approved_at|date:"H:i" }}</small>
+                    </td>
+                    <td>
+                        {% if order.approved_by %}
+                            {{ order.approved_by.username }}
+                        {% else %}
+                            System
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <div class="btn-group" role="group">
+                            <a href="{% url 'admin_order_detail' order.id %}" class="btn btn-sm btn-outline-dark">View</a>
+                            <a href="{% url 'print_order_summary' order.id %}" class="btn btn-sm btn-outline-primary" target="_blank">Print Summary</a>
+                            {% if order.digital_signature %}
+                            <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-sm btn-outline-success" download>📄 Signed PDF</a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">No approved orders found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Hidden form for creating prep groups -->
+<form id="prep-group-form" method="post" action="{% url 'mark_orders_prepared' %}" style="display: none;">
+    {% csrf_token %}
+</form>
+
+<!-- Selection Summary Panel -->
+<div id="selection-summary" class="content-card mt-4" style="display: none;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold mb-0">Prep Group Summary</h5>
+        <button id="clear-selection" class="btn btn-sm btn-outline-secondary">Clear Selection</button>
+    </div>
+    <div class="row">
+        <div class="col-md-3">
+            <div class="text-center">
+                <div class="fs-4 fw-bold text-primary" id="group-id">GRP000</div>
+                <small class="text-muted">Group ID</small>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="text-center">
+                <div class="fs-4 fw-bold" id="selected-count">0</div>
+                <small class="text-muted">Orders Selected</small>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="text-center">
+                <div class="fs-4 fw-bold text-success" id="total-amount">RM 0.00</div>
+                <small class="text-muted">Total Value</small>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="text-center">
+                <button id="print-prep-list" class="btn btn-success">🍽️ Create Prep Group</button>
+            </div>
+        </div>
+    </div>
+    <div class="mt-3">
+        <h6>Items Summary:</h6>
+        <div id="items-summary" class="small text-muted">
+            <!-- Items will be populated by JavaScript -->
+        </div>
+    </div>
+</div>
+
+<script>
+// Store order data for JavaScript
+const ordersData = [
+    {% for order in approved_orders %}
+    {
+        id: {{ order.id }},
+        total_amount: {{ order.total_amount }},
+        items: [
+            {% for item in order.items.all %}
+            {
+                name: "{{ item.product.name|escapejs }}",
+                quantity: {{ item.quantity }},
+                price: {{ item.product.price }}
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ]
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+];
+
+let selectedOrders = new Set();
+
+function updateSummary() {
+    const selectedCount = selectedOrders.size;
+    const summaryDiv = document.getElementById('selection-summary');
+
+    if (selectedCount === 0) {
+        summaryDiv.style.display = 'none';
+        return;
+    }
+
+    summaryDiv.style.display = 'block';
+
+    // Calculate totals
+    let totalAmount = 0;
+    const itemCounts = {};
+
+    selectedOrders.forEach(orderId => {
+        const order = ordersData.find(o => o.id === orderId);
+        if (order) {
+            totalAmount += order.total_amount;
+            order.items.forEach(item => {
+                if (itemCounts[item.name]) {
+                    itemCounts[item.name] += item.quantity;
+                } else {
+                    itemCounts[item.name] = item.quantity;
+                }
+            });
+        }
+    });
+
+    // Update display
+    document.getElementById('group-id').textContent = `GRP${new Date().toISOString().slice(0,15).replace(/[-:]/g,'')}`;
+    document.getElementById('selected-count').textContent = selectedCount;
+    document.getElementById('total-amount').textContent = `RM ${totalAmount.toFixed(2)}`;
+
+    // Update items summary
+    const itemsSummary = document.getElementById('items-summary');
+    const sortedItems = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]);
+    itemsSummary.innerHTML = sortedItems.map(([name, qty]) => `${name}: ${qty}`).join(', ');
+}
+
+function toggleOrderSelection(orderId, checked) {
+    if (checked) {
+        selectedOrders.add(orderId);
+    } else {
+        selectedOrders.delete(orderId);
+    }
+    updateSummary();
+}
+
+// Event listeners
+document.getElementById('select-all').addEventListener('change', function(e) {
+    const checkboxes = document.querySelectorAll('.order-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = e.target.checked;
+        toggleOrderSelection(parseInt(cb.value), e.target.checked);
+    });
+});
+
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('order-checkbox')) {
+        const orderId = parseInt(e.target.value);
+        toggleOrderSelection(orderId, e.target.checked);
+
+        // Update select-all checkbox
+        const allCheckboxes = document.querySelectorAll('.order-checkbox');
+        const checkedBoxes = document.querySelectorAll('.order-checkbox:checked');
+        document.getElementById('select-all').checked = allCheckboxes.length === checkedBoxes.length;
+    }
+});
+
+document.getElementById('clear-selection').addEventListener('click', function() {
+    selectedOrders.clear();
+    document.querySelectorAll('.order-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('select-all').checked = false;
+    updateSummary();
+});
+
+document.getElementById('print-prep-list').addEventListener('click', function() {
+    if (selectedOrders.size === 0) {
+        alert('Please select at least one order.');
+        return;
+    }
+
+    // Submit form to create prep group
+    const form = document.getElementById('prep-group-form');
+    const orderInputs = form.querySelectorAll('input[name="order_ids"]');
+    orderInputs.forEach(input => input.remove()); // Clear existing
+
+    selectedOrders.forEach(orderId => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'order_ids';
+        input.value = orderId;
+        form.appendChild(input);
+    });
+
+    form.submit();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends 'admin_base.html' %}
+
+{% block page_title %}Prepared Orders{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header">
+    <h1>Prep Groups</h1>
+    <p>Groups of orders that have been prepared together</p>
+</div>
+
+<!-- Navigation -->
+<div class="mb-4">
+    <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
+    <a href="{% url 'approved_orders_list' %}" class="btn btn-outline-primary">View Approved Orders</a>
+</div>
+
+<!-- Filters and Search -->
+<div class="content-card mb-4">
+    <form method="get" class="row g-3">
+        <div class="col-md-4">
+            <label for="q" class="form-label">Search</label>
+            <input type="text" name="q" id="q" value="{{ search_query }}" class="form-control" placeholder="Order #, customer, phone">
+        </div>
+        <div class="col-md-2">
+            <label for="days" class="form-label">Days since created</label>
+            <input type="number" name="days" id="days" value="{{ days_filter }}" class="form-control" placeholder="e.g. 1">
+        </div>
+        <div class="col-md-2">
+            <label for="count" class="form-label">Limit results</label>
+            <input type="number" name="count" id="count" value="{{ order_count_filter }}" class="form-control" placeholder="e.g. 50">
+        </div>
+        <div class="col-md-2">
+            <label for="order_by" class="form-label">Sort by</label>
+            <select name="order_by" id="order_by" class="form-select">
+                <option value="-created_at" {% if order_by == '-created_at' %}selected{% endif %}>Newest first</option>
+                <option value="created_at" {% if order_by == 'created_at' %}selected{% endif %}>Oldest first</option>
+                <option value="-total_orders" {% if order_by == '-total_orders' %}selected{% endif %}>Most orders</option>
+                <option value="total_orders" {% if order_by == '-total_orders' %}selected{% endif %}>Fewest orders</option>
+                <option value="-total_amount" {% if order_by == '-total_amount' %}selected{% endif %}>Highest amount</option>
+                <option value="total_amount" {% if order_by == 'total_amount' %}selected{% endif %}>Lowest amount</option>
+            </select>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary me-2">Filter</button>
+            <a href="{% url 'prepared_orders_list' %}" class="btn btn-outline-secondary">Reset</a>
+        </div>
+    </form>
+</div>
+
+<!-- Prepared Orders Table -->
+<div class="content-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold mb-0">Prep Groups ({{ prep_groups|length }})</h5>
+        <small class="text-muted">Click group ID to view details</small>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Group ID</th>
+                    <th>Created</th>
+                    <th>Orders</th>
+                    <th>Total Amount</th>
+                    <th>Created By</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for group in prep_groups %}
+                <tr class="table-success">
+                    <td>
+                        <a href="{% url 'prep_group_detail' group.group_id %}" class="text-decoration-none fw-bold">
+                            {{ group.group_id }}
+                        </a>
+                    </td>
+                    <td>
+                        <div>{{ group.created_at|date:"d M Y" }}</div>
+                        <small class="text-muted">{{ group.created_at|date:"H:i" }}</small>
+                    </td>
+                    <td class="fw-bold">{{ group.total_orders }}</td>
+                    <td class="fw-bold">RM {{ group.total_amount }}</td>
+                    <td>
+                        {% if group.created_by %}
+                            {{ group.created_by.username }}
+                        {% else %}
+                            System
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <div class="btn-group" role="group">
+                            <a href="{% url 'prep_group_detail' group.group_id %}" class="btn btn-sm btn-outline-dark">View Group</a>
+                            <button onclick="printGroup('{{ group.group_id }}')" class="btn btn-sm btn-outline-primary">Print Prep List</button>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">No prep groups found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function printGroup(groupId) {
+    const url = `/dashboard/prep-group/${groupId}/`;
+    window.open(url, '_blank');
+}
+</script>
+{% endblock %}

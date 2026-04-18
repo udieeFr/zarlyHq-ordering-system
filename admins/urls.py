@@ -10,7 +10,11 @@ urlpatterns = [
     path('order/<int:order_id>/reject/', views.reject_order, name='reject_order'),
     path('order/multi-accept/', views.bulk_accept_orders, name='bulk_accept_orders'),
     path('approved-orders/', views.approved_orders_list, name='approved_orders_list'),
+    path('prepared-orders/', views.prepared_orders_list, name='prepared_orders_list'),
+    path('prep-group/<str:group_id>/', views.prep_group_detail, name='prep_group_detail'),
     path('order/<int:order_id>/print-summary/', views.print_order_summary, name='print_order_summary'),
+    path('prep-list/', views.print_prep_list, name='print_prep_list'),
+    path('mark-prepared/', views.mark_orders_prepared, name='mark_orders_prepared'),
     
     # Inventory and Product Management
     path('inventory/', views.inventory_list, name='inventory_list'),
