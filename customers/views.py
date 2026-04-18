@@ -237,13 +237,38 @@ def submit_order(request):
             return redirect('product_list')
         
         # Capture realistic shipping information
+        latitude = request.POST.get('latitude')
+        longitude = request.POST.get('longitude')
+        try:
+            latitude = Decimal(latitude.strip()) if latitude else None
+        except Exception:
+            latitude = None
+        try:
+            longitude = Decimal(longitude.strip()) if longitude else None
+        except Exception:
+            longitude = None
+
+        street_address = request.POST.get('street_address', '').strip()
+        city = request.POST.get('city', '').strip()
+        state = request.POST.get('state', '').strip()
+        postcode = request.POST.get('postcode', '').strip()
+        formatted_address = request.POST.get('formatted_address', '').strip() or ', '.join(
+            part for part in [street_address, city, state, postcode] if part
+        )
+
         order = Order.objects.create(
             customer=request.user,
-            total_amount=total_price, 
+            total_amount=total_price,
             status='pending',
             full_name=request.POST.get('full_name'),
             phone_number=request.POST.get('phone_number'),
-            shipping_address=request.POST.get('shipping_address'),
+            street_address=street_address,
+            city=city,
+            state=state,
+            postcode=postcode,
+            latitude=latitude,
+            longitude=longitude,
+            formatted_address=formatted_address,
             order_notes=request.POST.get('order_notes')
         )
         

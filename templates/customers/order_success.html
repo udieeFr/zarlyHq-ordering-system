@@ -34,12 +34,12 @@
                     <h6 class="fw-bold mb-3 border-bottom pb-2 text-muted">Delivery Details</h6>
                     <p class="mb-1"><strong>Receiver:</strong> {{ order.full_name }}</p>
                     <p class="mb-1"><strong>Contact:</strong> {{ order.phone_number }}</p>
-                    <p class="mb-0"><strong>Address:</strong><br>{{ order.shipping_address }}</p>
-                </div>
-            </div>
-
-            {% if order.status == 'pending_payment' %}
-            <div class="card shadow-sm border-0 bg-light p-4 mb-4 text-center" style="border-radius: 15px; border: 2px dashed #0dcaf0 !important;">
+                        <p class="mb-1"><strong>Street Address:</strong> {{ order.street_address }}</p>
+                        <p class="mb-1"><strong>City:</strong> {{ order.city }}</p>
+                        <p class="mb-1"><strong>State:</strong> {{ order.state }}</p>
+                        <p class="mb-1"><strong>Postcode:</strong> {{ order.postcode }}</p>
+                        <p class="mb-0"><strong>Location:</strong> {{ order.latitude }}, {{ order.longitude }}</p>
+                {% if order.status == 'pending_payment' %}
                 <h5 class="fw-bold text-info">Payment Required</h5>
                 <p class="small text-muted mb-4">Please transfer **RM {{ order.total_amount }}** and upload your receipt below.</p>
                 <img src="{% static 'images/duitnow-qr.jpg' %}" style="max-width: 180px;" class="rounded shadow-sm mb-4">
@@ -48,8 +48,9 @@
                     <input type="file" name="payment_proof" class="form-control mb-3" required>
                     <button type="submit" class="btn btn-info w-100 text-white fw-bold py-2">Submit Payment Receipt</button>
                 </form>
+                {% endif %}
             </div>
-            {% endif %}
+        </div>
 
             <div class="d-grid gap-2">
                 {% if order.status == 'approved' and order.digital_signature %}

@@ -29,8 +29,12 @@
                     <span class="text-muted">{{ order.phone_number }}</span>
                 </div>
                 <div class="col-12 mb-3">
-                    <strong>Shipping Address:</strong><br>
-                    <span class="text-muted">{{ order.shipping_address }}</span>
+                    <strong>Delivery Address:</strong><br>
+                    <span class="text-muted">{{ order.address_summary }}</span>
+                </div>
+                <div class="col-12 mb-3">
+                    <strong>Coordinates:</strong><br>
+                    <span class="text-muted">{{ order.latitude }}, {{ order.longitude }}</span>
                 </div>
                 <div class="col-12">
                     <strong>Order Notes:</strong><br>

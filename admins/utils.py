@@ -24,10 +24,20 @@ def generate_invoice_pdf(order):
     c.drawString(50, 770, f"Order Receipt #{order.id}")
     c.drawString(50, 755, f"Date: {order.created_at.strftime('%Y-%m-%d %H:%M')}")
     c.drawString(50, 740, f"Customer: {order.customer.username}")
+    if order.street_address or order.city or order.state or order.postcode:
+        c.drawString(50, 725, f"Address: {order.address_summary}")
+        y = 705
+    else:
+        y = 725
+    if order.latitude and order.longitude:
+        c.drawString(50, y - 15, f"Coordinates: {order.latitude}, {order.longitude}")
+        y -= 25
+    else:
+        y -= 10
+
+    c.line(50, y, 550, y)
     
-    c.line(50, 730, 550, 730)
-    
-    y = 700
+    y -= 30
     for item in order.items.all():
         c.drawString(50, y, f"{item.product.name} (x{item.quantity})")
         c.drawString(450, y, f"RM {item.subtotal}")

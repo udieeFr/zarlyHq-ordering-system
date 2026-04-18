@@ -45,9 +45,16 @@
                 ID: {{ order.customer.username }}
             </td>
             <td>
-                <div class="section-label">Shipping Address</div>
-                {{ order.shipping_address|linebreaksbr }}
+                <div class="section-label">Delivery Address</div>
+                {% if order.formatted_address %}
+                    {{ order.formatted_address|linebreaksbr }}
+                {% else %}
+                    {{ order.street_address }}, {{ order.city }}, {{ order.state }} {{ order.postcode }}
+                {% endif %}
                 {% if order.order_notes %}<br><strong>Note:</strong> {{ order.order_notes }}{% endif %}
+                {% if order.latitude and order.longitude %}
+                    <br><strong>Coordinates:</strong> {{ order.latitude }}, {{ order.longitude }}
+                {% endif %}
             </td>
         </tr>
     </table>

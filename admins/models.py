@@ -12,7 +12,13 @@ class Order(models.Model):
     customer = models.ForeignKey(User, on_delete=models.CASCADE, limit_choices_to={'role': 'customer'})
     full_name = models.CharField(max_length=255, null=True, blank=True)
     phone_number = models.CharField(max_length=20, null=True, blank=True)
-    shipping_address = models.TextField(null=True, blank=True)
+    street_address = models.CharField(max_length=255, null=True, blank=True)
+    city = models.CharField(max_length=120, null=True, blank=True)
+    state = models.CharField(max_length=120, null=True, blank=True)
+    postcode = models.CharField(max_length=20, null=True, blank=True)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    formatted_address = models.TextField(blank=True)
     order_notes = models.TextField(null=True, blank=True)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='pending')
@@ -22,6 +28,13 @@ class Order(models.Model):
     approved_at = models.DateTimeField(null=True, blank=True)
     approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
                                     related_name='approved_orders', limit_choices_to={'role__in': ['sales_admin', 'manager']})
+
+    @property
+    def address_summary(self):
+        if self.formatted_address:
+            return self.formatted_address
+        parts = [self.street_address, self.city, self.state, self.postcode]
+        return ', '.join([part for part in parts if part])
 
     def __str__(self):
         return f"Order #{self.id} - {self.customer} ({self.status})"

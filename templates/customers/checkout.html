@@ -2,13 +2,18 @@
 {% load static %}
 
 {% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+<style>
+    #map { min-height: 400px; width: 100%; border-radius: 12px; }
+    .leaflet-container { border-radius: 12px; }
+</style>
 <main class="container py-5">
     <form method="post" enctype="multipart/form-data" action="{% url 'submit_order' %}">
         {% csrf_token %}
         
         <div class="row g-5">
             <div class="col-md-7">
-                <h4 class="fw-bold mb-4">1. Shipping Information</h4>
+                <h4 class="fw-bold mb-4">1. Delivery Location</h4>
                 <div class="card p-4 shadow-sm border-0 mb-4">
                     <div class="row g-3">
                         <div class="col-12">
@@ -20,9 +25,34 @@
                             <input type="text" name="phone_number" class="form-control" placeholder="012-XXXXXXX" required>
                         </div>
                         <div class="col-12">
-                            <label class="form-label small fw-bold">Shipping Address</label>
-                            <textarea name="shipping_address" class="form-control" rows="3" placeholder="Street name, City, Postcode" required></textarea>
+                            <label class="form-label small fw-bold">Search Location</label>
+                            <div class="input-group mb-3">
+                                <input id="location-search" type="search" class="form-control" placeholder="Enter an address, neighbourhood, or landmark">
+                                <button type="button" class="btn btn-outline-primary" onclick="searchLocation()">Search</button>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-secondary mb-3" onclick="locateMe()">Use My Current Location</button>
+                            <div id="map" class="rounded" style="height: 400px; border: 1px solid #dee2e6;"></div>
+                            <div id="location-status" class="text-muted small mt-2">Map is loading and waiting for location permission.</div>
                         </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-bold">Street Address</label>
+                            <input type="text" id="street_address" name="street_address" class="form-control" placeholder="Street and house number" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">City</label>
+                            <input type="text" id="city" name="city" class="form-control" placeholder="City / Town" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">State</label>
+                            <input type="text" id="state" name="state" class="form-control" placeholder="State" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Postcode</label>
+                            <input type="text" id="postcode" name="postcode" class="form-control" placeholder="Postcode" required>
+                        </div>
+                        <input type="hidden" id="latitude" name="latitude">
+                        <input type="hidden" id="longitude" name="longitude">
+                        <input type="hidden" id="formatted_address" name="formatted_address">
                         <div class="col-12">
                             <label class="form-label small fw-bold">Order Notes (Optional)</label>
                             <input type="text" name="order_notes" class="form-control" placeholder="Special delivery instructions">
@@ -78,9 +108,154 @@
     </form>
 </main>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script>
     function toggleUpload(show) {
         document.getElementById('upload-section').style.display = show ? 'block' : 'none';
+    }
+
+    const statusEl = document.getElementById('location-status');
+    const defaultLocation = [3.1390, 101.6869];
+
+    function setStatus(text, isError = false) {
+        if (!statusEl) return;
+        statusEl.textContent = text;
+        statusEl.style.color = isError ? '#d63384' : '#6c757d';
+    }
+
+    function initMap() {
+        const map = L.map('map').setView(defaultLocation, 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors / OSM France',
+            maxZoom: 19,
+            subdomains: ['a', 'b', 'c']
+        }).addTo(map);
+
+        const marker = L.marker(defaultLocation, { draggable: true }).addTo(map);
+        marker.on('dragend', function () {
+            const position = marker.getLatLng();
+            updateLocationFields(position.lat, position.lng);
+            reverseGeocode(position.lat, position.lng);
+        });
+
+        return { map, marker };
+    }
+
+    let map, marker;
+    document.addEventListener('DOMContentLoaded', function () {
+        ({ map, marker } = initMap());
+        setStatus('Map loaded. Click “Use My Current Location” or search an address.');
+        updateLocationFields(defaultLocation[0], defaultLocation[1]);
+        reverseGeocode(defaultLocation[0], defaultLocation[1]);
+    });
+
+    function updateLocationFields(lat, lng) {
+        const latitudeEl = document.getElementById('latitude');
+        const longitudeEl = document.getElementById('longitude');
+        if (latitudeEl) latitudeEl.value = lat.toFixed(6);
+        if (longitudeEl) longitudeEl.value = lng.toFixed(6);
+    }
+
+    function fillAddressFields(data) {
+        if (!data || !data.address) {
+            setStatus('Location found, but address details are unavailable.', true);
+            return;
+        }
+        const address = data.address;
+        const streetParts = [];
+        if (address.house_number) streetParts.push(address.house_number);
+        if (address.road) streetParts.push(address.road);
+        if (!address.road && address.neighbourhood) streetParts.push(address.neighbourhood);
+        const street = streetParts.join(' ').trim();
+
+        const streetEl = document.getElementById('street_address');
+        const cityEl = document.getElementById('city');
+        const stateEl = document.getElementById('state');
+        const postcodeEl = document.getElementById('postcode');
+        const formattedEl = document.getElementById('formatted_address');
+
+        if (streetEl) streetEl.value = street || data.display_name || '';
+        if (cityEl) cityEl.value = address.city || address.town || address.village || address.county || '';
+        if (stateEl) stateEl.value = address.state || address.region || '';
+        if (postcodeEl) postcodeEl.value = address.postcode || '';
+        if (formattedEl) formattedEl.value = data.display_name || '';
+
+        setStatus('Location updated successfully. You may drag the marker if needed.');
+    }
+
+    function reverseGeocode(lat, lng) {
+        setStatus('Resolving address from coordinates...');
+        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`;
+        fetch(url, { headers: { 'Accept': 'application/json' } })
+            .then((response) => response.json())
+            .then((data) => {
+                fillAddressFields(data);
+            })
+            .catch(() => {
+                setStatus('Reverse geocoding failed. Please search manually.', true);
+            });
+    }
+
+    function locateMe() {
+        if (!navigator.geolocation) {
+            setStatus('Geolocation is not available in your browser.', true);
+            return;
+        }
+        setStatus('Requesting location permission...');
+        navigator.geolocation.getCurrentPosition(
+            function (position) {
+                const latitude = position.coords.latitude;
+                const longitude = position.coords.longitude;
+                if (marker) {
+                    marker.setLatLng([latitude, longitude]);
+                    map.setView([latitude, longitude], 15);
+                }
+                updateLocationFields(latitude, longitude);
+                reverseGeocode(latitude, longitude);
+            },
+            function (error) {
+                if (error.code === error.PERMISSION_DENIED) {
+                    setStatus('Location permission denied. Use search instead.', true);
+                } else {
+                    setStatus('Could not access your location. Please search manually.', true);
+                }
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0,
+            }
+        );
+    }
+
+    function searchLocation() {
+        const query = document.getElementById('location-search').value.trim();
+        if (!query) {
+            setStatus('Type an address or landmark before searching.', true);
+            return;
+        }
+        setStatus('Searching for your location...');
+        const searchUrl = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&q=${encodeURIComponent(query)}`;
+        fetch(searchUrl, { headers: { 'Accept': 'application/json' } })
+            .then((response) => response.json())
+            .then((results) => {
+                if (!results || !results.length) {
+                    setStatus('Location not found. Try a different query.', true);
+                    return;
+                }
+                const best = results[0];
+                const lat = parseFloat(best.lat);
+                const lon = parseFloat(best.lon);
+                if (marker) {
+                    marker.setLatLng([lat, lon]);
+                    map.setView([lat, lon], 15);
+                }
+                updateLocationFields(lat, lon);
+                fillAddressFields(best);
+            })
+            .catch(() => {
+                setStatus('Search failed. Please try again later.', true);
+            });
     }
 </script>
 {% endblock %}
