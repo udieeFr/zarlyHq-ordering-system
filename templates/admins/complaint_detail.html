@@ -1,72 +1,96 @@
-{% extends 'base.html' %}
+{% extends 'admin_base.html' %}
+
+{% block page_title %}Complaint #{{ complaint.id }}{% endblock %}
+
 {% block content %}
-<div class="container py-5">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="fw-bold mb-0">Complaint Detail #{{ complaint.id }}</h2>
-            <p class="text-muted">Reviewing issue for Order #{{ complaint.order.id }}</p>
+<!-- Page Header -->
+<div class="page-header">
+    <h1>🚨 Complaint #{{ complaint.id }}</h1>
+    <p>Reviewing issue for Order #{{ complaint.order.id }}</p>
+</div>
+
+<!-- Navigation -->
+<div class="mb-4">
+    <a href="{% url 'admin_complaints_list' %}" class="btn btn-outline-secondary">← Back to Complaints</a>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <!-- Reported Issue -->
+        <div class="content-card">
+            <h5 class="fw-bold border-bottom pb-3 mb-3" style="color: #ef4444;">⚠️ Reported Issue</h5>
+            <h6 class="fw-bold mb-3">{{ complaint.subject }}</h6>
+            <p class="text-muted mb-4">{{ complaint.message }}</p>
+            {% if complaint.evidence_image %}
+                <img src="{{ complaint.evidence_image.url }}" class="img-fluid rounded border mb-3" style="max-height: 400px; cursor: zoom-in; border-color: #ef4444;" onclick="window.open(this.src)">
+            {% else %}
+                <p class="small text-muted">No evidence image provided.</p>
+            {% endif %}
         </div>
-        <a href="{% url 'admin_complaints_list' %}" class="btn btn-outline-secondary">&larr; Back to List</a>
-    </div>
 
-    <div class="row g-4">
-        <div class="col-lg-7">
-            <div class="card shadow-sm border-0 mb-4 p-4 rounded-4">
-                <h5 class="fw-bold text-danger border-bottom pb-2 mb-3">Reported Issue</h5>
-                <h6 class="fw-bold mb-1">{{ complaint.subject }}</h6>
-                <p class="text-muted mb-4">{{ complaint.message }}</p>
-                {% if complaint.evidence_image %}
-                    <img src="{{ complaint.evidence_image.url }}" class="img-fluid rounded border" style="max-height: 400px; cursor: zoom-in;" onclick="window.open(this.src)">
-                {% else %}
-                    <p class="small text-muted">No evidence image provided.</p>
-                {% endif %}
-            </div>
-
-            <div class="card shadow-sm border-0 p-4 rounded-4">
-                <h5 class="fw-bold border-bottom pb-2 mb-3">Customer Contact</h5>
-                <div class="row g-3">
-                    <div class="col-md-6"><label class="small text-muted d-block">Full Name</label><strong>{{ order.full_name }}</strong></div>
-                    <div class="col-md-6"><label class="small text-muted d-block">Phone Number</label><strong class="text-primary">{{ order.phone_number }}</strong></div>
-                    <div class="col-md-6"><label class="small text-muted d-block">Username</label><span class="badge bg-light text-dark">{{ customer.username }}</span></div>
-                    <div class="col-md-6"><label class="small text-muted d-block">Date of Order</label><span>{{ order.created_at|date:"d M Y" }}</span></div>
+        <!-- Customer Contact Information -->
+        <div class="content-card">
+            <h5 class="fw-bold border-bottom pb-3 mb-3">👤 Customer Contact</h5>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="small text-muted d-block mb-1"><strong>Full Name</strong></label>
+                    {{ order.full_name }}
+                </div>
+                <div class="col-md-6">
+                    <label class="small text-muted d-block mb-1"><strong>Phone Number</strong></label>
+                    <span class="text-primary">{{ order.phone_number }}</span>
+                </div>
+                <div class="col-md-6">
+                    <label class="small text-muted d-block mb-1"><strong>Username</strong></label>
+                    <span class="badge bg-light text-dark">{{ customer.username }}</span>
+                </div>
+                <div class="col-md-6">
+                    <label class="small text-muted d-block mb-1"><strong>Order Date</strong></label>
+                    {{ order.created_at|date:"d M Y" }}
                 </div>
             </div>
         </div>
+    </div>
 
-        <div class="col-lg-5">
-            <div class="card shadow-sm border-0 mb-4 p-4 bg-light rounded-4 border-start border-primary border-4">
-                <h5 class="fw-bold mb-3">Integrity Check</h5>
-                {% if order.digital_signature %}
-                    <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-primary w-100 fw-bold py-2 mb-3" target="_blank">View Signed Receipt 📄</a>
-                    <div class="p-2 bg-white rounded border small text-break"><code style="font-size: 0.7rem;">HASH: {{ order.digital_signature.signature_hash }}</code></div>
+    <div class="col-lg-5">
+        <!-- Integrity Check -->
+        <div class="content-card" style="border: 2px solid #3b82f6; background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%);">
+            <h5 class="fw-bold mb-3" style="color: #0369a1;">🔒 Integrity Check</h5>
+            {% if order.digital_signature %}
+                <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-primary w-100 fw-bold py-2 mb-3" target="_blank">📄 View Signed Receipt</a>
+                <div class="p-3 bg-white rounded border small text-break" style="border-color: #3b82f6;">
+                    <strong style="font-size: 0.75rem;">HASH:</strong><br>
+                    <code style="font-size: 0.65rem; word-break: break-all;">{{ order.digital_signature.signature_hash }}</code>
+                </div>
+            {% else %}
+                <div class="alert alert-warning small mb-0">⚠️ No signed receipt found.</div>
+            {% endif %}
+        </div>
+
+        <!-- Resolution Action -->
+        <div class="content-card">
+            <h5 class="fw-bold mb-4">⚡ Resolution Action</h5>
+            <form method="post" action="{% url 'resolve_complaint' complaint.id %}">
+                {% csrf_token %}
+                {% if complaint.status == 'pending' %}
+                    <div class="mb-4">
+                        <label class="form-label small fw-bold">Select Administrative Action:</label>
+                        <select name="action_taken" class="form-select border-2" style="border-color: #3b82f6;" required>
+                            <option value="" disabled selected>-- Choose action --</option>
+                            <option value="refund">💰 Contact User for Refund</option>
+                            <option value="remake">🔄 Remake Order</option>
+                            <option value="dismissed">❌ Dismiss Complaint</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100 py-3 fw-bold">✓ Confirm Resolution</button>
                 {% else %}
-                    <div class="alert alert-warning small">No signed receipt found.</div>
+                    <div class="alert alert-success mb-0">
+                        <strong>Resolution Outcome:</strong><br>
+                        {{ complaint.get_action_taken_display }}<br>
+                        <small class="text-muted mt-2 d-block">Closed on {{ complaint.created_at|date:"d M Y" }}</small>
+                    </div>
                 {% endif %}
-            </div>
-
-            <div class="card shadow-sm border-0 p-4 rounded-4">
-                <h5 class="fw-bold mb-4">Action Choice</h5>
-                <form method="post" action="{% url 'resolve_complaint' complaint.id %}">
-                    {% csrf_token %}
-                    {% if complaint.status == 'pending' %}
-                        <div class="mb-4">
-                            <label class="form-label small fw-bold">Select Administrative Action:</label>
-                            <select name="action_taken" class="form-select border-primary" required>
-                                <option value="" disabled selected>-- Choose action --</option>
-                                <option value="refund">Contact User for Refund</option>
-                                <option value="remake">Remake Order</option>
-                                <option value="dismissed">Dismiss Complaint</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="btn btn-success w-100 py-3 fw-bold">✅ Confirm Resolution</button>
-                    {% else %}
-                        <div class="text-center py-3">
-                            <h6 class="fw-bold text-success">Outcome: {{ complaint.get_action_taken_display }}</h6>
-                            <p class="text-muted small">Case closed on {{ complaint.created_at|date:"d M Y" }}</p>
-                        </div>
-                    {% endif %}
-                </form>
-            </div>
+            </form>
         </div>
     </div>
 </div>

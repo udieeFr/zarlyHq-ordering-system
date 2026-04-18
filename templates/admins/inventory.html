@@ -1,81 +1,87 @@
-{% extends 'base.html' %}
-{% block content %}
-<div class="container py-5">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="fw-bold mb-0">Inventory Stock Management</h2>
-            <p class="text-muted small"></p>
-        </div>
-        <div class="d-flex gap-2">
-            {% if has_staging %}
-                <button class="btn btn-warning fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#summaryModal">
-                    Review and Confirm ({{ staging_count }} Pending)
-                </button>
-                <a href="{% url 'clear_stock_staging' %}" class="btn btn-outline-danger">Discard Changes</a>
-            {% endif %}
-            <a href="{% url 'add_product' %}" class="btn btn-primary fw-bold">New Product</a>
-            <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">Dashboard</a>
-        </div>
-    </div>
+{% extends 'admin_base.html' %}
 
-    <div class="card border-0 shadow-sm overflow-hidden rounded-4">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="bg-light text-uppercase small fw-bold">
-                <tr>
-                    <th class="ps-4">Product Name</th>
-                    <th>Category</th>
-                    <th>Actual Stock</th>
-                    <th style="width: 150px;">New Stock</th>
-                    <th class="text-end pe-4">Current Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in inventory_data %}
-                <tr class="{% if item.has_change %}table-warning{% endif %}" id="row-{{ item.product.id }}">
-                    <td class="ps-4 fw-bold">{{ item.product.name }}</td>
-                    <td><span class="badge bg-light text-dark">{{ item.product.category.name }}</span></td>
-                    <td>{{ item.product.stock }}</td>
-                    <td>
-                        <input type="number" 
-                               name="stock" 
-                               value="{{ item.staged_stock|default:item.product.stock }}" 
-                               class="form-control form-control-sm stock-input" 
-                               data-url="{% url 'stage_stock_update' item.product.id %}"
-                               style="width: 100px;">
-                    </td>
-                    <td class="text-end pe-4">
-                        <span class="status-badge">
-                            {% if item.has_change %}
-                                <span class="badge bg-primary">Updating</span>
-                            {% elif item.product.stock <= 0 %}
-                                <span class="badge bg-danger">Out of Stock</span>
-                            {% else %}
-                                <span class="badge bg-success">In Stock</span>
-                            {% endif %}
-                        </span>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="5" class="text-center py-5 text-muted">No products found.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+{% block page_title %}Inventory Management{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header">
+    <h1>📦 Inventory Stock Management</h1>
+    <p>Manage product stock levels and quantities</p>
 </div>
 
+<!-- Action Buttons -->
+<div class="mb-4 d-flex gap-2">
+    {% if has_staging %}
+        <button class="btn btn-warning fw-bold" data-bs-toggle="modal" data-bs-target="#summaryModal">
+            ⚠️ Review and Confirm ({{ staging_count }} Pending)
+        </button>
+        <a href="{% url 'clear_stock_staging' %}" class="btn btn-outline-danger">Discard Changes</a>
+    {% endif %}
+    <a href="{% url 'add_product' %}" class="btn btn-primary fw-bold">➕ New Product</a>
+    <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
+</div>
+
+<!-- Inventory Table -->
+<div class="content-card overflow-hidden">
+    <table class="table table-hover align-middle mb-0">
+        <thead class="bg-light text-uppercase small fw-bold">
+            <tr>
+                <th class="ps-4">Product Name</th>
+                <th>Category</th>
+                <th>Current Stock</th>
+                <th style="width: 150px;">New Stock</th>
+                <th class="text-end pe-4">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in inventory_data %}
+            <tr class="{% if item.has_change %}table-warning{% endif %}" id="row-{{ item.product.id }}">
+                <td class="ps-4 fw-bold">{{ item.product.name }}</td>
+                <td><span class="badge bg-light text-dark">{{ item.product.category.name }}</span></td>
+                <td>{{ item.product.stock }}</td>
+                <td>
+                    <input type="number" 
+                           name="stock" 
+                           value="{{ item.staged_stock|default:item.product.stock }}" 
+                           class="form-control form-control-sm stock-input" 
+                           data-url="{% url 'stage_stock_update' item.product.id %}"
+                           style="width: 100px;">
+                </td>
+                <td class="text-end pe-4">
+                    <span class="status-badge">
+                        {% if item.has_change %}
+                            <span class="badge bg-primary">Updating</span>
+                        {% elif item.product.stock <= 0 %}
+                            <span class="badge bg-danger">Out of Stock</span>
+                        {% else %}
+                            <span class="badge bg-success">In Stock</span>
+                        {% endif %}
+                    </span>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center py-5 text-muted">No products found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Confirm Modal -->
 <div class="modal fade" id="summaryModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content border-0 shadow rounded-4">
-            <div class="modal-header bg-dark text-white">
+        <div class="modal-content border-0 rounded-4">
+            <div class="modal-header" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: white;">
                 <h5 class="modal-title fw-bold">Confirm Inventory Updates</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
+                <p class="text-muted mb-3">Review the following changes before applying:</p>
                 <table class="table table-sm border">
                     <thead class="bg-light">
                         <tr>
-                            <th>Item Name</th>
+                            <th>Product Name</th>
                             <th class="text-center">Current</th>
+                            <th class="text-center">→</th>
                             <th class="text-center">Updated</th>
                         </tr>
                     </thead>
@@ -85,6 +91,7 @@
                             <tr>
                                 <td class="fw-bold">{{ item.product.name }}</td>
                                 <td class="text-center">{{ item.product.stock }}</td>
+                                <td class="text-center">→</td>
                                 <td class="text-center text-primary fw-bold">{{ item.staged_stock }}</td>
                             </tr>
                             {% endif %}
@@ -93,9 +100,10 @@
                 </table>
             </div>
             <div class="modal-footer border-0 p-4">
-                <form method="post" action="{% url 'confirm_stock_changes' %}" class="w-100">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" action="{% url 'confirm_stock_changes' %}" style="display: inline;">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-success w-100 py-3 fw-bold">Apply and Save to Database</button>
+                    <button type="submit" class="btn btn-success fw-bold" style="min-width: 150px;">✓ Apply Changes</button>
                 </form>
             </div>
         </div>
@@ -119,7 +127,6 @@ document.querySelectorAll('.stock-input').forEach(input => {
             body: 'stock=' + val
         }).then(response => {
             if (response.ok) {
-                // Optionally reload to update status badges or just highlight row
                 location.reload(); 
             }
         });
