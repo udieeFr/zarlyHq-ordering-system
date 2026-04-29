@@ -11,6 +11,9 @@ urlpatterns = [
     path('checkout/', views.checkout, name='checkout'),
     path('submit-order/', views.submit_order, name='submit_order'),
     path('order-details/<int:order_id>/', views.order_success, name='order_success'),
+    path('stripe/success/<int:order_id>/', views.stripe_success, name='stripe_success'),
+    path('stripe/cancel/<int:order_id>/', views.stripe_cancel, name='stripe_cancel'),
+    path('stripe/webhook/', views.stripe_webhook, name='stripe_webhook'),
     
     # Document & Payment Paths
     path('order/<int:order_id>/invoice/', views.download_invoice, name='download_invoice'),

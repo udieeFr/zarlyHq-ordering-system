@@ -17,8 +17,9 @@ from dotenv import load_dotenv
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load environment variables from .env file
-load_dotenv(os.path.join(BASE_DIR, '.env'))
+# Load environment variables from .env file.
+# override=True ensures the project .env wins over stale system variables.
+load_dotenv(os.path.join(BASE_DIR, '.env'), override=True)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -82,11 +83,11 @@ WSGI_APPLICATION = 'zarlyOs.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'zarly_db',
-        'USER': 'zarly_user',
-        'PASSWORD': 'supersecret123',   # Same as in docker-compose.yml
-        'HOST': 'localhost',            # Because we exposed port 5432
-        'PORT': '5433',
+        'NAME': os.getenv('DB_NAME', 'zarly_db'),
+        'USER': os.getenv('DB_USER', 'zarly_user'),
+        'PASSWORD': os.getenv('DB_PASSWORD', 'supersecret123'),
+        'HOST': os.getenv('DB_HOST', 'localhost'),
+        'PORT': os.getenv('DB_PORT', '5433'),
     }
 }
 
@@ -139,3 +140,15 @@ AUTH_USER_MODEL = 'customers.User'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'product_list' # Will use our home_redirect function
 LOGOUT_REDIRECT_URL = 'product_list'
+
+# ============================================================================
+# STRIPE CONFIGURATION
+# ============================================================================
+STRIPE_PUBLIC_KEY = os.getenv('STRIPE_PUBLIC_KEY', '')
+STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', '')
+STRIPE_CURRENCY = os.getenv('STRIPE_CURRENCY', 'MYR')
+
+# For localhost testing: use ngrok or Stripe CLI to tunnel webhooks
+# Stripe CLI: stripe listen --forward-to localhost:8000/api/stripe/webhook/
+STRIPE_WEBHOOK_TOLERANCE = 300  # Accept webhooks within 5 minutes of creation

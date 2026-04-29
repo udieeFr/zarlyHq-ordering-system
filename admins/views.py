@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Q, Sum
 from datetime import timedelta
-from .models import Order, DigitalSignature, Complaint, PrepGroup
+from .models import Order, DigitalSignature, Complaint, PrepGroup, Payment
 from .utils import generate_invoice_pdf, sign_pdf_digitally
 from customers.auth_utils import (
     sales_admin_required, 
@@ -36,13 +36,9 @@ def unified_login(request):
         if form.is_valid():
             user = form.get_user()
             login(request, user)
-            
-            # Redirect based on user role
-            next_url = request.POST.get('next') or request.GET.get('next')
-            if next_url and next_url != '/':
-                return redirect(next_url)
-            
-            # Role-based redirect
+
+            # Always redirect by role after login so staff land on the right area.
+            # This avoids stale ?next=... values sending sales admins somewhere else.
             dashboard_url = get_user_dashboard_url(user)
             return redirect(dashboard_url)
         else:
@@ -585,8 +581,14 @@ def bulk_accept_orders(request):
 def approve_order(request, order_id):
     """Generates PDF receipt and applies digital signature upon approval."""
     order = get_object_or_404(Order, id=order_id)
-    if not order.payment_proof:
-        messages.error(request, "Cannot approve: Payment proof missing.")
+
+    has_confirmed_stripe_payment = order.payments.filter(
+        payment_method='stripe',
+        status='succeeded'
+    ).exists()
+
+    if not order.payment_proof and not has_confirmed_stripe_payment:
+        messages.error(request, "Cannot approve: Payment proof or confirmed Stripe payment is missing.")
         return redirect('admin_order_detail', order_id=order.id)
     try:
         raw_pdf = generate_invoice_pdf(order)

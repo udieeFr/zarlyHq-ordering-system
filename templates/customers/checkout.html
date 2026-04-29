@@ -63,17 +63,18 @@
                 <h4 class="fw-bold mb-4">2. Payment Method</h4>
                 <div class="card p-4 shadow-sm border-0">
                     <div class="form-check mb-3 p-3 border rounded">
-                        <input class="form-check-input ms-1" type="radio" name="payment_method" value="now" id="payNow" checked onchange="toggleUpload(true)">
-                        <label class="form-check-label fw-bold ms-2" for="payNow">Pay Now (DuitNow / Bank Transfer)</label>
+                        <input class="form-check-input ms-1" type="radio" name="payment_method" value="stripe" id="payStripe" checked onchange="toggleUpload(false)">
+                        <label class="form-check-label fw-bold ms-2" for="payStripe">Pay Now with Stripe (Card / Online Banking)</label>
                     </div>
                     <div class="form-check mb-4 p-3 border rounded">
-                        <input class="form-check-input ms-1" type="radio" name="payment_method" value="later" id="payLater" onchange="toggleUpload(false)">
-                        <label class="form-check-label fw-bold ms-2" for="payLater">Pay Later (Cash on Delivery / After Approval)</label>
+                        <input class="form-check-input ms-1" type="radio" name="payment_method" value="manual" id="payManual" onchange="toggleUpload(true)">
+                        <label class="form-check-label fw-bold ms-2" for="payManual">Manual Payment Proof (DuitNow / Bank Transfer)</label>
                     </div>
 
-                    <div id="upload-section" class="bg-light p-3 rounded text-center">
-                        <p class="small fw-bold">Scan to Pay</p>
+                    <div id="upload-section" class="bg-light p-3 rounded text-center" style="display:none;">
+                        <p class="small fw-bold">Upload Your Payment Receipt</p>
                         <img src="{% static 'images/duitnow-qr.jpg' %}" style="max-width: 150px;" class="mb-3 rounded border">
+                        <p class="small text-muted">Use this only for manual bank transfer or DuitNow payment proof.</p>
                         <input type="file" name="payment_proof" class="form-control">
                     </div>
                 </div>
@@ -101,7 +102,7 @@
                         </label>
                     </div>
 
-                    <button type="submit" class="btn btn-primary w-100 py-3 fw-bold">Confirm Order & Generate Invoice</button>
+                    <button type="submit" class="btn btn-primary w-100 py-3 fw-bold">Confirm Order & Continue to Payment</button>
                 </div>
             </div>
         </div>

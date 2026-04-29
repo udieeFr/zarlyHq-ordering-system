@@ -40,14 +40,24 @@
                         <p class="mb-1"><strong>Postcode:</strong> {{ order.postcode }}</p>
                         <p class="mb-0"><strong>Location:</strong> {{ order.latitude }}, {{ order.longitude }}</p>
                 {% if order.status == 'pending_payment' %}
-                <h5 class="fw-bold text-info">Payment Required</h5>
-                <p class="small text-muted mb-4">Please transfer **RM {{ order.total_amount }}** and upload your receipt below.</p>
-                <img src="{% static 'images/duitnow-qr.jpg' %}" style="max-width: 180px;" class="rounded shadow-sm mb-4">
-                <form method="post" action="{% url 'upload_payment_proof' order.id %}" enctype="multipart/form-data">
-                    {% csrf_token %}
-                    <input type="file" name="payment_proof" class="form-control mb-3" required>
-                    <button type="submit" class="btn btn-info w-100 text-white fw-bold py-2">Submit Payment Receipt</button>
-                </form>
+                    <h5 class="fw-bold text-info">Payment Pending</h5>
+                    <p class="small text-muted mb-3">
+                        {% if payment and payment.payment_method == 'stripe' %}
+                            Your Stripe payment is being verified. Do not place the order again. This page will reflect payment status after webhook confirmation.
+                        {% else %}
+                            Please complete your payment and upload the receipt below if you used manual bank transfer or DuitNow.
+                        {% endif %}
+                    </p>
+                    {% if payment and payment.payment_method == 'manual' %}
+                        <img src="{% static 'images/duitnow-qr.jpg' %}" style="max-width: 180px;" class="rounded shadow-sm mb-4">
+                        <form method="post" action="{% url 'upload_payment_proof' order.id %}" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <input type="file" name="payment_proof" class="form-control mb-3" required>
+                            <button type="submit" class="btn btn-info w-100 text-white fw-bold py-2">Submit Payment Receipt</button>
+                        </form>
+                    {% endif %}
+                {% elif order.status == 'approved' %}
+                    <p class="small text-success mb-0">Payment approved and order is moving through fulfillment.</p>
                 {% endif %}
             </div>
         </div>

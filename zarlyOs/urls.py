@@ -29,7 +29,7 @@ def home_redirect(request):
         elif request.user.role in ['sales_admin', 'manager'] or request.user.is_superuser:
             return redirect('sales_admin_dashboard')
         else:
-            return redirect('login')
+            return redirect('product_list')
     else:
         return redirect('login')
 

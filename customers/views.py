@@ -2,13 +2,27 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
 from django.contrib import messages
-from django.http import HttpResponse  # Required for PDF downloads
+from django.http import HttpResponse, JsonResponse  # Required for PDF downloads
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 from .models import Product, Category, Allergy
-from admins.models import Order, OrderItem, Complaint
+from admins.models import Order, OrderItem, Complaint, Payment
 from admins.utils import generate_invoice_pdf  # The PDF generation engine
+from .stripe_utils import (
+    create_stripe_checkout_session, 
+    get_session_url,
+    verify_webhook_signature,
+    handle_checkout_session_completed,
+    handle_payment_intent_failed,
+    handle_charge_refunded,
+)
 from decimal import Decimal
+from django.conf import settings
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 def get_cart_from_session(request):
     """
@@ -133,8 +147,25 @@ def upload_payment_proof(request, order_id):
     
     if request.method == 'POST' and request.FILES.get('payment_proof'):
         order.payment_proof = request.FILES['payment_proof']
-        order.status = 'pending'  # Re-queue for admin approval
+        order.status = 'pending_payment'  # Re-queue for admin approval
         order.save()
+
+        payment, created = Payment.objects.get_or_create(
+            order=order,
+            payment_method='manual',
+            defaults={
+                'status': 'pending',
+                'amount': order.total_amount,
+                'currency': settings.STRIPE_CURRENCY,
+                'proof_image': order.payment_proof,
+            }
+        )
+        if not created:
+            payment.status = 'pending'
+            payment.amount = order.total_amount
+            payment.currency = settings.STRIPE_CURRENCY
+            payment.proof_image = order.payment_proof
+            payment.save()
         messages.success(request, "Payment proof uploaded! The admin will review it shortly.")
         return redirect('order_success', order_id=order.id)
     
@@ -227,7 +258,8 @@ def checkout(request):
 def submit_order(request):
     """
     Processes the checkout form: captures realistic shipping details,
-    creates the Order and OrderItems, and handles immediate payment proof.
+    creates the Order and OrderItems, and handles payment method selection.
+    For Stripe, redirects to Stripe Checkout. For manual, stores proof and awaits admin.
     """
     if request.method == 'POST':
         cart_items, total_price = get_cart_from_session(request)
@@ -283,18 +315,63 @@ def submit_order(request):
             item['product'].stock -= item['quantity']
             item['product'].save()
         
-        # Handle payment proof if uploaded during checkout
+        # Handle payment method selection
         payment_method = request.POST.get('payment_method')
-        if payment_method == 'now' and request.FILES.get('payment_proof'):
-            order.payment_proof = request.FILES['payment_proof']
-            order.save()
         
-        # Clear cart
-        request.session['cart'] = {}
-        request.session.modified = True
+        if payment_method == 'stripe':
+            # Create Stripe Checkout Session
+            session_id, error = create_stripe_checkout_session(order, request)
+            if error:
+                messages.error(
+                    request,
+                    f"Could not create Stripe payment session: {error}. Check STRIPE_SECRET_KEY and try again."
+                )
+                return redirect('checkout')
+
+            order.status = 'pending_payment'
+            order.save(update_fields=['status'])
+            
+            # Get the checkout URL
+            checkout_url = get_session_url(session_id)
+            if not checkout_url:
+                messages.error(request, "Could not retrieve Stripe checkout URL. Please try again.")
+                return redirect('checkout')
+            
+            # Clear cart before redirecting to Stripe
+            request.session['cart'] = {}
+            request.session.modified = True
+            
+            messages.success(request, 'Order created! Redirecting to payment...')
+            return redirect(checkout_url)
         
-        messages.success(request, f'Order #{order.id} submitted successfully!')
-        return redirect('order_success', order_id=order.id)
+        elif payment_method == 'manual' or payment_method == 'later':
+            # Manual payment: upload proof now or later
+            if request.FILES.get('payment_proof'):
+                order.payment_proof = request.FILES['payment_proof']
+                order.save()
+                # Change to pending so admin can review
+                order.status = 'pending_payment'
+                order.save(update_fields=['status'])
+            
+            # Create a manual payment record for audit trail
+            Payment.objects.create(
+                order=order,
+                payment_method='manual',
+                status='pending',
+                amount=order.total_amount,
+                currency=settings.STRIPE_CURRENCY,
+            )
+            
+            # Clear cart
+            request.session['cart'] = {}
+            request.session.modified = True
+            
+            messages.success(request, f'Order #{order.id} submitted successfully!')
+            return redirect('order_success', order_id=order.id)
+        
+        else:
+            messages.error(request, 'Please select a payment method.')
+            return redirect('checkout')
 
     return redirect('checkout')
 
@@ -302,8 +379,10 @@ def submit_order(request):
 def order_success(request, order_id):
     """Order detail/success page"""
     order = get_object_or_404(Order, id=order_id, customer=request.user)
+    payment = order.payments.order_by('-created_at').first()
     return render(request, 'customers/order_success.html', {
-        'order': order
+        'order': order,
+        'payment': payment,
     })
 
 def logout_view(request):
@@ -328,3 +407,123 @@ def submit_complaint(request):
         )
         messages.success(request, "Your complaint has been submitted successfully.")
     return redirect('product_list')
+
+
+# ============================================================================
+# STRIPE PAYMENT CALLBACKS AND WEBHOOK
+# ============================================================================
+
+@login_required
+def stripe_success(request, order_id):
+    """
+    Called after successful Stripe Checkout completion (via redirect_url).
+    Payment is not confirmed yet; webhook is the real authority.
+    This page shows pending status and awaits webhook processing.
+    """
+    order = get_object_or_404(Order, id=order_id, customer=request.user)
+    
+    # Get the payment record if it exists
+    payment = order.payments.filter(payment_method='stripe').first()
+    
+    return render(request, 'customers/stripe_success.html', {
+        'order': order,
+        'payment': payment,
+    })
+
+
+@login_required
+def stripe_cancel(request, order_id):
+    """
+    Called when customer cancels the Stripe Checkout flow.
+    Order remains in 'pending' state and can be retried.
+    """
+    order = get_object_or_404(Order, id=order_id, customer=request.user)
+    
+    # Mark the pending Stripe payment as cancelled
+    payment = order.payments.filter(
+        payment_method='stripe',
+        status='pending'
+    ).first()
+    
+    if payment:
+        payment.status = 'cancelled'
+        payment.save()
+    
+    messages.warning(request, 'Payment was cancelled. You can retry whenever ready.')
+    return render(request, 'customers/stripe_cancel.html', {
+        'order': order,
+        'payment': payment,
+    })
+
+
+@csrf_exempt  # Stripe doesn't use CSRF tokens, they use signature verification
+@require_http_methods(['POST'])
+def stripe_webhook(request):
+    """
+    Webhook endpoint for Stripe events.
+    Stripe sends payment status updates here.
+    
+    Important: We verify the signature before processing any event.
+    """
+    payload = request.body
+    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+    
+    # Verify signature
+    event, error = verify_webhook_signature(
+        payload,
+        sig_header,
+        settings.STRIPE_WEBHOOK_SECRET
+    )
+    
+    if error:
+        logger.warning(f'Webhook signature verification failed: {error}')
+        return JsonResponse({'error': 'Invalid signature'}, status=400)
+    
+    # Handle the event
+    event_type = event['type']
+    event_data = event['data']['object']
+    
+    try:
+        if event_type == 'checkout.session.completed':
+            # Payment successful
+            success, msg = handle_checkout_session_completed(
+                event_data['id'],
+                event
+            )
+            if success:
+                logger.info(f'Webhook processed: {msg}')
+            else:
+                logger.error(f'Webhook error: {msg}')
+        
+        elif event_type == 'payment_intent.payment_failed':
+            # Payment failed
+            success, msg = handle_payment_intent_failed(
+                event_data['id'],
+                event
+            )
+            if success:
+                logger.info(f'Webhook processed: {msg}')
+            else:
+                logger.error(f'Webhook error: {msg}')
+        
+        elif event_type == 'charge.refunded':
+            # Refund issued
+            success, msg = handle_charge_refunded(
+                event_data['id'],
+                event
+            )
+            if success:
+                logger.info(f'Webhook processed: {msg}')
+            else:
+                logger.error(f'Webhook error: {msg}')
+        
+        else:
+            # We don't handle this event type yet
+            logger.debug(f'Unhandled event type: {event_type}')
+    
+    except Exception as e:
+        logger.error(f'Unexpected error processing webhook: {str(e)}')
+    
+    # Always return 200 to Stripe so it knows we received the event
+    # (even if we couldn't process it; we'll retry on next attempt)
+    return JsonResponse({'received': True}, status=200)

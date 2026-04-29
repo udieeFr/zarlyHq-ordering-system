@@ -39,9 +39,6 @@
                     <form method="post" class="mb-4">
                         {% csrf_token %}
                         
-                        <!-- Hidden next parameter -->
-                        <input type="hidden" name="next" value="{{ request.GET.next|default:'/' }}">
-
                         <!-- Username Field -->
                         <div class="mb-3">
                             <label for="{{ form.username.id_for_label }}" class="form-label fw-bold small">

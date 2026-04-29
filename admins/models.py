@@ -74,6 +74,63 @@ class DigitalSignature(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
     signature_value = models.TextField()
 
+class Payment(models.Model):
+    """
+    Tracks payment transactions (Stripe, manual proof, etc).
+    One order can have multiple payment attempts (e.g., first fails, second succeeds).
+    This keeps payment audit trail separate from order state.
+    """
+    PAYMENT_METHOD_CHOICES = (
+        ('stripe', 'Stripe Card Payment'),
+        ('manual', 'Manual Proof (Bank Transfer / DuitNow)'),
+        ('cash', 'Cash on Delivery'),
+    )
+    
+    PAYMENT_STATUS_CHOICES = (
+        ('pending', 'Payment Initiated'),
+        ('processing', 'Payment Processing'),
+        ('succeeded', 'Payment Succeeded'),
+        ('failed', 'Payment Failed'),
+        ('cancelled', 'Payment Cancelled'),
+        ('refunded', 'Refunded'),
+    )
+    
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='payments')
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES)
+    status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)  # Amount paid
+    currency = models.CharField(max_length=3, default='MYR')
+    
+    # Stripe-specific fields
+    stripe_session_id = models.CharField(max_length=255, null=True, blank=True, unique=True)
+    stripe_payment_intent_id = models.CharField(max_length=255, null=True, blank=True)
+    stripe_charge_id = models.CharField(max_length=255, null=True, blank=True)
+    stripe_customer_id = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Manual payment fields
+    payment_reference = models.CharField(max_length=255, null=True, blank=True)  # Bank ref or transaction id
+    proof_image = models.ImageField(upload_to='payment_proofs/', null=True, blank=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    
+    # For webhook audit trail
+    last_webhook_event = models.CharField(max_length=100, null=True, blank=True)
+    webhook_event_timestamp = models.DateTimeField(null=True, blank=True)
+    
+    def __str__(self):
+        return f"Payment #{self.id} - Order #{self.order.id} - {self.status}"
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['order', '-created_at']),
+            models.Index(fields=['status', 'created_at']),
+            models.Index(fields=['stripe_session_id']),
+            models.Index(fields=['stripe_payment_intent_id']),
+        ]
+
 class Complaint(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending Review'),

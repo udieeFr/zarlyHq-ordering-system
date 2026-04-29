@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4 p-md-5">
+                    <h2 class="fw-bold mb-3">Payment cancelled</h2>
+                    <p class="text-muted mb-4">
+                        You cancelled the Stripe checkout for order #{{ order.id }}.
+                        Your order has not been marked as paid.
+                    </p>
+
+                    <div class="alert alert-warning">
+                        <strong>Status:</strong> {{ order.status|capfirst }}
+                        <br>
+                        <strong>Total:</strong> RM {{ order.total_amount }}
+                    </div>
+
+                    {% if payment %}
+                    <p class="mb-1"><strong>Payment method:</strong> {{ payment.get_payment_method_display }}</p>
+                    <p class="mb-1"><strong>Payment state:</strong> {{ payment.get_status_display }}</p>
+                    {% endif %}
+
+                    <a href="{% url 'checkout' %}" class="btn btn-primary mt-3">Try again</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

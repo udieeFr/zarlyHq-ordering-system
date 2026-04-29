@@ -101,12 +101,15 @@ def get_user_dashboard_url(user):
     if not user.is_authenticated:
         return 'login'
     
+    if not user.role:
+        return 'product_list'
+
     if user.role == 'customer':
         return 'product_list'
     elif user.role in ['sales_admin', 'manager'] or user.is_superuser:
         return 'dashboard_home'
     
-    return 'login'
+    return 'product_list'
 
 
 def get_user_login_url(user):
