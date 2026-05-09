@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .header { background-color: #dc3545; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; border: 1px solid #ddd; }
+        .reason-box { background-color: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 15px 0; }
+        .action-button { display: inline-block; background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; margin: 15px 0; }
+        .footer { text-align: center; color: #999; font-size: 12px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Payment Proof Rejected</h2>
+        </div>
+        
+        <div class="content">
+            <p>Hi <strong>{{ customer_name }}</strong>,</p>
+            
+            <p>Your payment proof for <strong>Order #{{ order_id }}</strong> was not approved. Please review the reason below and resubmit a valid payment proof.</p>
+            
+            <div class="reason-box">
+                <strong>Reason:</strong><br>
+                {{ reason }}
+            </div>
+            
+            <p><strong>What should you do?</strong></p>
+            <ol>
+                <li>Log in to your Zarly account</li>
+                <li>Go to your order details</li>
+                <li>Upload a new payment proof (clear image or PDF)</li>
+                <li>We'll verify and approve it within 24 hours</li>
+            </ol>
+            
+            <p>If you have any questions, please contact our customer support team.</p>
+            
+            <a href="{{ dashboard_url }}" class="action-button">View Your Order</a>
+        </div>
+        
+        <div class="footer">
+            <p>© 2024 Zarly. All rights reserved.</p>
+            <p>This is an automated email. Please do not reply to this address.</p>
+        </div>
+    </div>
+</body>
+</html>

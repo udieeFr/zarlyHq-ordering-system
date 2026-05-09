@@ -1,0 +1,205 @@
+{% extends 'customer_base.html' %}
+
+{% block page_title %}Rejected Orders{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">❌ Rejected Orders</h1>
+            
+            {% if total_rejected == 0 %}
+                <div class="alert alert-success" role="alert">
+                    <h4 class="alert-heading">Great news!</h4>
+                    <p class="mb-0">You don't have any rejected orders. All your orders have been accepted or are pending review.</p>
+                </div>
+            {% else %}
+                <div class="alert alert-info mb-4">
+                    <p class="mb-0">
+                        You have <strong>{{ total_rejected }} rejected order(s)</strong>. 
+                        <br>Please review the rejection reasons below. You can place a new order anytime.
+                    </p>
+                </div>
+
+                {% for rejected in rejected_orders %}
+                <div class="card mb-4 border-danger">
+                    <div class="card-header bg-light border-danger">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <h5 class="mb-1">❌ Order #{{ rejected.order.id }}</h5>
+                                <small class="text-muted">
+                                    Rejected on {{ rejected.rejected_at|date:"d M Y, H:i" }}
+                                </small>
+                            </div>
+                            <div class="col-auto">
+                                <span class="badge bg-danger">REJECTED</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <p class="mb-2">
+                                    <strong>Order Date:</strong><br>
+                                    {{ rejected.order.created_at|date:"d M Y, H:i" }}
+                                </p>
+                                <p class="mb-0">
+                                    <strong>Order Amount:</strong><br>
+                                    RM {{ rejected.order_total_amount }}
+                                </p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-2">
+                                    <strong>Items:</strong><br>
+                                    {{ rejected.order_item_count }} item(s)
+                                </p>
+                                <p class="mb-0">
+                                    <strong>Reviewed by:</strong><br>
+                                    {{ rejected.rejected_by.get_full_name|default:rejected.rejected_by.username }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <div class="alert alert-warning mb-0">
+                            <h6 class="alert-heading mb-2">🔴 Reason for Rejection:</h6>
+                            <p class="mb-0">
+                                <strong>{{ rejected.get_rejection_reason_display }}</strong>
+                            </p>
+                        </div>
+
+                        {% if rejected.rejection_reason.category %}
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                Category: <span class="badge bg-light text-dark">{{ rejected.rejection_reason.get_category_display }}</span>
+                            </small>
+                        </div>
+                        {% endif %}
+
+                        <div class="mt-3">
+                            <details class="details-box">
+                                <summary class="cursor-pointer">
+                                    <strong>📋 Order Details</strong>
+                                </summary>
+                                <div class="mt-3 pt-3 border-top">
+                                    <table class="table table-sm table-borderless">
+                                        <tbody>
+                                            <tr>
+                                                <td><strong>Order ID:</strong></td>
+                                                <td>#{{ rejected.order.id }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Delivery Address:</strong></td>
+                                                <td>{{ rejected.order.address_summary }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Phone:</strong></td>
+                                                <td>{{ rejected.order.phone_number }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Items Count:</strong></td>
+                                                <td>{{ rejected.order_item_count }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Total Amount:</strong></td>
+                                                <td>RM {{ rejected.order_total_amount }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+
+                                    {% if rejected.order.order_notes %}
+                                    <div class="mt-3">
+                                        <strong>Order Notes:</strong>
+                                        <p class="text-muted">{{ rejected.order.order_notes }}</p>
+                                    </div>
+                                    {% endif %}
+
+                                    {% if rejected.order.items.all %}
+                                    <div class="mt-3">
+                                        <strong>Items in Order:</strong>
+                                        <ul class="list-unstyled mt-2">
+                                            {% for item in rejected.order.items.all %}
+                                            <li class="mb-2">
+                                                <strong>{{ item.product.name }}</strong>
+                                                <br>
+                                                <small class="text-muted">
+                                                    Quantity: {{ item.quantity }} × RM {{ item.product.price }} = RM {{ item.subtotal }}
+                                                </small>
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-light">
+                        <p class="mb-0 small text-muted">
+                            💡 <strong>No payment was charged</strong> for this order. You can place a new order anytime.
+                            {% if rejected.can_appeal %}
+                            <br>If you believe this was a mistake, please <a href="{% url 'submit_complaint' %}">contact support</a>.
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                {% endfor %}
+
+                <!-- Pagination -->
+                {% if paginator.num_pages > 1 %}
+                <nav aria-label="Page navigation" class="mt-5">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1">First</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+                        </li>
+                        {% endif %}
+
+                        {% for num in paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                        {% else %}
+                        <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+                        {% endif %}
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ paginator.num_pages }}">Last</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            {% endif %}
+
+            <div class="mt-5">
+                <a href="{% url 'product_list' %}" class="btn btn-primary">← Back to Menu</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .details-box {
+        cursor: pointer;
+        padding: 12px;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        background: #f8f9fa;
+    }
+    .details-box summary {
+        outline: none;
+    }
+    .details-box summary:hover {
+        color: #0d6efd;
+    }
+</style>
+{% endblock %}

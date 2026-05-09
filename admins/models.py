@@ -192,3 +192,86 @@ class PrepGroup(models.Model):
                         'orders': [order.id]
                     }
         return sorted(item_counts.items(), key=lambda x: x[1]['quantity'], reverse=True)
+
+
+class RejectionReason(models.Model):
+    """Predefined rejection reasons for dropdown selection."""
+    CATEGORY_CHOICES = (
+        ('system', 'System Error'),
+        ('customer', 'Customer Issue'),
+        ('payment', 'Payment Issue'),
+        ('inventory', 'Inventory Issue'),
+        ('address', 'Address Issue'),
+        ('other', 'Other'),
+    )
+    
+    code = models.CharField(max_length=50, unique=True)  # e.g., 'OUT_OF_STOCK'
+    reason_text = models.CharField(max_length=200)  # e.g., 'Out of Stock'
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
+    customer_message = models.TextField(help_text="Message shown to customer")
+    internal_note = models.TextField(blank=True, help_text="Internal note for admins only")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['category', 'reason_text']
+        verbose_name_plural = "Rejection Reasons"
+    
+    def __str__(self):
+        return f"{self.reason_text} ({self.get_category_display()})"
+
+
+class RejectedOrder(models.Model):
+    """
+    Complete audit trail for rejected orders.
+    Stores order snapshot, rejection reason, admin info, and timestamps.
+    """
+    # Core rejection data
+    order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='rejection_record')
+    rejection_reason = models.ForeignKey(RejectionReason, on_delete=models.SET_NULL, null=True, blank=True)
+    custom_reason = models.TextField(blank=True, help_text="Custom rejection reason if admin typed instead of selecting predefined")
+    
+    # Admin who rejected
+    rejected_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                    related_name='rejected_orders', limit_choices_to={'role__in': ['sales_admin', 'manager']})
+    rejected_at = models.DateTimeField(auto_now_add=True)
+    
+    # Snapshot of order at time of rejection
+    order_total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    order_item_count = models.PositiveIntegerField()
+    customer_name = models.CharField(max_length=255)
+    customer_email = models.EmailField()
+    
+    # Customer notification tracking
+    customer_notified = models.BooleanField(default=False)
+    notification_sent_at = models.DateTimeField(null=True, blank=True)
+    
+    # Appeals/follow-up
+    can_appeal = models.BooleanField(default=True)
+    appeal_requested = models.BooleanField(default=False)
+    appeal_requested_at = models.DateTimeField(null=True, blank=True)
+    appeal_notes = models.TextField(blank=True)
+    
+    class Meta:
+        ordering = ['-rejected_at']
+        indexes = [
+            models.Index(fields=['order', '-rejected_at']),
+            models.Index(fields=['rejection_reason', 'rejected_at']),
+            models.Index(fields=['customer_email', '-rejected_at']),
+        ]
+    
+    def __str__(self):
+        return f"Rejected Order #{self.order.id} - {self.get_rejection_reason_display()}"
+    
+    def get_rejection_reason_display(self):
+        """Get the display reason (predefined or custom)."""
+        if self.custom_reason:
+            return self.custom_reason
+        return self.rejection_reason.reason_text if self.rejection_reason else "No reason provided"
+    
+    def get_customer_message(self):
+        """Get the message shown to customer."""
+        if self.custom_reason:
+            return self.custom_reason
+        return self.rejection_reason.customer_message if self.rejection_reason else "Your order was rejected."

@@ -27,10 +27,10 @@
                         <div class="text-muted small mb-2">Pending review</div>
                         <div class="fw-bold fs-4">{{ dashboard_metrics.pending_count }}</div>
                     </div>
-                    <div class="p-3 rounded-3 bg-white border shadow-sm" style="min-width: 160px;">
+                    <a href="{% url 'pending_payment_orders_list' %}" class="p-3 rounded-3 bg-white border shadow-sm" style="min-width: 160px; text-decoration: none; color: inherit; transition: all 0.3s;">
                         <div class="text-muted small mb-2">Awaiting payment</div>
                         <div class="fw-bold fs-4">{{ dashboard_metrics.pending_payment_count }}</div>
-                    </div>
+                    </a>
                     <div class="p-3 rounded-3 bg-white border shadow-sm" style="min-width: 160px;">
                         <div class="text-muted small mb-2">Approved</div>
                         <div class="fw-bold fs-4">{{ dashboard_metrics.approved_count }}</div>
@@ -80,7 +80,7 @@
                             <label class="form-check-label">Select all</label>
                         </div>
                         <button type="submit" class="btn btn-sm btn-success">Accept selected</button>
-                        <button type="button" class="btn btn-sm btn-outline-danger">Reject selected</button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="reject-selected-btn" data-bs-toggle="modal" data-bs-target="#rejectModal">Reject selected</button>
                     </div>
                 </div>
                 <div class="table-responsive">
@@ -130,77 +130,96 @@
                     </table>
                 </div>
             </form>
+
+            <!-- Hidden Bulk Reject Form -->
+            <form method="post" action="{% url 'bulk_reject_orders' %}" id="bulk-reject-form" style="display: none;">
+                {% csrf_token %}
+                <input type="hidden" name="rejection_reason" id="rejection-reason-input">
+            </form>
         </div>
 
         <!-- Awaiting Payment Table -->
         <div class="content-card">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div>
-                    <h5 class="fw-bold mb-0">💳 Awaiting Payment/Verification</h5>
-                    <small class="text-muted">Orders pending payment proof</small>
+            <form method="post" action="{% url 'bulk_accept_orders' %}" id="bulk-accept-payment-form">
+                {% csrf_token %}
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-3 gap-3">
+                    <div>
+                        <h5 class="fw-bold mb-0">💳 Awaiting Payment/Verification</h5>
+                        <small class="text-muted">Orders pending payment proof</small>
+                    </div>
+                    <div class="d-flex gap-2 align-items-center">
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="checkbox" id="select-all-payment-orders">
+                            <label class="form-check-label">Select all</label>
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-success">Accept selected</button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="reject-payment-selected-btn" data-bs-toggle="modal" data-bs-target="#rejectPaymentModal">Reject selected</button>
+                    </div>
                 </div>
-                <div class="form-check mb-0">
-                    <input class="form-check-input" type="checkbox" id="select-all-payment-orders">
-                    <label class="form-check-label">Select all</label>
-                </div>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th style="width: 40px;"></th>
-                            <th>Order</th>
-                            <th>Proof</th>
-                            <th>Status</th>
-                            <th class="text-end">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for order in pending_payment_orders %}
-                        <tr>
-                            <td>
-                                <div class="form-check mb-0">
-                                    <input class="form-check-input payment-checkbox" type="checkbox" value="{{ order.id }}" id="payment-order-{{ order.id }}">
-                                </div>
-                            </td>
-                            <td>
-                                <div class="fw-bold">Order #{{ order.id }}</div>
-                                <small class="text-muted">Placed {{ order.created_at|date:"d M Y H:i" }}</small>
-                            </td>
-                            <td>
-                                {% if order.payment_proof %}
-                                <span class="badge bg-success">Uploaded</span>
-                                {% else %}
-                                <span class="badge bg-secondary">Waiting</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if order.payment_proof %}
-                                <span class="text-success">Ready for review</span>
-                                {% else %}
-                                <span class="text-muted">Awaiting customer</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-end">
-                                <div class="position-relative order-proof-hover d-inline-block">
-                                    <a href="{% url 'admin_order_detail' order.id %}" class="btn btn-sm btn-dark">View & Sign</a>
-                                    {% if order.payment_proof %}
-                                    <div class="payment-proof-tooltip shadow-sm">
-                                        <img src="{{ order.payment_proof.url }}" alt="Payment proof for order {{ order.id }}">
-                                        <div class="tooltip-note">Proof preview</div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;"></th>
+                                <th>Order</th>
+                                <th>Proof</th>
+                                <th>Status</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in pending_payment_orders %}
+                            <tr>
+                                <td>
+                                    <div class="form-check mb-0">
+                                        <input class="form-check-input payment-checkbox" type="checkbox" name="order_ids" value="{{ order.id }}" id="payment-order-{{ order.id }}">
                                     </div>
+                                </td>
+                                <td>
+                                    <div class="fw-bold">Order #{{ order.id }}</div>
+                                    <small class="text-muted">Placed {{ order.created_at|date:"d M Y H:i" }}</small>
+                                </td>
+                                <td>
+                                    {% if order.payment_proof %}
+                                    <span class="badge bg-success">Uploaded</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Waiting</span>
                                     {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="5" class="text-center text-muted py-4">No orders awaiting payment.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+                                </td>
+                                <td>
+                                    {% if order.payment_proof %}
+                                    <span class="text-success">Ready for review</span>
+                                    {% else %}
+                                    <span class="text-muted">Awaiting customer</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <div class="position-relative order-proof-hover d-inline-block">
+                                        <a href="{% url 'admin_order_detail' order.id %}" class="btn btn-sm btn-dark">View & Sign</a>
+                                        {% if order.payment_proof %}
+                                        <div class="payment-proof-tooltip shadow-sm">
+                                            <img src="{{ order.payment_proof.url }}" alt="Payment proof for order {{ order.id }}">
+                                            <div class="tooltip-note">Proof preview</div>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">No orders awaiting payment.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </form>
+
+            <!-- Hidden Bulk Reject Form for Payment Orders -->
+            <form method="post" action="{% url 'bulk_reject_orders' %}" id="bulk-reject-payment-form" style="display: none;">
+                {% csrf_token %}
+                <input type="hidden" name="rejection_reason" id="rejection-reason-payment-input">
+            </form>
         </div>
     </div>
 
@@ -257,6 +276,81 @@
         </div>
     </div>
 </div>
+
+<!-- Reject Orders Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="rejectModalLabel">Reject Selected Orders</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning mb-3">
+                    <strong>Confirm Rejection</strong><br>
+                    <span id="order-count">No orders</span> selected for rejection.
+                </div>
+                <div class="mb-3">
+                    <label for="rejection-reason-id" class="form-label">Select Rejection Reason</label>
+                    <select class="form-select" id="rejection-reason-id" name="rejection_reason_id">
+                        <option value="">-- Choose a reason (or enter custom below) --</option>
+                        {% for reason in rejection_reasons %}
+                        <option value="{{ reason.id }}" title="{{ reason.internal_note }}">
+                            {{ reason.reason_text }} {% if reason.category != 'other' %}({{ reason.get_category_display }}){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="custom-reason-input" class="form-label">Custom Reason (Optional)</label>
+                    <textarea class="form-control" id="custom-reason-input" rows="3" placeholder="Or type a custom reason here..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-reject-btn">Reject Orders</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reject Payment Orders Modal -->
+<div class="modal fade" id="rejectPaymentModal" tabindex="-1" aria-labelledby="rejectPaymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="rejectPaymentModalLabel">Reject Selected Orders</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning mb-3">
+                    <strong>Confirm Rejection</strong><br>
+                    <span id="payment-order-count">No orders</span> selected for rejection.
+                </div>
+                <div class="mb-3">
+                    <label for="rejection-reason-payment-id" class="form-label">Select Rejection Reason</label>
+                    <select class="form-select" id="rejection-reason-payment-id" name="rejection_reason_id">
+                        <option value="">-- Choose a reason (or enter custom below) --</option>
+                        {% for reason in rejection_reasons %}
+                        <option value="{{ reason.id }}" title="{{ reason.internal_note }}">
+                            {{ reason.reason_text }} {% if reason.category != 'other' %}({{ reason.get_category_display }}){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="custom-reason-payment-input" class="form-label">Custom Reason (Optional)</label>
+                    <textarea class="form-control" id="custom-reason-payment-input" rows="3" placeholder="Or type a custom reason here..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-reject-payment-btn">Reject Orders</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_scripts %}
@@ -300,7 +394,24 @@
         const orderCheckboxes = document.querySelectorAll('.order-checkbox');
         const selectAllPayment = document.getElementById('select-all-payment-orders');
         const paymentCheckboxes = document.querySelectorAll('.payment-checkbox');
+        
+        // Pending Orders Reject Modal
+        const rejectModal = document.getElementById('rejectModal');
+        const confirmRejectBtn = document.getElementById('confirm-reject-btn');
+        const rejectionReasonInput = document.getElementById('rejection-reason');
+        const bulkRejectForm = document.getElementById('bulk-reject-form');
+        const rejectionReasonHiddenInput = document.getElementById('rejection-reason-input');
+        const orderCountSpan = document.getElementById('order-count');
 
+        // Payment Orders Reject Modal
+        const rejectPaymentModal = document.getElementById('rejectPaymentModal');
+        const confirmRejectPaymentBtn = document.getElementById('confirm-reject-payment-btn');
+        const rejectionReasonPaymentInput = document.getElementById('rejection-reason-payment');
+        const bulkRejectPaymentForm = document.getElementById('bulk-reject-payment-form');
+        const rejectionReasonPaymentHiddenInput = document.getElementById('rejection-reason-payment-input');
+        const paymentOrderCountSpan = document.getElementById('payment-order-count');
+
+        // Select all orders
         if (selectAll) {
             selectAll.addEventListener('change', function () {
                 orderCheckboxes.forEach(function (checkbox) {
@@ -309,10 +420,121 @@
             });
         }
 
+        // Select all payment orders
         if (selectAllPayment) {
             selectAllPayment.addEventListener('change', function () {
                 paymentCheckboxes.forEach(function (checkbox) {
                     checkbox.checked = selectAllPayment.checked;
+                });
+            });
+        }
+
+        // Update order count in pending reject modal
+        if (rejectModal) {
+            rejectModal.addEventListener('show.bs.modal', function () {
+                const selectedCount = document.querySelectorAll('.order-checkbox:checked').length;
+                if (selectedCount === 0) {
+                    orderCountSpan.textContent = 'No orders selected!';
+                    confirmRejectBtn.disabled = true;
+                } else {
+                    orderCountSpan.textContent = `${selectedCount} order(s)`;
+                    confirmRejectBtn.disabled = false;
+                }
+            });
+        }
+
+        // Update order count in payment reject modal
+        if (rejectPaymentModal) {
+            rejectPaymentModal.addEventListener('show.bs.modal', function () {
+                const selectedCount = document.querySelectorAll('.payment-checkbox:checked').length;
+                if (selectedCount === 0) {
+                    paymentOrderCountSpan.textContent = 'No orders selected!';
+                    confirmRejectPaymentBtn.disabled = true;
+                } else {
+                    paymentOrderCountSpan.textContent = `${selectedCount} order(s)`;
+                    confirmRejectPaymentBtn.disabled = false;
+                }
+            });
+        }
+
+        // Handle pending order reject confirmation
+        if (confirmRejectBtn) {
+            confirmRejectBtn.addEventListener('click', function () {
+                const selectedOrderIds = Array.from(document.querySelectorAll('.order-checkbox:checked'))
+                    .map(cb => cb.value);
+                
+                if (selectedOrderIds.length === 0) {
+                    alert('Please select at least one order to reject.');
+                    return;
+                }
+
+                const rejectionReasonId = document.getElementById('rejection-reason-id').value;
+                const customReason = document.getElementById('custom-reason-input').value;
+
+                const formData = new FormData(bulkRejectForm);
+                selectedOrderIds.forEach(orderId => {
+                    formData.append('order_ids', orderId);
+                });
+                formData.set('rejection_reason_id', rejectionReasonId);
+                formData.set('custom_reason', customReason);
+
+                confirmRejectBtn.disabled = true;
+                confirmRejectBtn.textContent = 'Processing...';
+
+                fetch(bulkRejectForm.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    }
+                }).then(response => {
+                    window.location.reload();
+                }).catch(error => {
+                    console.error('Error:', error);
+                    confirmRejectBtn.disabled = false;
+                    confirmRejectBtn.textContent = 'Reject Orders';
+                    alert('Error rejecting orders. Please try again.');
+                });
+            });
+        }
+
+        // Handle payment order reject confirmation
+        if (confirmRejectPaymentBtn) {
+            confirmRejectPaymentBtn.addEventListener('click', function () {
+                const selectedOrderIds = Array.from(document.querySelectorAll('.payment-checkbox:checked'))
+                    .map(cb => cb.value);
+                
+                if (selectedOrderIds.length === 0) {
+                    alert('Please select at least one order to reject.');
+                    return;
+                }
+
+                const rejectionReasonId = document.getElementById('rejection-reason-payment-id').value;
+                const customReason = document.getElementById('custom-reason-payment-input').value;
+
+                const formData = new FormData(bulkRejectPaymentForm);
+                selectedOrderIds.forEach(orderId => {
+                    formData.append('order_ids', orderId);
+                });
+                formData.set('rejection_reason_id', rejectionReasonId);
+                formData.set('custom_reason', customReason);
+
+                confirmRejectPaymentBtn.disabled = true;
+                confirmRejectPaymentBtn.textContent = 'Processing...';
+
+                fetch(bulkRejectPaymentForm.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    }
+                }).then(response => {
+                    window.location.reload();
+                }).catch(error => {
+                    console.error('Error:', error);
+                    confirmRejectPaymentBtn.disabled = false;
+                    confirmRejectPaymentBtn.textContent = 'Reject Orders';
+                    alert('Error rejecting orders. Please try again.');
                 });
             });
         }

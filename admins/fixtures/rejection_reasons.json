@@ -1,0 +1,143 @@
+[
+  {
+    "model": "admins.rejectionreason",
+    "pk": 1,
+    "fields": {
+      "code": "OUT_OF_STOCK",
+      "reason_text": "Out of Stock",
+      "category": "inventory",
+      "customer_message": "Unfortunately, one or more items in your order are currently out of stock. Please consider placing a new order with available items.",
+      "internal_note": "Item inventory insufficient",
+      "is_active": true,
+      "created_at": "2026-05-09T00:00:00Z",
+      "updated_at": "2026-05-09T00:00:00Z"
+    }
+  },
+  {
+    "model": "admins.rejectionreason",
+    "pk": 2,
+    "fields": {
+      "code": "INVALID_ADDRESS",
+      "reason_text": "Invalid Address",
+      "category": "address",
+      "customer_message": "Your delivery address is incomplete or invalid. Please update your address and reorder.",
+      "internal_note": "Address validation failed or incomplete",
+      "is_active": true,
+      "created_at": "2026-05-09T00:00:00Z",
+      "updated_at": "2026-05-09T00:00:00Z"
+    }
+  },
+  {
+    "model": "admins.rejectionreason",
+    "pk": 3,
+    "fields": {
+      "code": "PAYMENT_DECLINED",
+      "reason_text": "Payment Declined",
+      "category": "payment",
+      "customer_message": "Your payment was declined. Please verify your payment details and try again.",
+      "internal_note": "Payment method rejected by gateway",
+      "is_active": true,
+      "created_at": "2026-05-09T00:00:00Z",
+      "updated_at": "2026-05-09T00:00:00Z"
+    }
+  },
+  {
+    "model": "admins.rejectionreason",
+    "pk": 4,
+    "fields": {
+      "code": "DUPLICATE_ORDER",
+      "reason_text": "Duplicate Order",
+      "category": "customer",
+      "customer_message": "This order appears to be a duplicate of a recent order. Please contact us if this was unintentional.",
+      "internal_note": "Duplicate order detected from same customer",
+      "is_active": true,
+      "created_at": "2026-05-09T00:00:00Z",
+      "updated_at": "2026-05-09T00:00:00Z"
+    }
+  },
+  {
+    "model": "admins.rejectionreason",
+    "pk": 5,
+    "fields": {
+      "code": "SUSPICIOUS_ACTIVITY",
+      "reason_text": "Suspicious Activity",
+      "category": "system",
+      "customer_message": "Your order has been flagged for security review. Please contact support to resolve this.",
+      "internal_note": "Order failed fraud detection checks",
+      "is_active": true,
+      "created_at": "2026-05-09T00:00:00Z",
+      "updated_at": "2026-05-09T00:00:00Z"
+    }
+  },
+  {
+    "model": "admins.rejectionreason",
+    "pk": 6,
+    "fields": {
+      "code": "INVALID_ORDER_DETAILS",
+      "reason_text": "Invalid Order Details",
+      "category": "customer",
+      "customer_message": "There are invalid details in your order. Please review and resubmit with correct information.",
+      "internal_note": "Order details do not meet requirements",
+      "is_active": true,
+      "created_at": "2026-05-09T00:00:00Z",
+      "updated_at": "2026-05-09T00:00:00Z"
+    }
+  },
+  {
+    "model": "admins.rejectionreason",
+    "pk": 7,
+    "fields": {
+      "code": "DELIVERY_NOT_AVAILABLE",
+      "reason_text": "Delivery Not Available",
+      "category": "system",
+      "customer_message": "We are unable to deliver to your address at this time. Please try updating your location.",
+      "internal_note": "Delivery area not covered",
+      "is_active": true,
+      "created_at": "2026-05-09T00:00:00Z",
+      "updated_at": "2026-05-09T00:00:00Z"
+    }
+  },
+  {
+    "model": "admins.rejectionreason",
+    "pk": 8,
+    "fields": {
+      "code": "SYSTEM_ERROR",
+      "reason_text": "System Error",
+      "category": "system",
+      "customer_message": "A system error occurred while processing your order. Please reorder and contact support if the issue persists.",
+      "internal_note": "Internal system error during processing",
+      "is_active": true,
+      "created_at": "2026-05-09T00:00:00Z",
+      "updated_at": "2026-05-09T00:00:00Z"
+    }
+  },
+  {
+    "model": "admins.rejectionreason",
+    "pk": 9,
+    "fields": {
+      "code": "NO_PAYMENT_PROOF",
+      "reason_text": "No Payment Proof Received",
+      "category": "payment",
+      "customer_message": "We did not receive proof of payment for your order. Please upload your payment proof and resubmit.",
+      "internal_note": "Customer did not provide required payment proof",
+      "is_active": true,
+      "created_at": "2026-05-09T00:00:00Z",
+      "updated_at": "2026-05-09T00:00:00Z"
+    }
+  },
+  {
+    "model": "admins.rejectionreason",
+    "pk": 10,
+    "fields": {
+      "code": "OTHER",
+      "reason_text": "Other Reason",
+      "category": "other",
+      "customer_message": "Your order was rejected. Please contact customer support for more details.",
+      "internal_note": "Custom reason provided by admin",
+      "is_active": true,
+      "created_at": "2026-05-09T00:00:00Z",
+      "updated_at": "2026-05-09T00:00:00Z"
+    }
+  }
+]
+

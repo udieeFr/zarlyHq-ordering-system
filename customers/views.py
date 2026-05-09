@@ -21,6 +21,7 @@ from decimal import Decimal
 from django.conf import settings
 import os
 import logging
+from .payment_utils import validate_payment_proof, get_payment_proof_context, get_all_payment_methods
 
 logger = logging.getLogger(__name__)
 
@@ -140,34 +141,73 @@ def download_invoice(request, order_id):
 @login_required
 def upload_payment_proof(request, order_id):
     """
-    Handles payment proof upload from the order detail page.
-    Once uploaded, the order moves to 'pending' for admin verification.
+    Handles payment proof upload from the order detail page with validation.
+    Once uploaded, the order status is set to 'pending_payment' for admin verification.
+    
+    Validates:
+    - File exists
+    - File size (max 5MB)
+    - File type (images and PDF)
+    - File integrity
     """
     order = get_object_or_404(Order, id=order_id, customer=request.user)
     
-    if request.method == 'POST' and request.FILES.get('payment_proof'):
-        order.payment_proof = request.FILES['payment_proof']
-        order.status = 'pending_payment'  # Re-queue for admin approval
-        order.save()
-
-        payment, created = Payment.objects.get_or_create(
-            order=order,
-            payment_method='manual',
-            defaults={
-                'status': 'pending',
-                'amount': order.total_amount,
-                'currency': settings.STRIPE_CURRENCY,
-                'proof_image': order.payment_proof,
-            }
-        )
-        if not created:
-            payment.status = 'pending'
-            payment.amount = order.total_amount
-            payment.currency = settings.STRIPE_CURRENCY
-            payment.proof_image = order.payment_proof
-            payment.save()
-        messages.success(request, "Payment proof uploaded! The admin will review it shortly.")
+    # Only allow proof upload for pending_payment orders
+    if order.status not in ['pending_payment', 'pending']:
+        messages.error(request, "Payment proof can only be uploaded for pending orders.")
         return redirect('order_success', order_id=order.id)
+    
+    if request.method == 'POST':
+        proof_file = request.FILES.get('payment_proof')
+        
+        if not proof_file:
+            messages.error(request, "Please select a file to upload.")
+            return redirect('order_success', order_id=order.id)
+        
+        # Validate proof file
+        is_valid, error_msg = validate_payment_proof(proof_file, max_size_mb=5)
+        if not is_valid:
+            messages.error(request, f"Upload failed: {error_msg}")
+            return redirect('order_success', order_id=order.id)
+        
+        try:
+            # Save proof to order - order stays in 'pending' status
+            # Admin will move it to 'accepted' or 'awaiting_payment' after review
+            order.payment_proof = proof_file
+            order.save()
+            
+            # Update or create Payment record
+            payment, created = Payment.objects.get_or_create(
+                order=order,
+                payment_method='manual',
+                defaults={
+                    'status': 'pending',
+                    'amount': order.total_amount,
+                    'currency': settings.STRIPE_CURRENCY,
+                    'proof_image': proof_file,
+                }
+            )
+            
+            if not created:
+                # Update existing payment record
+                payment.status = 'pending'
+                payment.amount = order.total_amount
+                payment.currency = settings.STRIPE_CURRENCY
+                payment.proof_image = proof_file
+                payment.save()
+            
+            messages.success(
+                request, 
+                "✓ Payment proof uploaded successfully! The admin will review it within 1-2 hours."
+            )
+            logger.info(f"Payment proof uploaded for Order #{order.id} by {request.user.username}")
+            
+            return redirect('order_success', order_id=order.id)
+            
+        except Exception as e:
+            messages.error(request, f"Error saving payment proof: {str(e)}")
+            logger.error(f"Error uploading payment proof for Order #{order.id}: {str(e)}")
+            return redirect('order_success', order_id=order.id)
     
     return redirect('order_success', order_id=order.id)
 
@@ -345,14 +385,21 @@ def submit_order(request):
             messages.success(request, 'Order created! Redirecting to payment...')
             return redirect(checkout_url)
         
-        elif payment_method == 'manual' or payment_method == 'later':
-            # Manual payment: upload proof now or later
-            if request.FILES.get('payment_proof'):
-                order.payment_proof = request.FILES['payment_proof']
-                order.save()
-                # Change to pending so admin can review
-                order.status = 'pending_payment'
-                order.save(update_fields=['status'])
+        elif payment_method == 'manual':
+            # Manual payment: customer can choose to pay now or later
+            # Order starts as 'pending' (pending request)
+            # Admin will approve and set to 'accepted' or 'awaiting_payment'
+            manual_timing = request.POST.get('manual_payment_timing', 'now')
+            
+            if manual_timing == 'now':
+                # Pay Now: show payment methods immediately to upload proof
+                messages.success(request, f'Order #{order.id} created! Please complete payment below.')
+            else:
+                # Pay Later: customer pays after admin approval
+                messages.success(
+                    request, 
+                    f'Order #{order.id} created! Once we approve your order, you can pay and upload proof from your dashboard.'
+                )
             
             # Create a manual payment record for audit trail
             Payment.objects.create(
@@ -363,11 +410,13 @@ def submit_order(request):
                 currency=settings.STRIPE_CURRENCY,
             )
             
+            # Store payment timing in session so order_success knows which UI to show
+            request.session[f'payment_timing_{order.id}'] = manual_timing
+            
             # Clear cart
             request.session['cart'] = {}
             request.session.modified = True
             
-            messages.success(request, f'Order #{order.id} submitted successfully!')
             return redirect('order_success', order_id=order.id)
         
         else:
@@ -378,13 +427,56 @@ def submit_order(request):
 
 @login_required
 def order_success(request, order_id):
-    """Order detail/success page"""
+    """
+    Order detail/success page with payment options for pending orders.
+    Shows QR codes and bank details for manual payment methods.
+    - If "Pay Now" selected: Shows payment info to upload proof
+    - If "Pay Later" selected: Shows message to upload later from dashboard
+    """
     order = get_object_or_404(Order, id=order_id, customer=request.user)
     payment = order.payments.order_by('-created_at').first()
-    return render(request, 'customers/order_success.html', {
+    
+    # Check payment timing choice from session (only relevant for manual payments)
+    payment_timing = request.session.get(f'payment_timing_{order.id}', 'now')
+    
+    # Get payment methods context if order is pending payment with no proof yet
+    payment_context = {}
+    show_payment_methods = False
+    
+    if order.status in ['pending_payment', 'pending']:
+        if payment and payment.payment_method == 'manual':
+            # Show payment methods ONLY if:
+            # 1. Customer chose "Pay Now" timing
+            # 2. No proof uploaded yet
+            if payment_timing == 'now' and not order.payment_proof:
+                show_payment_methods = True
+                payment_methods = get_all_payment_methods(order.id, order.total_amount)
+                payment_context = {
+                    'payment_methods': payment_methods,
+                    'max_file_size_mb': 5,
+                    'show_payment_methods': True,
+                    'payment_timing': 'now',
+                }
+            elif order.payment_proof:
+                # Proof already uploaded, just show confirmation
+                payment_context = {
+                    'show_payment_methods': False,
+                    'payment_proof_submitted': True,
+                }
+            elif payment_timing == 'later':
+                # Customer chose "Pay Later" - show dashboard link message
+                payment_context = {
+                    'show_payment_methods': False,
+                    'payment_timing': 'later',
+                }
+    
+    context = {
         'order': order,
         'payment': payment,
-    })
+        **payment_context,
+    }
+    
+    return render(request, 'customers/order_success.html', context)
 
 def logout_view(request):
     """Log user out"""
@@ -533,3 +625,78 @@ def stripe_webhook(request):
 
     # Always return 200 — Stripe treats anything else as failure and will retry
     return JsonResponse({'received': True}, status=200)
+
+
+@login_required
+def rejected_orders(request):
+    """
+    Display all rejected orders for the customer with rejection reasons.
+    Allows customer to see why orders were rejected.
+    """
+    from admins.models import RejectedOrder
+    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+    
+    # Get all rejected orders for this customer
+    rejected_orders_qs = RejectedOrder.objects.filter(order__customer=request.user).select_related(
+        'order', 'rejection_reason', 'rejected_by'
+    ).order_by('-rejected_at')
+    
+    # Pagination
+    paginator = Paginator(rejected_orders_qs, 10)
+    page_number = request.GET.get('page', 1)
+    try:
+        rejected_orders_page = paginator.page(page_number)
+    except PageNotAnInteger:
+        rejected_orders_page = paginator.page(1)
+    except EmptyPage:
+        rejected_orders_page = paginator.page(paginator.num_pages)
+    
+    return render(request, 'customers/rejected_orders.html', {
+        'rejected_orders': rejected_orders_page,
+        'page_obj': rejected_orders_page,
+        'paginator': paginator,
+        'total_rejected': rejected_orders_qs.count(),
+    })
+
+
+@login_required
+def awaiting_payment_orders(request):
+    """
+    Display all orders awaiting payment for the customer.
+    Allows customers to upload payment proof from their dashboard.
+    """
+    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+    
+    # Get all pending payment orders for this customer
+    awaiting_orders_qs = Order.objects.filter(
+        customer=request.user, 
+        status='pending_payment',
+        payment_proof__isnull=True  # No proof uploaded yet
+    ).order_by('-created_at')
+    
+    # Pagination
+    paginator = Paginator(awaiting_orders_qs, 10)
+    page_number = request.GET.get('page', 1)
+    try:
+        awaiting_orders_page = paginator.page(page_number)
+    except PageNotAnInteger:
+        awaiting_orders_page = paginator.page(1)
+    except EmptyPage:
+        awaiting_orders_page = paginator.page(paginator.num_pages)
+    
+    # Get payment methods for each order
+    orders_with_methods = []
+    for order in awaiting_orders_page:
+        payment_methods = get_all_payment_methods(order.id, order.total_amount)
+        orders_with_methods.append({
+            'order': order,
+            'payment_methods': payment_methods,
+        })
+    
+    return render(request, 'customers/awaiting_payment.html', {
+        'orders_with_methods': orders_with_methods,
+        'awaiting_orders': awaiting_orders_page,
+        'page_obj': awaiting_orders_page,
+        'paginator': paginator,
+        'total_awaiting': awaiting_orders_qs.count(),
+    })

@@ -234,6 +234,8 @@ def add_product(request):
 @sales_admin_required
 def admin_order_detail(request, order_id):
     """View complete order info, shipping, and items."""
+    from admins.models import RejectionReason
+    
     order = get_object_or_404(Order, id=order_id)
     
     # Get the latest Stripe payment record if it exists so admins can see
@@ -242,15 +244,21 @@ def admin_order_detail(request, order_id):
     
     has_payment = order_has_confirmed_payment(order)
     
+    # Get active rejection reasons for dropdown
+    rejection_reasons = RejectionReason.objects.filter(is_active=True).order_by('category', 'reason_text')
+    
     return render(request, 'admins/order_detail.html', {
         'order': order,
         'stripe_payment': stripe_payment,
         'has_payment': has_payment,
+        'rejection_reasons': rejection_reasons,
     })
 
 @sales_admin_required
 def sales_admin_dashboard(request):
     """Main sales admin dashboard with order management and metrics."""
+    from admins.models import RejectionReason
+    
     search_query = request.GET.get('q', '').strip()
 
     base_pending = Order.objects.filter(status='pending')
@@ -289,6 +297,9 @@ def sales_admin_dashboard(request):
     if dashboard_metrics['overdue_payment_count']:
         notifications.append(f"{dashboard_metrics['overdue_payment_count']} orders still awaiting payment proof after 24h")
 
+    # Get active rejection reasons for bulk reject modal
+    rejection_reasons = RejectionReason.objects.filter(is_active=True).order_by('category', 'reason_text')
+
     return render(request, 'admins/sales_admin_dashboard.html', {
         'pending_orders': pending_orders.order_by('-created_at'),
         'pending_payment_orders': pending_payment_orders.order_by('-created_at'),
@@ -298,6 +309,7 @@ def sales_admin_dashboard(request):
         'notifications': notifications,
         'urgent_pending_ids': urgent_pending_ids,
         'high_value_pending_ids': high_value_pending_ids,
+        'rejection_reasons': rejection_reasons,
     })
 
 @sales_admin_required
@@ -347,6 +359,107 @@ def approved_orders_list(request):
         'order_count_filter': order_count_filter,
         'order_by': order_by,
     })
+
+@sales_admin_required
+def pending_payment_orders_list(request):
+    """List all pending_payment orders waiting for payment proof verification."""
+    queryset = Order.objects.filter(status='pending_payment').select_related('customer', 'approved_by').prefetch_related('items__product', 'payments')
+
+    # Search
+    search_query = request.GET.get('q', '').strip()
+    if search_query:
+        queryset = queryset.filter(
+            Q(id__exact=search_query) |
+            Q(customer__username__icontains=search_query) |
+            Q(full_name__icontains=search_query) |
+            Q(phone_number__icontains=search_query)
+        )
+
+    # Filters
+    days_filter = request.GET.get('days', '')
+    if days_filter:
+        try:
+            days = int(days_filter)
+            cutoff_date = timezone.now() - timedelta(days=days)
+            queryset = queryset.filter(created_at__gte=cutoff_date)
+        except ValueError:
+            pass
+
+    # Ordering
+    order_by = request.GET.get('order_by', '-created_at')
+    if order_by in ['created_at', '-created_at', 'total_amount', '-total_amount', 'customer__username']:
+        queryset = queryset.order_by(order_by)
+
+    pending_payment_orders = queryset
+
+    return render(request, 'admins/pending_payment_orders.html', {
+        'pending_payment_orders': pending_payment_orders,
+        'search_query': search_query,
+        'days_filter': days_filter,
+        'order_by': order_by,
+    })
+
+@sales_admin_required
+def approve_pending_payment(request, order_id):
+    """Verify payment proof and move order to approved status."""
+    order = get_object_or_404(Order, id=order_id, status='pending_payment')
+    
+    if not order.payment_proof:
+        messages.error(request, "No payment proof found for this order.")
+        return redirect('pending_payment_orders_list')
+    
+    # Finalize approval (signs invoice and moves to 'approved')
+    finalize_order_approval(order, request.user)
+    
+    messages.success(request, f"Order #{order.id} payment approved and signed.")
+    return redirect('pending_payment_orders_list')
+
+@sales_admin_required
+def reject_pending_payment(request, order_id):
+    """Reject payment proof and move order back to pending for re-upload."""
+    order = get_object_or_404(Order, id=order_id, status='pending_payment')
+    
+    rejection_reason = request.POST.get('rejection_reason', '').strip()
+    if not rejection_reason:
+        messages.error(request, "Please provide a rejection reason.")
+        return redirect('pending_payment_orders_list')
+    
+    # Move back to pending
+    order.status = 'pending'
+    order.payment_proof = None  # Clear the rejected proof
+    order.save()
+    
+    # Update Payment record status
+    Payment.objects.filter(order=order, payment_method='manual').update(status='rejected')
+    
+    # Send notification email to customer
+    try:
+        from django.core.mail import send_mail
+        from django.template.loader import render_to_string
+        from django.urls import reverse
+        
+        dashboard_url = request.build_absolute_uri(reverse('order_success', kwargs={'order_id': order.id}))
+        
+        email_body = render_to_string('emails/payment_proof_rejected.html', {
+            'customer_name': order.customer.first_name or order.customer.username,
+            'order_id': order.id,
+            'reason': rejection_reason,
+            'dashboard_url': dashboard_url,
+        })
+        
+        send_mail(
+            subject=f'Payment Proof Rejected - Order #{order.id}',
+            message='',
+            from_email=None,  # Uses DEFAULT_FROM_EMAIL
+            recipient_list=[order.customer.email],
+            html_message=email_body,
+            fail_silently=True,
+        )
+    except Exception as e:
+        print(f"Error sending rejection email: {e}")
+    
+    messages.success(request, f"Order #{order.id} payment proof rejected. Customer notified.")
+    return redirect('pending_payment_orders_list')
 
 @sales_admin_required
 def print_order_summary(request, order_id):
@@ -611,10 +724,11 @@ def set_pending_payment(request, order_id):
 
 @sales_admin_required
 def bulk_accept_orders(request):
-    """Accepts multiple pending orders in one action."""
+    """Accepts multiple pending or awaiting payment orders in one action."""
     if request.method == 'POST':
         order_ids = request.POST.getlist('order_ids')
-        pending_orders = Order.objects.filter(id__in=order_ids, status='pending')
+        # Accept both pending and pending_payment orders
+        pending_orders = Order.objects.filter(id__in=order_ids, status__in=['pending', 'pending_payment'])
         approved_count = 0
         awaiting_payment_count = 0
 
@@ -623,8 +737,10 @@ def bulk_accept_orders(request):
                 finalize_order_approval(order, request.user)
                 approved_count += 1
             else:
-                order.status = 'pending_payment'
-                order.save()
+                # If payment isn't confirmed yet, move to pending_payment
+                if order.status != 'pending_payment':
+                    order.status = 'pending_payment'
+                    order.save()
                 awaiting_payment_count += 1
 
         if approved_count or awaiting_payment_count:
@@ -637,35 +753,128 @@ def bulk_accept_orders(request):
     return redirect('sales_admin_dashboard')
 
 @sales_admin_required
+def bulk_reject_orders(request):
+    """Rejects multiple pending or awaiting payment orders in one action."""
+    if request.method == 'POST':
+        from admins.models import RejectionReason, RejectedOrder
+        from admins.notification_utils import notify_rejection_to_customer
+        
+        order_ids = request.POST.getlist('order_ids')
+        rejection_reason_id = request.POST.get('rejection_reason_id')
+        custom_reason = request.POST.get('custom_reason', '').strip()
+        
+        # Reject both pending and pending_payment orders
+        eligible_orders = Order.objects.filter(id__in=order_ids, status__in=['pending', 'pending_payment'])
+        rejected_count = 0
+
+        for order in eligible_orders:
+            # Get the rejection reason
+            rejection_reason = None
+            if rejection_reason_id:
+                try:
+                    rejection_reason = RejectionReason.objects.get(id=rejection_reason_id)
+                except:
+                    pass
+            
+            # Update order status
+            order.status = 'rejected'
+            order.save()
+            
+            # Create rejection record for analytics
+            rejected_order_record = RejectedOrder.objects.create(
+                order=order,
+                rejection_reason=rejection_reason,
+                custom_reason=custom_reason,
+                rejected_by=request.user,
+                order_total_amount=order.total_amount,
+                order_item_count=order.items.count(),
+                customer_name=order.customer.first_name or order.customer.username,
+                customer_email=order.customer.email,
+            )
+            
+            # Send rejection email to customer
+            try:
+                notify_rejection_to_customer(rejected_order_record, send_email=True)
+            except Exception as e:
+                # Log error but don't block rejection
+                print(f"Error notifying customer for order {order.id}: {str(e)}")
+            
+            rejected_count += 1
+
+        if rejected_count:
+            messages.warning(request, f"Rejected {rejected_count} order(s) and sent notification emails.")
+        else:
+            messages.warning(request, 'No pending orders were selected or eligible for rejection.')
+    return redirect('sales_admin_dashboard')
+
+@sales_admin_required
 def approve_order(request, order_id):
     """
-    Generates PDF receipt and applies digital signature upon approval.
-    Used when sales admin manually approves a reviewed order.
+    Approves a pending order. If payment is confirmed, moves to 'approved' status.
+    If payment is not yet confirmed, moves to 'pending_payment' (awaiting payment list).
     """
     order = get_object_or_404(Order, id=order_id)
 
-    if not order_has_confirmed_payment(order):
-        messages.error(request, "Cannot approve: Payment proof or confirmed Stripe payment is missing.")
-        return redirect('admin_order_detail', order_id=order.id)
+    if order_has_confirmed_payment(order):
+        # Payment confirmed - approve and sign invoice
+        try:
+            finalize_order_approval(order, request.user)
+            messages.success(request, f"Order #{order.id} Approved and Digitally Signed.")
+        except Exception as e:
+            messages.error(request, f"Error signing document: {str(e)}")
+    else:
+        # Payment not yet received - move to awaiting payment list
+        order.status = 'pending_payment'
+        order.save()
+        messages.success(request, f"Order #{order.id} Approved. Customer will see it in their Awaiting Payment list.")
     
-    try:
-        finalize_order_approval(order, request.user)
-        messages.success(request, f"Order #{order.id} Approved and Digitally Signed.")
-    except Exception as e:
-        messages.error(request, f"Error signing document: {str(e)}")
     return redirect('sales_admin_dashboard')
 
 
 @sales_admin_required
 def reject_order(request, order_id):
-    """Rejects the order while saving administrative reasoning."""
+    """Rejects a single order while saving administrative reasoning."""
+    from admins.models import RejectionReason, RejectedOrder
+    from admins.notification_utils import notify_rejection_to_customer
+    
     order = get_object_or_404(Order, id=order_id)
     if request.method != 'POST':
         return redirect('admin_order_detail', order_id=order.id)
-    order.rejection_reason = request.POST.get('rejection_reason', '').strip() or None
+    
+    rejection_reason_id = request.POST.get('rejection_reason_id')
+    custom_reason = request.POST.get('custom_reason', '').strip()
+    
+    # Get the rejection reason
+    rejection_reason = None
+    if rejection_reason_id:
+        try:
+            rejection_reason = RejectionReason.objects.get(id=rejection_reason_id)
+        except:
+            pass
+    
+    # Update order status
     order.status = 'rejected'
     order.save()
-    messages.warning(request, f"Order #{order.id} Rejected.")
+    
+    # Create rejection record for analytics
+    rejected_order_record = RejectedOrder.objects.create(
+        order=order,
+        rejection_reason=rejection_reason,
+        custom_reason=custom_reason,
+        rejected_by=request.user,
+        order_total_amount=order.total_amount,
+        order_item_count=order.items.count(),
+        customer_name=order.customer.first_name or order.customer.username,
+        customer_email=order.customer.email,
+    )
+    
+    # Send rejection email to customer
+    try:
+        notify_rejection_to_customer(rejected_order_record, send_email=True)
+        messages.warning(request, f"Order #{order.id} Rejected and customer notified via email.")
+    except Exception as e:
+        messages.warning(request, f"Order #{order.id} Rejected but failed to send email: {str(e)}")
+    
     return redirect('sales_admin_dashboard')
 
 # --- COMPLAINTS ---

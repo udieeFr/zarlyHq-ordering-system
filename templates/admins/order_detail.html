@@ -127,18 +127,6 @@
                 <small class="text-muted">
                     <strong>Method:</strong> Stripe Card Payment<br>
                     <strong>Amount:</strong> RM {{ stripe_payment.amount|floatformat:2 }}<br>
-                    {% if stripe_payment.stripe_session_id %}
-                    <strong>Session ID:</strong> <code>{{ stripe_payment.stripe_session_id|truncatechars:20 }}</code><br>
-                    {% endif %}
-                    {% if stripe_payment.stripe_payment_intent_id %}
-                    <strong>Payment Intent:</strong> <code>{{ stripe_payment.stripe_payment_intent_id|truncatechars:20 }}</code><br>
-                    {% endif %}
-                    {% if stripe_payment.stripe_charge_id %}
-                    <strong>Charge ID:</strong> <code>{{ stripe_payment.stripe_charge_id|truncatechars:20 }}</code><br>
-                    {% endif %}
-                    {% if stripe_payment.paid_at %}
-                    <strong>Paid At:</strong> {{ stripe_payment.paid_at|date:"M d, Y H:i" }}<br>
-                    {% endif %}
                     <strong>Status:</strong>
                     <span style="color:
                         {% if stripe_payment.status == 'succeeded' %}#10b981
@@ -187,12 +175,11 @@
 
             <!--
                 APPROVE BUTTON
-                Appears only when:
-                  - order.status == 'pending' (not yet acted on)
-                  - AND has_payment is True
-                    (set by order_has_confirmed_payment() in admins/views.py,
-                     which returns True only when Stripe webhook has confirmed
-                     the payment OR a manual proof image has been uploaded)
+                Appears when: order.status == 'pending' (not yet acted on)
+                
+                Outcome depends on payment status:
+                - WITH payment: Moves to 'approved' with digitally signed receipt
+                - WITHOUT payment: Moves to 'pending_payment' (customer sees in Awaiting Payment list)
             -->
             {% if order.status == 'pending' %}
                 {% if has_payment %}
@@ -200,23 +187,22 @@
                         ✓ Approve & Generate Signed Receipt
                     </a>
                 {% else %}
+                    <a href="{% url 'approve_order' order.id %}" class="btn btn-warning w-100 fw-bold py-2">
+                        ✓ Approve (No Payment Yet - Will Go to Awaiting Payment List)
+                    </a>
                     <!--
                         No confirmed payment yet.
-                        Show different message depending on whether Stripe was attempted.
+                        Show info about why payment is missing depending on Stripe status.
                     -->
                     {% if stripe_payment %}
-                        <div class="text-center py-4 text-muted">
-                            <span style="font-size: 2rem; display: block; margin-bottom: 0.5rem;">⏳</span>
-                            <strong>Awaiting Stripe confirmation</strong><br>
-                            <small>
-                                Payment confirmation arrives automatically via webhook
-                                once the customer completes checkout. No action needed from admin.
-                            </small>
-                        </div>
+                        <p class="text-muted small mt-2 text-center">
+                            <span style="font-size: 1.5rem; display: block; margin-bottom: 0.25rem;">⏳</span>
+                            Awaiting Stripe confirmation via webhook.
+                        </p>
                     {% else %}
-                        <p class="text-center py-4 text-muted">
-                            <span style="font-size: 2rem; display: block; margin-bottom: 0.5rem;">⏳</span>
-                            Waiting for customer to upload payment proof...
+                        <p class="text-muted small mt-2 text-center">
+                            <span style="font-size: 1.5rem; display: block; margin-bottom: 0.25rem;">📄</span>
+                            Waiting for customer to upload payment proof.
                         </p>
                     {% endif %}
                 {% endif %}
@@ -251,8 +237,12 @@
                         ❌ Rejected
                     {% endif %}
                 </small>
-                {% if order.status == 'rejected' and order.rejection_reason %}
-                <p class="small mt-2 text-danger"><strong>Reason:</strong> {{ order.rejection_reason }}</p>
+                {% if order.status == 'rejected' and order.rejection_record %}
+                <p class="small mt-2 text-danger">
+                    <strong>Rejected on:</strong> {{ order.rejection_record.rejected_at|date:"d M Y, H:i" }}<br>
+                    <strong>Reason:</strong> {{ order.rejection_record.get_rejection_reason_display }}<br>
+                    <strong>Rejected by:</strong> {{ order.rejection_record.rejected_by.get_full_name|default:order.rejection_record.rejected_by.username }}
+                </p>
                 {% endif %}
             </div>
         </div>
@@ -263,9 +253,22 @@
             <form method="post" action="{% url 'reject_order' order.id %}">
                 {% csrf_token %}
                 <div class="mb-3">
-                    <label for="rejection_reason" class="form-label">Rejection Reason</label>
-                    <textarea name="rejection_reason" id="rejection_reason" class="form-control" rows="3"
-                              placeholder="Enter the reason for rejecting this order" required></textarea>
+                    <label for="rejection_reason_id" class="form-label">Select Rejection Reason</label>
+                    <select name="rejection_reason_id" id="rejection_reason_id" class="form-select">
+                        <option value="">-- Choose a reason (or enter custom below) --</option>
+                        {% for reason in rejection_reasons %}
+                        <option value="{{ reason.id }}" title="{{ reason.internal_note }}">
+                            {{ reason.reason_text }} {% if reason.category != 'other' %}({{ reason.get_category_display }}){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <small class="text-muted">Hover over options to see internal notes</small>
+                </div>
+                <div class="mb-3">
+                    <label for="custom_reason" class="form-label">Custom Rejection Reason</label>
+                    <textarea name="custom_reason" id="custom_reason" class="form-control" rows="3"
+                              placeholder="Or type a custom reason here (optional - overrides selected reason)"></textarea>
+                    <small class="text-muted">Leave blank to use the selected reason above</small>
                 </div>
                 <button type="submit" class="btn btn-outline-danger w-100">Reject Order</button>
             </form>

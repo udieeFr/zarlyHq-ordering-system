@@ -7,7 +7,7 @@
         <div class="col-lg-8">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2 class="fw-bold mb-0">Order Summary #{{ order.id }}</h2>
-                <span class="badge {% if order.status == 'approved' %}bg-success{% elif order.status == 'pending_payment' %}bg-info text-white{% else %}bg-secondary{% endif %} px-3 py-2">
+                <span class="badge {% if order.status == 'approved' %}bg-success{% elif order.status == 'pending' or order.status == 'pending_payment' or order.status == 'awaiting_payment' %}bg-info text-white{% else %}bg-secondary{% endif %} px-3 py-2">
                     {{ order.status|capfirst }}
                 </span>
             </div>
@@ -39,25 +39,183 @@
                         <p class="mb-1"><strong>State:</strong> {{ order.state }}</p>
                         <p class="mb-1"><strong>Postcode:</strong> {{ order.postcode }}</p>
                         <p class="mb-0"><strong>Location:</strong> {{ order.latitude }}, {{ order.longitude }}</p>
-                {% if order.status == 'pending_payment' %}
-                    <h5 class="fw-bold text-info">Payment Pending</h5>
-                    <p class="small text-muted mb-3">
-                        {% if payment and payment.payment_method == 'stripe' %}
-                            Your Stripe payment is being verified. Do not place the order again. This page will reflect payment status after webhook confirmation.
-                        {% else %}
-                            Please complete your payment and upload the receipt below if you used manual bank transfer or DuitNow.
+                {% if order.status == 'pending' or order.status == 'pending_payment' or order.status == 'awaiting_payment' %}
+                    <hr class="my-4">
+                    
+                    {% if show_payment_methods %}
+                        <!-- Customer chose "Pay Now" - Show payment methods -->
+                        <h5 class="fw-bold text-info mb-3">💰 Complete Your Payment Now</h5>
+                        
+                        {% if payment and payment.payment_method == 'manual' %}
+                            <!-- Tabbed Payment Methods -->
+                            <ul class="nav nav-tabs mb-4" role="tablist">
+                                {% if payment_methods.duitnow %}
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="duitnow-tab" data-bs-toggle="tab" data-bs-target="#duitnow" type="button" role="tab">
+                                        📱 DuitNow
+                                    </button>
+                                </li>
+                                {% endif %}
+                                {% if payment_methods.bank_transfer %}
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="bank-tab" data-bs-toggle="tab" data-bs-target="#bank" type="button" role="tab">
+                                        🏦 Bank Transfer
+                                    </button>
+                            </li>
+                            {% endif %}
+                        </ul>
+
+                        <div class="tab-content">
+                            <!-- DuitNow Tab -->
+                            {% if payment_methods.duitnow %}
+                            <div class="tab-pane fade show active" id="duitnow" role="tabpanel">
+                                <div class="text-center mb-4">
+                                    <h6 class="fw-bold mb-3">Scan QR Code with Your Banking App</h6>
+                                    {% if payment_methods.duitnow.qr_image %}
+                                        <img src="{{ payment_methods.duitnow.qr_image }}" alt="DuitNow QR Code" class="img-fluid" style="max-width: 250px; border: 2px solid #dee2e6; padding: 10px; border-radius: 8px;">
+                                    {% endif %}
+                                    <p class="small text-muted mt-3 mb-0">Reference: <strong>{{ payment_methods.duitnow.reference }}</strong></p>
+                                </div>
+                                <div class="alert alert-info">
+                                    <strong>How to pay:</strong>
+                                    <ol class="mb-0 mt-2">
+                                        <li>Open your banking app (Maybank, CIMB, Public Bank, etc.)</li>
+                                        <li>Select "DuitNow" or "Scan QR"</li>
+                                        <li>Scan the QR code above</li>
+                                        <li>Confirm payment of <strong>RM {{ order.total_amount }}</strong></li>
+                                        <li>Reference: <strong>{{ payment_methods.duitnow.reference }}</strong></li>
+                                        <li>Take a screenshot of the success confirmation</li>
+                                    </ol>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            <!-- Bank Transfer Tab -->
+                            {% if payment_methods.bank_transfer %}
+                            <div class="tab-pane fade" id="bank" role="tabpanel">
+                                <div class="mb-4">
+                                    <div class="alert alert-warning">
+                                        <strong>Bank Transfer Details:</strong>
+                                    </div>
+                                    <table class="table table-sm">
+                                        <tbody>
+                                            <tr>
+                                                <td class="fw-bold" style="width: 40%;">Bank Name</td>
+                                                <td>{{ payment_methods.bank_transfer.bank_name }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Account Number</td>
+                                                <td><code>{{ payment_methods.bank_transfer.account_number }}</code></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Account Holder</td>
+                                                <td>{{ payment_methods.bank_transfer.account_holder }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">SWIFT Code</td>
+                                                <td><code>{{ payment_methods.bank_transfer.swift_code }}</code></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Amount</td>
+                                                <td><strong>RM {{ payment_methods.bank_transfer.amount }}</strong></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Reference</td>
+                                                <td><strong>{{ payment_methods.bank_transfer.reference }}</strong></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% if payment_methods.bank_transfer.qr_image %}
+                                <div class="text-center mb-4">
+                                    <p class="small fw-bold">Or scan this QR code:</p>
+                                    <img src="{{ payment_methods.bank_transfer.qr_image }}" alt="Bank Transfer QR Code" class="img-fluid" style="max-width: 200px; border: 2px solid #dee2e6; padding: 10px; border-radius: 8px;">
+                                </div>
+                                {% endif %}
+                                <div class="alert alert-info">
+                                    <strong>Steps:</strong>
+                                    <ol class="mb-0 mt-2">
+                                        <li>Log in to your banking app or online banking</li>
+                                        <li>Select "Transfer" and choose the account</li>
+                                        <li>Enter the account details above</li>
+                                        <li>Enter amount: <strong>RM {{ order.total_amount }}</strong></li>
+                                        <li>Reference: <strong>{{ payment_methods.bank_transfer.reference }}</strong></li>
+                                        <li>Complete the transfer</li>
+                                        <li>Screenshot the success message</li>
+                                    </ol>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Payment Proof Upload Form -->
+                        <div class="card bg-light border-0 mt-4 p-4">
+                            <h6 class="fw-bold mb-3">📸 Upload Payment Receipt</h6>
+                            <p class="small text-muted mb-3">After completing your payment, upload a screenshot or image of the success confirmation. This helps us verify your payment faster.</p>
+                            
+                            <form method="post" action="{% url 'upload_payment_proof' order.id %}" enctype="multipart/form-data" id="payment-form">
+                                {% csrf_token %}
+                                <div class="mb-3">
+                                    <label for="payment_proof" class="form-label fw-bold">Select Receipt Image</label>
+                                    <input 
+                                        type="file" 
+                                        name="payment_proof" 
+                                        id="payment_proof"
+                                        class="form-control"
+                                        accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
+                                        required
+                                    >
+                                    <small class="text-muted d-block mt-2">
+                                        ✓ Supported: JPG, PNG, GIF, WebP, PDF<br>
+                                        ✓ Max size: 5MB<br>
+                                        📸 Clear screenshot recommended
+                                    </small>
+                                </div>
+                                <div id="preview" class="mb-3" style="display: none;">
+                                    <img id="preview-img" src="" alt="Preview" class="img-thumbnail" style="max-width: 200px;">
+                                </div>
+                                <button type="submit" class="btn btn-success w-100 fw-bold py-2">
+                                    ✓ Upload Receipt & Verify
+                                </button>
+                            </form>
+                        </div>
                         {% endif %}
-                    </p>
-                    {% if payment and payment.payment_method == 'manual' %}
-                        <img src="{% static 'images/duitnow-qr.jpg' %}" style="max-width: 180px;" class="rounded shadow-sm mb-4">
-                        <form method="post" action="{% url 'upload_payment_proof' order.id %}" enctype="multipart/form-data">
-                            {% csrf_token %}
-                            <input type="file" name="payment_proof" class="form-control mb-3" required>
-                            <button type="submit" class="btn btn-info w-100 text-white fw-bold py-2">Submit Payment Receipt</button>
-                        </form>
+                    {% elif payment_proof_submitted %}
+                        <!-- Payment proof already submitted - show confirmation -->
+                        <div class="alert alert-success" role="alert">
+                            <h5 class="alert-heading">✓ Payment Proof Submitted</h5>
+                            <p class="mb-0">
+                                Your payment receipt has been uploaded and is awaiting admin verification.<br>
+                                <small class="text-muted">You'll receive a notification once your payment is confirmed. Typically verified within 1-2 hours.</small>
+                            </p>
+                        </div>
+                    {% elif payment_timing == 'later' %}
+                        <!-- Customer chose "Pay Later" - show dashboard link -->
+                        <div class="alert alert-warning" role="alert">
+                            <h5 class="alert-heading">⏳ Pay After Admin Approval</h5>
+                            <p class="mb-3">
+                                Your order has been created! Once our admin team approves your order, you'll have the opportunity to pay and upload your payment receipt from your dashboard.
+                            </p>
+                            <div class="alert alert-info mb-0">
+                                <strong>Payment methods available on your dashboard:</strong>
+                                <ul class="small mb-0 mt-2">
+                                    <li>📱 DuitNow - Scan QR code instantly</li>
+                                    <li>🏦 Bank Transfer - Direct transfer with QR or account details</li>
+                                </ul>
+                            </div>
+                        </div>
+                    {% endif %}
+                    
+                    {% if payment and payment.payment_method == 'stripe' %}
+                        <div class="alert alert-info" role="alert">
+                            <p class="mb-0">
+                                Your Stripe payment is being verified. Do not place the order again.<br>
+                                <small class="text-muted">This page will automatically update when payment is confirmed (usually within a few seconds).</small>
+                            </p>
+                        </div>
                     {% endif %}
                 {% elif order.status == 'approved' %}
-                    <p class="small text-success mb-0">Payment approved and order is moving through fulfillment.</p>
+                    <p class="small text-success mb-0">✓ Payment approved and order is moving through fulfillment.</p>
                 {% endif %}
             </div>
         </div>
@@ -67,7 +225,7 @@
                     <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-success py-3 fw-bold" download>
                         Download Signed Receipt (Proof of Integrity) 📄
                     </a>
-                {% elif order.status == 'pending_payment' %}
+                {% elif order.status == 'pending' or order.status == 'pending_payment' or order.status == 'awaiting_payment' %}
                     <a href="{% url 'download_invoice' order.id %}" class="btn btn-outline-info py-3 fw-bold">
                         Download Payment Invoice 🧾
                     </a>
@@ -77,4 +235,54 @@
         </div>
     </div>
 </div>
+
+<script>
+    // File preview functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const fileInput = document.getElementById('payment_proof');
+        const preview = document.getElementById('preview');
+        const previewImg = document.getElementById('preview-img');
+        
+        if (fileInput) {
+            fileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                
+                if (file) {
+                    // Show preview for images
+                    if (file.type.startsWith('image/')) {
+                        const reader = new FileReader();
+                        reader.onload = function(event) {
+                            previewImg.src = event.target.result;
+                            preview.style.display = 'block';
+                        };
+                        reader.readAsDataURL(file);
+                    } else {
+                        preview.style.display = 'none';
+                    }
+                    
+                    // Validate file size
+                    const maxSize = 5 * 1024 * 1024; // 5MB
+                    if (file.size > maxSize) {
+                        alert('File is too large. Maximum size is 5MB.');
+                        fileInput.value = '';
+                        preview.style.display = 'none';
+                        return;
+                    }
+                }
+            });
+        }
+        
+        // Form submission validation
+        const form = document.getElementById('payment-form');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                const fileInput = document.getElementById('payment_proof');
+                if (!fileInput.files.length) {
+                    e.preventDefault();
+                    alert('Please select a file to upload.');
+                }
+            });
+        }
+    });
+</script>
 {% endblock %}

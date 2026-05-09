@@ -19,6 +19,12 @@ urlpatterns = [
     path('order/<int:order_id>/invoice/', views.download_invoice, name='download_invoice'),
     path('order/<int:order_id>/pay/', views.upload_payment_proof, name='upload_payment_proof'),
     
+    # Rejected Orders
+    path('rejected-orders/', views.rejected_orders, name='rejected_orders'),
+    
+    # Awaiting Payment Orders
+    path('awaiting-payment/', views.awaiting_payment_orders, name='awaiting_payment_orders'),
+    
     path('logout/', views.logout_view, name='logout'),
     path('submit-complaint/', views.submit_complaint, name='submit_complaint'),
 ]
