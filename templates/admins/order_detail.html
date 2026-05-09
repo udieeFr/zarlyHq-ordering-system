@@ -3,19 +3,18 @@
 {% block page_title %}Order Details #{{ order.id }}{% endblock %}
 
 {% block content %}
-<!-- Page Header -->
 <div class="page-header">
     <h1>Order #{{ order.id }}</h1>
     <p>Complete order details and verification</p>
 </div>
 
-<!-- Navigation -->
 <div class="mb-4">
     <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
 </div>
 
 <div class="row g-4">
     <div class="col-md-7">
+
         <!-- Customer Information -->
         <div class="content-card">
             <h5 class="fw-bold border-bottom pb-3 mb-3">👤 Customer Information</h5>
@@ -36,9 +35,19 @@
                     <strong>Coordinates:</strong><br>
                     <span class="text-muted">{{ order.latitude }}, {{ order.longitude }}</span>
                 </div>
-                <div class="col-12">
+                <div class="col-12 mb-3">
                     <strong>Order Notes:</strong><br>
                     <span class="text-muted">{{ order.order_notes|default:"None" }}</span>
+                </div>
+                <div class="col-12">
+                    <strong>Customer Status:</strong><br>
+                    {% with approved_count=order.customer.approved_orders.count %}
+                        {% if approved_count > 0 %}
+                            <span class="badge bg-info">Returning ({{ approved_count }} approved orders)</span>
+                        {% else %}
+                            <span class="badge bg-secondary">New Customer</span>
+                        {% endif %}
+                    {% endwith %}
                 </div>
             </div>
         </div>
@@ -71,23 +80,148 @@
                 </tfoot>
             </table>
         </div>
+
     </div>
 
     <div class="col-md-5">
+
         <!-- Payment Verification -->
         <div class="content-card" style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);">
             <h5 class="fw-bold border-bottom pb-3 mb-3" style="color: #0369a1;">💳 Payment Verification</h5>
-            {% if order.payment_proof %}
-                <img src="{{ order.payment_proof.url }}" class="img-fluid rounded border mb-3" style="max-height: 300px; cursor: zoom-in; border-color: #0ea5e9;" onclick="window.open(this.src)">
-                {% if order.status != 'approved' %}
-                    <a href="{% url 'approve_order' order.id %}" class="btn btn-success w-100 fw-bold py-2">✓ Approve & Generate Signed Receipt</a>
+
+            {% if stripe_payment %}
+            <!--
+                STRIPE PAYMENT BLOCK
+                Shows status-appropriate badge and messaging.
+                No manual proof upload is shown for Stripe orders — Stripe
+                confirmation via webhook IS the proof.
+            -->
+            <div class="alert
+                {% if stripe_payment.status == 'succeeded' %}alert-success
+                {% elif stripe_payment.status == 'processing' %}alert-warning
+                {% elif stripe_payment.status == 'pending' %}alert-secondary
+                {% else %}alert-danger
+                {% endif %} mb-3"
+                style="border-left: 4px solid
+                {% if stripe_payment.status == 'succeeded' %}#10b981
+                {% elif stripe_payment.status == 'processing' %}#f59e0b
+                {% elif stripe_payment.status == 'pending' %}#64748b
+                {% else %}#ef4444{% endif %};">
+
+                <strong>
+                    {% if stripe_payment.status == 'succeeded' %}
+                        ✅ Stripe Payment Confirmed
+                    {% elif stripe_payment.status == 'processing' %}
+                        ⏳ Stripe Payment Processing
+                    {% elif stripe_payment.status == 'pending' %}
+                        🧾 Stripe Checkout Started
+                    {% elif stripe_payment.status == 'failed' %}
+                        ❌ Stripe Payment Failed
+                    {% elif stripe_payment.status == 'cancelled' %}
+                        🚫 Stripe Payment Cancelled
+                    {% else %}
+                        💳 Stripe Payment Record
+                    {% endif %}
+                </strong><br>
+
+                <small class="text-muted">
+                    <strong>Method:</strong> Stripe Card Payment<br>
+                    <strong>Amount:</strong> RM {{ stripe_payment.amount|floatformat:2 }}<br>
+                    {% if stripe_payment.stripe_session_id %}
+                    <strong>Session ID:</strong> <code>{{ stripe_payment.stripe_session_id|truncatechars:20 }}</code><br>
+                    {% endif %}
+                    {% if stripe_payment.stripe_payment_intent_id %}
+                    <strong>Payment Intent:</strong> <code>{{ stripe_payment.stripe_payment_intent_id|truncatechars:20 }}</code><br>
+                    {% endif %}
+                    {% if stripe_payment.stripe_charge_id %}
+                    <strong>Charge ID:</strong> <code>{{ stripe_payment.stripe_charge_id|truncatechars:20 }}</code><br>
+                    {% endif %}
+                    {% if stripe_payment.paid_at %}
+                    <strong>Paid At:</strong> {{ stripe_payment.paid_at|date:"M d, Y H:i" }}<br>
+                    {% endif %}
+                    <strong>Status:</strong>
+                    <span style="color:
+                        {% if stripe_payment.status == 'succeeded' %}#10b981
+                        {% elif stripe_payment.status == 'processing' %}#d97706
+                        {% elif stripe_payment.status == 'pending' %}#64748b
+                        {% else %}#dc2626{% endif %};
+                        font-weight: bold;">
+                        {{ stripe_payment.get_status_display }}
+                    </span>
+                </small>
+
+                <!-- Status-specific guidance for admin -->
+                {% if stripe_payment.status == 'pending' %}
+                <div class="mt-2 pt-2 border-top border-secondary border-opacity-25">
+                    <small class="text-muted">
+                        ℹ️ Customer opened Stripe checkout. Payment confirmation arrives
+                        automatically via webhook once the customer completes payment —
+                        no manual proof needed. If this stays pending after the customer
+                        pays, ask your system administrator to check the webhook configuration.
+                    </small>
+                </div>
+                {% elif stripe_payment.status == 'succeeded' %}
+                <div class="mt-2 pt-2 border-top border-success border-opacity-25">
+                    <small class="text-success">
+                        ✔ Payment verified by Stripe. Safe to approve this order.
+                    </small>
+                </div>
                 {% endif %}
-            {% else %}
-                <p class="text-center py-5 text-muted">
-                    <span style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;">⏳</span>
-                    Waiting for customer to upload proof...
-                </p>
+            </div>
             {% endif %}
+
+            <!--
+                MANUAL PAYMENT PROOF BLOCK
+                Only shown for non-Stripe orders (bank transfer / DuitNow).
+                Hidden when a Stripe payment record exists.
+            -->
+            {% if order.payment_proof and not stripe_payment %}
+            <div class="mb-3">
+                <strong class="text-muted">📸 Payment Proof (Bank Transfer / DuitNow)</strong>
+                <img src="{{ order.payment_proof.url }}"
+                     class="img-fluid rounded border mt-2"
+                     style="max-height: 300px; cursor: zoom-in; border-color: #0ea5e9;"
+                     onclick="window.open(this.src)">
+            </div>
+            {% endif %}
+
+            <!--
+                APPROVE BUTTON
+                Appears only when:
+                  - order.status == 'pending' (not yet acted on)
+                  - AND has_payment is True
+                    (set by order_has_confirmed_payment() in admins/views.py,
+                     which returns True only when Stripe webhook has confirmed
+                     the payment OR a manual proof image has been uploaded)
+            -->
+            {% if order.status == 'pending' %}
+                {% if has_payment %}
+                    <a href="{% url 'approve_order' order.id %}" class="btn btn-success w-100 fw-bold py-2">
+                        ✓ Approve & Generate Signed Receipt
+                    </a>
+                {% else %}
+                    <!--
+                        No confirmed payment yet.
+                        Show different message depending on whether Stripe was attempted.
+                    -->
+                    {% if stripe_payment %}
+                        <div class="text-center py-4 text-muted">
+                            <span style="font-size: 2rem; display: block; margin-bottom: 0.5rem;">⏳</span>
+                            <strong>Awaiting Stripe confirmation</strong><br>
+                            <small>
+                                Payment confirmation arrives automatically via webhook
+                                once the customer completes checkout. No action needed from admin.
+                            </small>
+                        </div>
+                    {% else %}
+                        <p class="text-center py-4 text-muted">
+                            <span style="font-size: 2rem; display: block; margin-bottom: 0.5rem;">⏳</span>
+                            Waiting for customer to upload payment proof...
+                        </p>
+                    {% endif %}
+                {% endif %}
+            {% endif %}
+
         </div>
 
         <!-- Digital Signature Status -->
@@ -130,12 +264,14 @@
                 {% csrf_token %}
                 <div class="mb-3">
                     <label for="rejection_reason" class="form-label">Rejection Reason</label>
-                    <textarea name="rejection_reason" id="rejection_reason" class="form-control" rows="3" placeholder="Enter the reason for rejecting this order" required></textarea>
+                    <textarea name="rejection_reason" id="rejection_reason" class="form-control" rows="3"
+                              placeholder="Enter the reason for rejecting this order" required></textarea>
                 </div>
                 <button type="submit" class="btn btn-outline-danger w-100">Reject Order</button>
             </form>
         </div>
         {% endif %}
+
     </div>
 </div>
 {% endblock %}

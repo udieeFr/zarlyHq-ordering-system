@@ -23,6 +23,11 @@
                     <p class="mb-1"><strong>Payment state:</strong> {{ payment.get_status_display }}</p>
                     {% endif %}
 
+                    <div class="d-grid gap-2 d-sm-flex mt-4">
+                        <a href="{% url 'dashboard_home' %}" class="btn btn-primary fw-bold px-4 py-2">Go to Dashboard</a>
+                        <a href="{% url 'order_success' order.id %}" class="btn btn-outline-secondary px-4 py-2">View Order Summary</a>
+                    </div>
+
                     <p class="mt-4 mb-0 text-muted">
                         If this page still shows pending, wait a few seconds and refresh after the webhook is processed.
                     </p>

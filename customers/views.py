@@ -328,8 +328,9 @@ def submit_order(request):
                 )
                 return redirect('checkout')
 
-            order.status = 'pending_payment'
-            order.save(update_fields=['status'])
+            # Keep order in pending review until admin accepts it.
+            # Stripe webhook will mark the payment as succeeded when confirmed.
+            # Admin acceptance will route paid orders to approved and unpaid to pending_payment.
             
             # Get the checkout URL
             checkout_url = get_session_url(session_id)
@@ -456,74 +457,79 @@ def stripe_cancel(request, order_id):
     })
 
 
-@csrf_exempt  # Stripe doesn't use CSRF tokens, they use signature verification
+@csrf_exempt  # Stripe doesn't use CSRF tokens — they sign payloads instead
 @require_http_methods(['POST'])
 def stripe_webhook(request):
     """
     Webhook endpoint for Stripe events.
-    Stripe sends payment status updates here.
-    
-    Important: We verify the signature before processing any event.
+    Stripe sends payment status updates here after checkout.session.completed fires.
+
+    DEBUG CHECKLIST if payments stay 'pending':
+    1. Check Django terminal for "[WEBHOOK] Secret prefix in use:" line.
+       First 12 chars should match the start of your .env STRIPE_WEBHOOK_SECRET.
+    2. Check that Stripe-Signature header is arriving (logged below).
+    3. If signature fails: your .env secret doesn't match what Stripe CLI is using.
+       Copy the whsec_test_... value from `stripe listen` output and update .env,
+       then restart Django.
     """
     payload = request.body
     sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
-    
-    # Verify signature
+
+    # === DEBUG LOGGING: verify which secret Django loaded and whether header arrived ===
+    secret_preview = settings.STRIPE_WEBHOOK_SECRET[:12] if settings.STRIPE_WEBHOOK_SECRET else 'NOT SET'
+    logger.info(f'[WEBHOOK] Received POST. Secret prefix in use: {secret_preview}...')
+    logger.info(f'[WEBHOOK] Stripe-Signature header present: {bool(sig_header)}')
+    if sig_header:
+        logger.info(f'[WEBHOOK] Signature prefix: {sig_header[:30]}...')
+    # ==================================================================================
+
+    if not sig_header:
+        logger.error('[WEBHOOK] No Stripe-Signature header — request may not be from Stripe')
+        return JsonResponse({'error': 'No signature'}, status=400)
+
+    # Verify signature using webhook secret
     event, error = verify_webhook_signature(
         payload,
         sig_header,
         settings.STRIPE_WEBHOOK_SECRET
     )
-    
+
     if error:
-        logger.warning(f'Webhook signature verification failed: {error}')
+        logger.error(f'[WEBHOOK] Signature verification FAILED: {error}')
+        logger.error('[WEBHOOK] Fix: copy whsec_test_... from `stripe listen` into .env STRIPE_WEBHOOK_SECRET and restart Django')
         return JsonResponse({'error': 'Invalid signature'}, status=400)
-    
-    # Handle the event
+
     event_type = event['type']
     event_data = event['data']['object']
-    
+    logger.info(f'[WEBHOOK] Signature OK. Processing event: {event_type}')
+
     try:
         if event_type == 'checkout.session.completed':
-            # Payment successful
-            success, msg = handle_checkout_session_completed(
-                event_data['id'],
-                event
-            )
+            success, msg = handle_checkout_session_completed(event_data['id'], event)
             if success:
-                logger.info(f'Webhook processed: {msg}')
+                logger.info(f'[WEBHOOK] checkout.session.completed OK: {msg}')
             else:
-                logger.error(f'Webhook error: {msg}')
-        
+                logger.error(f'[WEBHOOK] checkout.session.completed FAILED: {msg}')
+
         elif event_type == 'payment_intent.payment_failed':
-            # Payment failed
-            success, msg = handle_payment_intent_failed(
-                event_data['id'],
-                event
-            )
+            success, msg = handle_payment_intent_failed(event_data['id'], event)
             if success:
-                logger.info(f'Webhook processed: {msg}')
+                logger.info(f'[WEBHOOK] payment_intent.payment_failed handled: {msg}')
             else:
-                logger.error(f'Webhook error: {msg}')
-        
+                logger.error(f'[WEBHOOK] payment_intent.payment_failed FAILED: {msg}')
+
         elif event_type == 'charge.refunded':
-            # Refund issued
-            success, msg = handle_charge_refunded(
-                event_data['id'],
-                event
-            )
+            success, msg = handle_charge_refunded(event_data['id'], event)
             if success:
-                logger.info(f'Webhook processed: {msg}')
+                logger.info(f'[WEBHOOK] charge.refunded handled: {msg}')
             else:
-                logger.error(f'Webhook error: {msg}')
-        
+                logger.error(f'[WEBHOOK] charge.refunded FAILED: {msg}')
+
         else:
-            # We don't handle this event type yet
-            logger.debug(f'Unhandled event type: {event_type}')
-    
+            logger.debug(f'[WEBHOOK] Unhandled event type (ignored): {event_type}')
+
     except Exception as e:
-        logger.error(f'Unexpected error processing webhook: {str(e)}')
-    
-    # Always return 200 to Stripe so it knows we received the event
-    # (even if we couldn't process it; we'll retry on next attempt)
+        logger.error(f'[WEBHOOK] Unexpected error processing {event_type}: {str(e)}')
+
+    # Always return 200 — Stripe treats anything else as failure and will retry
     return JsonResponse({'received': True}, status=200)

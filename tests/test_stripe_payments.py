@@ -62,10 +62,12 @@ class TestStripeCheckoutSession:
 
 class TestStripeWebhookHelpers:
     def test_checkout_session_completed_marks_payment_succeeded(self, test_customer, test_product):
+        # After Stripe webhook confirms payment, the Payment record is marked succeeded,
+        # but the order stays in pending status for admin review.
         order = Order.objects.create(
             customer=test_customer,
             total_amount=Decimal('50.00'),
-            status='pending_payment',
+            status='pending',
             full_name='Test Customer',
             phone_number='0123456789',
             street_address='123 Main St',
@@ -104,4 +106,4 @@ class TestStripeWebhookHelpers:
         assert payment.status == 'succeeded'
         assert payment.stripe_payment_intent_id == 'pi_test_123'
         assert payment.stripe_customer_id == 'cus_test_123'
-        assert order.status == 'pending_payment'
+        assert order.status == 'pending'

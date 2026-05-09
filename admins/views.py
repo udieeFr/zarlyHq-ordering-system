@@ -22,6 +22,36 @@ def is_sales_admin(user):
     """Checks if the user has administrative permissions."""
     return user.is_authenticated and (user.role in ['sales_admin', 'manager'] or user.is_superuser)
 
+
+def order_has_confirmed_payment(order):
+    """
+    Returns True when order has verified payment (manual proof or Stripe webhook confirmed).
+    For Stripe: checks that webhook has fired (stripe_payment_intent_id set) and payment succeeded.
+    For manual: checks that payment proof was uploaded.
+    """
+    # Check Stripe payment - must have payment_intent_id (set by webhook) and be succeeded
+    has_stripe_payment = order.payments.filter(
+        payment_method='stripe',
+        status='succeeded',
+        stripe_payment_intent_id__isnull=False  # Webhook has processed this payment
+    ).exists()
+    return bool(order.payment_proof) or has_stripe_payment
+
+
+def finalize_order_approval(order, user):
+    """Signs the invoice and marks the order as approved."""
+    raw_pdf = generate_invoice_pdf(order)
+    signed_path, doc_hash = sign_pdf_digitally(raw_pdf, order.id)
+    DigitalSignature.objects.create(
+        order=order,
+        signature_hash=doc_hash,
+        pdf_path=os.path.join('signed_pdfs', os.path.basename(signed_path)),
+    )
+    order.status = 'approved'
+    order.approved_at = timezone.now()
+    order.approved_by = user
+    order.save()
+
 def unified_login(request):
     """
     Unified login view that redirects users to appropriate dashboard based on role.
@@ -205,7 +235,18 @@ def add_product(request):
 def admin_order_detail(request, order_id):
     """View complete order info, shipping, and items."""
     order = get_object_or_404(Order, id=order_id)
-    return render(request, 'admins/order_detail.html', {'order': order})
+    
+    # Get the latest Stripe payment record if it exists so admins can see
+    # the transaction evidence even before webhook confirmation finishes.
+    stripe_payment = order.payments.filter(payment_method='stripe').order_by('-created_at').first()
+    
+    has_payment = order_has_confirmed_payment(order)
+    
+    return render(request, 'admins/order_detail.html', {
+        'order': order,
+        'stripe_payment': stripe_payment,
+        'has_payment': has_payment,
+    })
 
 @sales_admin_required
 def sales_admin_dashboard(request):
@@ -559,9 +600,13 @@ def mark_orders_prepared(request):
 def set_pending_payment(request, order_id):
     """Marks order as accepted and requests payment from customer."""
     order = get_object_or_404(Order, id=order_id)
-    order.status = 'pending_payment'
-    order.save()
-    messages.success(request, f"Order #{order.id} marked as Accepted and Waiting for Payment.")
+    if order_has_confirmed_payment(order):
+        finalize_order_approval(order, request.user)
+        messages.success(request, f"Order #{order.id} approved and signed.")
+    else:
+        order.status = 'pending_payment'
+        order.save()
+        messages.success(request, f"Order #{order.id} marked as Accepted and Waiting for Payment.")
     return redirect('sales_admin_dashboard')
 
 @sales_admin_required
@@ -570,42 +615,46 @@ def bulk_accept_orders(request):
     if request.method == 'POST':
         order_ids = request.POST.getlist('order_ids')
         pending_orders = Order.objects.filter(id__in=order_ids, status='pending')
-        count = pending_orders.update(status='pending_payment')
-        if count:
-            messages.success(request, f"{count} order(s) accepted and moved to pending payment.")
+        approved_count = 0
+        awaiting_payment_count = 0
+
+        for order in pending_orders:
+            if order_has_confirmed_payment(order):
+                finalize_order_approval(order, request.user)
+                approved_count += 1
+            else:
+                order.status = 'pending_payment'
+                order.save()
+                awaiting_payment_count += 1
+
+        if approved_count or awaiting_payment_count:
+            messages.success(
+                request,
+                f"Accepted {approved_count} paid order(s) and moved {awaiting_payment_count} order(s) to awaiting payment."
+            )
         else:
             messages.warning(request, 'No pending orders were selected or eligible for acceptance.')
     return redirect('sales_admin_dashboard')
 
 @sales_admin_required
 def approve_order(request, order_id):
-    """Generates PDF receipt and applies digital signature upon approval."""
+    """
+    Generates PDF receipt and applies digital signature upon approval.
+    Used when sales admin manually approves a reviewed order.
+    """
     order = get_object_or_404(Order, id=order_id)
 
-    has_confirmed_stripe_payment = order.payments.filter(
-        payment_method='stripe',
-        status='succeeded'
-    ).exists()
-
-    if not order.payment_proof and not has_confirmed_stripe_payment:
+    if not order_has_confirmed_payment(order):
         messages.error(request, "Cannot approve: Payment proof or confirmed Stripe payment is missing.")
         return redirect('admin_order_detail', order_id=order.id)
+    
     try:
-        raw_pdf = generate_invoice_pdf(order)
-        signed_path, doc_hash = sign_pdf_digitally(raw_pdf, order.id)
-        DigitalSignature.objects.create(
-            order=order, 
-            signature_hash=doc_hash, 
-            pdf_path=os.path.join('signed_pdfs', os.path.basename(signed_path)),
-        )
-        order.status = 'approved'
-        order.approved_at = timezone.now()
-        order.approved_by = request.user
-        order.save()
+        finalize_order_approval(order, request.user)
         messages.success(request, f"Order #{order.id} Approved and Digitally Signed.")
     except Exception as e:
         messages.error(request, f"Error signing document: {str(e)}")
     return redirect('sales_admin_dashboard')
+
 
 @sales_admin_required
 def reject_order(request, order_id):

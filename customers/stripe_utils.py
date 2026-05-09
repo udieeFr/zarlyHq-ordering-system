@@ -121,13 +121,11 @@ def handle_checkout_session_completed(session_id, event):
         payment.paid_at = timezone.now()
         payment.save()
         
-        # Move order to pending_payment so admin can review and approve
-        # For Stripe, we trust the payment is real, but we still want manual approval
-        # of the order before fulfillment
+        # Keep the order in pending review until sales admin accepts it.
+        # Stripe payment confirmation is stored on the payment record and
+        # will be displayed in the admin review screen.
         if order.status == 'pending':
-            order.status = 'pending_payment'
-            order.save()
-            logger.info(f'Order {order.id} marked as pending_payment after Stripe payment')
+            logger.info(f'Order {order.id} remains in pending review after Stripe payment confirmation')
         
         return True, f'Payment confirmed for order {order.id}'
         
