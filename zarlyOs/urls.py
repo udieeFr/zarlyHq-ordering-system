@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.shortcuts import redirect
 from admins.views import unified_login, logout_view, dashboard_home, admin_login, customer_login, custom_login
+from customers.views import stripe_webhook
 from django.conf import settings               # <--- Add this
 from django.conf.urls.static import static
 
@@ -53,6 +54,9 @@ urlpatterns = [
     # App URLs
     path('dashboard/', include('admins.urls')),  # All admin URLs under /dashboard/
     path('menu/', include('customers.urls')),    # All customer URLs under /menu/
+
+    # Stripe webhook alias for Stripe CLI forwarding
+    path('stripe/webhook/', stripe_webhook, name='stripe_webhook_root'),
 ]
 
 if settings.DEBUG:

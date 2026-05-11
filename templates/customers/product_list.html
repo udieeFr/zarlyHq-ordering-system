@@ -2,222 +2,178 @@
 {% load static %}
 
 {% block content %}
-<div class="container py-4 menu-page">
-    <div class="menu-heading mb-4">
-        <div>
-            <p class="eyebrow">Food Menu</p>
-            <h1>Popular Delicious Foods</h1>
-        </div>
-        <div class="menu-pill-row">
-            <a href="{% url 'product_list' %}" class="pill {% if not request.GET.category %}pill-active{% endif %}">All Menu</a>
-            {% for cat in categories %}
-                <a href="?category={{ cat.id }}" class="pill {% if request.GET.category == cat.id|stringformat:"s" %}pill-active{% endif %}">{{ cat.name }}</a>
-            {% endfor %}
-        </div>
+<div class="menu-page">
+
+  <!-- ── Hero + Inline Filters ──────────────────────────── -->
+  <div class="menu-hero">
+    <div class="menu-hero-text">
+      <p class="eyebrow">Food Menu</p>
+      <h1 class="menu-hero-title">Popular Delicious Foods</h1>
     </div>
+    <form method="get" class="menu-filter-form">
+      <div class="filter-select-wrap">
+        <select name="category" id="filterCategory" class="filter-inline-select">
+          <option value="">All Categories</option>
+          {% for cat in categories %}
+            <option value="{{ cat.id }}" {% if request.GET.category == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filter-select-wrap">
+        <select name="allergy" id="filterAllergy" class="filter-inline-select">
+          <option value="">No allergy filter</option>
+          {% for al in allergies %}
+            <option value="{{ al.id }}" {% if request.GET.allergy == al.id|stringformat:"s" %}selected{% endif %}>🚫 Hide {{ al.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="button" id="filterReset" class="filter-reset-btn">✕ Reset</button>
+    </form>
+  </div>
 
-    <div class="card filter-card mb-4">
-        <form method="get" class="row g-3 align-items-end">
-            <div class="col-md-5">
-                <label class="form-label small fw-bold">By Category</label>
-                <select name="category" class="form-select" onchange="this.form.submit()">
-                    <option value="">All Categories</option>
-                    {% for cat in categories %}
-                        <option value="{{ cat.id }}" {% if request.GET.category == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-5">
-                <label class="form-label small fw-bold">Allergies concern</label>
-                <select name="allergy" class="form-select" onchange="this.form.submit()">
-                    <option value="">None</option>
-                    {% for al in allergies %}
-                        <option value="{{ al.id }}" {% if request.GET.allergy == al.id|stringformat:"s" %}selected{% endif %}>Contains {{ al.name }} ⚠️</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-2">
-                <a href="{% url 'product_list' %}" class="btn btn-outline-secondary w-100">Reset</a>
-            </div>
-        </form>
+  <!-- ── Category Cards ─────────────────────────────────── -->
+  <div class="categories-section">
+    <div class="categories-scroll">
+      <a href="{% url 'product_list' %}" class="cat-card pill {% if not request.GET.category %}pill-active{% endif %}">
+        <div class="cat-icon-wrap">🍽️</div>
+        <span class="cat-name">All Menu</span>
+      </a>
+      {% for cat in categories %}
+        <a href="?category={{ cat.id }}" class="cat-card pill {% if request.GET.category == cat.id|stringformat:"s" %}pill-active{% endif %}">
+          <div class="cat-icon-wrap">
+            {% if forloop.counter|divisibleby:6 %}🌶️
+            {% elif forloop.counter|divisibleby:5 %}🥘
+            {% elif forloop.counter|divisibleby:4 %}🍜
+            {% elif forloop.counter|divisibleby:3 %}🥗
+            {% elif forloop.counter|divisibleby:2 %}🍖
+            {% else %}🍱{% endif %}
+          </div>
+          <span class="cat-name">{{ cat.name }}</span>
+        </a>
+      {% endfor %}
     </div>
+  </div>
 
-    <div class="row g-3">
-        <div class="col-lg-9">
-            <div class="row g-3">
-                {% for p in products %}
-                <div class="col-sm-6 col-lg-3">
-                    <div class="card h-100 border-0 shadow-sm product-card {% if p.stock <= 0 %}out-of-stock{% endif %}\">
+  <!-- ── Product Grid (full width) ────────────────────── -->
+  <div class="row g-3" id="product-grid">
+    {% include 'customers/partials/product_grid.html' %}
+  </div>
 
-                        {% if p.stock <= 0 %}
-                            <span class="badge bg-danger stock-badge">SOLD OUT</span>
-                        {% endif %}
-                        <div class="product-image">
-                            <img src="{% if p.image %}{{ p.image.url }}{% else %}{% static 'images/products/promo1.jpg' %}{% endif %}" alt="{{ p.name }}">
-                            {% if p.category %}
-                                <span class="category-chip">{{ p.category.name }}</span>
-                            {% endif %}
-                        </div>
-                        <div class="card-body d-flex flex-column">
-                            <h5 class="product-title">{{ p.name }}</h5>
-                            <div class="product-rating">
-                                <span class="stars">★★★★★</span>
-                                <span class="rating-count">({{ p.stock|add:20 }})</span>
-                            </div>
-                            <div class="product-details">
-                                <p class="price">RM {{ p.price }}</p>
-                                {% if p.stock > 0 %}
-                                    <p class="text-muted">Available: {{ p.stock }} units</p>
-                                {% else %}
-                                    <p class="text-muted">Currently unavailable</p>
-                                {% endif %}
-                            </div>
-
-                            <div class="product-actions mt-auto">
-                                {% if p.stock > 0 %}
-                                    <form method="post" action="{% url 'add_to_cart' %}" class="d-flex gap-2 align-items-center">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="product_id" value="{{ p.id }}">
-                                        <input type="number" name="quantity" value="1" min="1" max="{{ p.stock }}" class="form-control quantity-input">
-                                        <button type="submit" class="btn btn-primary add-cart-btn">Add To Cart</button>
-                                    </form>
-                                {% else %}
-                                    <button class="btn btn-secondary w-100 btn-sm" disabled>Out of Stock</button>
-                                {% endif %}
-                                <div class="icon-actions mt-3 d-flex gap-2 justify-content-center">
-                                    <button type="button" class="icon-btn">♡</button>
-                                    <button type="button" class="icon-btn">👁</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% empty %}
-                <div class="col-12 text-center py-5">
-                    <p class="text-muted">No products found.</p>
-                </div>
-                {% endfor %}
-            </div>
-
-            <nav aria-label="Product page navigation" class="pagination-wrapper mt-4">
-                <ul class="pagination justify-content-center">
-                    <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
-                        {% if page_obj.has_previous %}
-                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.allergy %}&allergy={{ request.GET.allergy }}{% endif %}" aria-label="Previous">
-                                <span aria-hidden="true">&larr;</span>
-                            </a>
-                        {% else %}
-                            <span class="page-link" aria-hidden="true">&larr;</span>
-                        {% endif %}
-                    </li>
-
-                    {% for num in paginator.page_range %}
-                        {% if num >= page_obj.number|add:-2 and num <= page_obj.number|add:2 %}
-                            <li class="page-item {% if page_obj.number == num %}active{% endif %}">
-                                <a class="page-link" href="?page={{ num }}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.allergy %}&allergy={{ request.GET.allergy }}{% endif %}">{{ num }}</a>
-                            </li>
-                        {% endif %}
-                    {% endfor %}
-
-                    <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
-                        {% if page_obj.has_next %}
-                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.allergy %}&allergy={{ request.GET.allergy }}{% endif %}" aria-label="Next">
-                                <span aria-hidden="true">&rarr;</span>
-                            </a>
-                        {% else %}
-                            <span class="page-link" aria-hidden="true">&rarr;</span>
-                        {% endif %}
-                    </li>
-                </ul>
-            </nav>
-        </div>
-
-        <div class="col-lg-3">
-            <div class="sticky-sidebar">
-                <div class="card sidebar-widget bg-orange text-white mb-4">
-                    <h5 class="fw-bold mb-1 text-center">Your Cart 🛒</h5>
-                    <p class="small text-center opacity-75 mb-3">You have {{ cart_count|default:"0" }} items.</p>
-                    <a href="{% url 'cart' %}" class="btn btn-light btn-sm w-100 fw-bold py-2">View My Cart</a>
-                </div>
-
-                <div class="card sidebar-widget mb-4">
-                    <h6 class="fw-bold border-bottom pb-2 mb-3">My Recent Orders</h6>
-                {% for o in user_orders %}
-                    <div class="mb-3 small border-bottom pb-2 recent-order">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="fw-bold text-primary">#{{ o.id }}</span>
-                            <span class="badge order-status-badge {% if o.status == 'approved' %}bg-success text-white{% elif o.status == 'pending_payment' %}bg-info text-white{% else %}bg-secondary text-white{% endif %}">
-                                {{ o.status|capfirst }}
-                            </span>
-                        </div>
-                        
-                        <div class="mt-2 d-grid gap-1">
-                            <a href="{% url 'order_success' o.id %}" class="btn btn-sm btn-outline-dark w-100 order-link">
-                                {% if o.status == 'pending_payment' %}Pay Now & Details{% else %}View Details{% endif %}
-                            </a>
-                            
-                            {% if o.status == 'approved' and o.digital_signature %}
-                                <a href="{{ o.digital_signature.pdf_path.url }}" class="btn btn-sm btn-success w-100 order-link" download>
-                                     Download Receipt 📄
-                                </a>
-                            {% elif o.status == 'pending_payment' %}
-                                <a href="{% url 'download_invoice' o.id %}" class="btn btn-sm btn-info text-white w-100 order-link">
-                                    Download Invoice 🧾
-                                </a>
-                            {% endif %}
-                        </div>
-                    </div>
-                {% empty %}
-                    <p class="small text-muted text-center py-3">No orders yet.</p>
-                {% endfor %}
-            </div>
-
-            <button class="btn btn-danger w-100 py-3 fw-bold shadow-sm rounded-4" data-bs-toggle="modal" data-bs-target="#compModal">
-                File a complaint
-            </button>
-            </div>
-        </div>
-    </div>
 </div>
 
-<div class="modal fade" id="compModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content border-0 shadow rounded-4">
-            <div class="modal-header bg-danger text-white border-0">
-                <h5 class="modal-title fw-bold">Customer Complaint</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="post" action="{% url 'submit_complaint' %}" enctype="multipart/form-data">
-                {% csrf_token %}
-                <div class="modal-body p-4">
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">Select Order (Receipt Validation)</label>
-                        <select name="order_id" class="form-select" required>
-                            <option value="">-- Choose Order --</option>
-                            {% for o in completed_orders %}
-                                <option value="{{ o.id }}">Order #{{ o.id }} (RM {{ o.total_amount }})</option>
-                            {% endfor %}
-                        </select>
-                        <p class="text-muted small order-note">Only orders with a signed receipt can be reported for security and audit purposes.</p>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">Subject</label>
-                        <input type="text" name="subject" class="form-control" placeholder="Briefly describe the issue" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">Message</label>
-                        <textarea name="message" class="form-control" rows="4" placeholder="Explain the problem in detail..." required></textarea>
-                    </div>
-                    <div class="mb-0">
-                        <label class="form-label small fw-bold">Upload Evidence (Image)</label>
-                        <input type="file" name="evidence_image" class="form-control">
-                    </div>
-                </div>
-                <div class="modal-footer border-0">
-                    <button type="submit" class="btn btn-danger w-100 py-2 fw-bold">Submit Complaint</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
+<script>
+(function () {
+  const grid = document.getElementById('product-grid');
+
+  /* ── helpers ─────────────────────────────── */
+  function buildParams(extra = {}) {
+    const cat = document.getElementById('filterCategory').value;
+    const alg = document.getElementById('filterAllergy').value;
+    const p   = new URLSearchParams();
+    if (cat) p.set('category', cat);
+    if (alg) p.set('allergy', alg);
+    Object.entries(extra).forEach(([k, v]) => { if (v) p.set(k, v); else p.delete(k); });
+    return p;
+  }
+
+  async function loadGrid(params) {
+    grid.style.opacity = '0.45';
+    grid.style.pointerEvents = 'none';
+    const url = `${window.location.pathname}?${params}`;
+    try {
+      const res  = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      const html = await res.text();
+      grid.innerHTML = html;
+      history.pushState({}, '', url);
+    } finally {
+      grid.style.opacity = '1';
+      grid.style.pointerEvents = '';
+    }
+  }
+
+  /* ── category pills ──────────────────────── */
+  document.querySelectorAll('.pill').forEach(pill => {
+    pill.addEventListener('click', e => {
+      e.preventDefault();
+      document.querySelectorAll('.pill').forEach(p => p.classList.remove('pill-active'));
+      pill.classList.add('pill-active');
+      const href   = pill.getAttribute('href') || '';
+      const params = new URLSearchParams(href.split('?')[1] || '');
+      const catVal = params.get('category') || '';
+      document.getElementById('filterCategory').value = catVal;
+      loadGrid(params);
+    });
+  });
+
+  /* ── dropdowns ───────────────────────────── */
+  ['filterCategory', 'filterAllergy'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => loadGrid(buildParams()));
+  });
+
+  document.getElementById('filterReset').addEventListener('click', () => {
+    document.getElementById('filterCategory').value = '';
+    document.getElementById('filterAllergy').value  = '';
+    document.querySelectorAll('.pill').forEach(p => p.classList.remove('pill-active'));
+    document.querySelector('.pill')?.classList.add('pill-active');
+    loadGrid(new URLSearchParams());
+  });
+
+  /* ── pagination (event delegation) ─────────*/
+  grid.addEventListener('click', e => {
+    const link = e.target.closest('.page-link[href]');
+    if (!link) return;
+    e.preventDefault();
+    const params = new URLSearchParams(link.getAttribute('href').split('?')[1] || '');
+    loadGrid(params);
+    window.scrollTo({ top: grid.offsetTop - 80, behavior: 'smooth' });
+  });
+
+  /* ── add to cart (event delegation) ────────*/
+  grid.addEventListener('submit', async e => {
+    const form = e.target.closest('[data-cart-form]');
+    if (!form) return;
+    e.preventDefault();
+
+    const btn  = form.querySelector('button[type="submit"]');
+    const orig = btn.textContent;
+    btn.textContent = '✓';
+    btn.disabled = true;
+
+    try {
+      const res  = await fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        document.querySelectorAll('.badge-count').forEach(b => b.textContent = data.cart_count);
+        const sideCount = document.querySelector('.sidebar-cart-count');
+        if (sideCount) sideCount.textContent = data.cart_count;
+        showToast('🛒 ' + data.message);
+      } else {
+        showToast(data.message, 'error');
+      }
+    } catch {
+      showToast('Something went wrong.', 'error');
+    } finally {
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1200);
+    }
+  });
+
+  /* ── toast ───────────────────────────────── */
+  function showToast(msg, type = 'success') {
+    const t = document.createElement('div');
+    t.className = 'zarly-toast zarly-toast-' + type;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    requestAnimationFrame(() => t.classList.add('show'));
+    setTimeout(() => {
+      t.classList.remove('show');
+      t.addEventListener('transitionend', () => t.remove(), { once: true });
+    }, 3000);
+  }
+})();
+</script>
 {% endblock %}

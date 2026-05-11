@@ -151,7 +151,7 @@
                 {% elif stripe_payment.status == 'succeeded' %}
                 <div class="mt-2 pt-2 border-top border-success border-opacity-25">
                     <small class="text-success">
-                        ✔ Payment verified by Stripe. Safe to approve this order.
+                        <!-- ✔ Payment verified by Stripe. Safe to approve this order. -->
                     </small>
                 </div>
                 {% endif %}
@@ -184,11 +184,11 @@
             {% if order.status == 'pending' %}
                 {% if has_payment %}
                     <a href="{% url 'approve_order' order.id %}" class="btn btn-success w-100 fw-bold py-2">
-                        ✓ Approve & Generate Signed Receipt
+                         Approve order
                     </a>
                 {% else %}
                     <a href="{% url 'approve_order' order.id %}" class="btn btn-warning w-100 fw-bold py-2">
-                        ✓ Approve (No Payment Yet - Will Go to Awaiting Payment List)
+                         Approve (No Payment Yet - Will Go to Awaiting Payment List)
                     </a>
                     <!--
                         No confirmed payment yet.

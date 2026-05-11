@@ -267,10 +267,47 @@ def sales_admin_dashboard(request):
     if search_query:
         search_filter = Q(customer__username__icontains=search_query) | Q(full_name__icontains=search_query) | Q(phone_number__icontains=search_query) | Q(id__exact=search_query)
         pending_orders = base_pending.filter(search_filter)
-        pending_payment_orders = base_pending_payment.filter(search_filter)
+        pending_payment_orders = base_pending_payment.filter(search_filter).prefetch_related('payments')
     else:
         pending_orders = base_pending
-        pending_payment_orders = base_pending_payment
+        pending_payment_orders = base_pending_payment.prefetch_related('payments')
+
+    # Enrich awaiting-payment rows with payment source/status text for UI badges and button hover.
+    pending_payment_orders = list(pending_payment_orders.order_by('-created_at'))
+    for order in pending_payment_orders:
+        manual_uploaded = bool(order.payment_proof)
+        stripe_confirmed = False
+        stripe_seen = False
+        for payment in order.payments.all():
+            if payment.payment_method == 'stripe':
+                stripe_seen = True
+                if payment.status == 'succeeded' and payment.stripe_payment_intent_id:
+                    stripe_confirmed = True
+
+        if stripe_confirmed:
+            order.payment_review_badge = 'Stripe Confirmed'
+            order.payment_review_badge_class = 'bg-success'
+            order.payment_review_status = 'Ready for approval'
+            order.payment_review_status_class = 'text-success'
+            order.payment_review_tooltip = 'Stripe webhook confirmed payment. Click to review and sign.'
+        elif manual_uploaded:
+            order.payment_review_badge = 'Manual Proof Uploaded'
+            order.payment_review_badge_class = 'bg-primary'
+            order.payment_review_status = 'Ready for review'
+            order.payment_review_status_class = 'text-success'
+            order.payment_review_tooltip = 'Customer uploaded payment proof. Click to review and sign.'
+        elif stripe_seen:
+            order.payment_review_badge = 'Stripe Pending'
+            order.payment_review_badge_class = 'bg-warning text-dark'
+            order.payment_review_status = 'Awaiting Stripe confirmation'
+            order.payment_review_status_class = 'text-warning'
+            order.payment_review_tooltip = 'Stripe payment started, waiting for webhook confirmation.'
+        else:
+            order.payment_review_badge = 'Waiting'
+            order.payment_review_badge_class = 'bg-secondary'
+            order.payment_review_status = 'Awaiting customer'
+            order.payment_review_status_class = 'text-muted'
+            order.payment_review_tooltip = 'No payment submitted yet.'
 
     approved_orders_qs = Order.objects.filter(status='approved')
     approved_orders = approved_orders_qs.order_by('-approved_at')[:10]
@@ -302,7 +339,7 @@ def sales_admin_dashboard(request):
 
     return render(request, 'admins/sales_admin_dashboard.html', {
         'pending_orders': pending_orders.order_by('-created_at'),
-        'pending_payment_orders': pending_payment_orders.order_by('-created_at'),
+        'pending_payment_orders': pending_payment_orders,
         'accepted_orders': approved_orders,
         'search_query': search_query,
         'dashboard_metrics': dashboard_metrics,
@@ -401,16 +438,19 @@ def pending_payment_orders_list(request):
 
 @sales_admin_required
 def approve_pending_payment(request, order_id):
-    """Verify payment proof and move order to approved status."""
+    """Approve an awaiting-payment order when payment is confirmed."""
     order = get_object_or_404(Order, id=order_id, status='pending_payment')
-    
-    if not order.payment_proof:
-        messages.error(request, "No payment proof found for this order.")
+
+    if not order_has_confirmed_payment(order):
+        messages.error(
+            request,
+            "Payment is not confirmed yet for this order. Wait for Stripe confirmation or manual proof upload."
+        )
         return redirect('pending_payment_orders_list')
-    
+
     # Finalize approval (signs invoice and moves to 'approved')
     finalize_order_approval(order, request.user)
-    
+
     messages.success(request, f"Order #{order.id} payment approved and signed.")
     return redirect('pending_payment_orders_list')
 
@@ -525,7 +565,15 @@ def print_prep_list(request):
 @sales_admin_required
 def prepared_orders_list(request):
     """List all prep groups with prepared orders."""
-    prep_groups = PrepGroup.objects.all().select_related('created_by').order_by('-created_at')
+    # Show only active prep groups that still have at least one order in prepared state.
+    # Once a group is marked ready_for_delivery, it drops out of this list.
+    prep_groups = (
+        PrepGroup.objects
+        .filter(orders__status='prepared')
+        .select_related('created_by')
+        .distinct()
+        .order_by('-created_at')
+    )
 
     # Search
     search_query = request.GET.get('q', '').strip()

@@ -72,20 +72,22 @@ def product_list(request):
     if cat_id:
         products = products.filter(category_id=cat_id)
         
-    if allergy_id == 'none':
-        products = products.filter(allergies__isnull=True)
-    elif allergy_id:
-        products = products.filter(allergies__id=allergy_id).distinct()
+    if allergy_id:
+        products = products.exclude(allergies__id=allergy_id)
 
     # 2. Pagination
     paginator = Paginator(products.order_by('name'), 12)
+    # Normalize page number: ensure it's a positive integer and handle out-of-range pages
     page_number = request.GET.get('page', 1)
     try:
-        product_page = paginator.page(page_number)
-    except PageNotAnInteger:
-        product_page = paginator.page(1)
-    except EmptyPage:
-        product_page = paginator.page(paginator.num_pages)
+        page_int = int(page_number)
+        if page_int < 1:
+            page_int = 1
+    except (TypeError, ValueError):
+        page_int = 1
+
+    # Use get_page which gracefully handles invalid and out-of-range numbers
+    product_page = paginator.get_page(page_int)
 
     # 3. Sidebar and UI Data
     cart = request.session.get('cart', {})
@@ -99,7 +101,7 @@ def product_list(request):
         # Receipt validation: Only orders that were 'approved' can have complaints
         completed_orders = Order.objects.filter(customer=request.user, status='approved')
 
-    return render(request, 'customers/product_list.html', {
+    context = {
         'products': product_page,
         'page_obj': product_page,
         'paginator': paginator,
@@ -108,7 +110,12 @@ def product_list(request):
         'cart_count': cart_count,
         'user_orders': user_orders,
         'completed_orders': completed_orders,
-    })
+    }
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render(request, 'customers/partials/product_grid.html', context)
+
+    return render(request, 'customers/product_list.html', context)
 
 @login_required
 def download_invoice(request, order_id):
@@ -211,29 +218,83 @@ def upload_payment_proof(request, order_id):
     
     return redirect('order_success', order_id=order.id)
 
+
+@login_required
+def payment_page(request, order_id):
+    """
+    Simple payment landing page that lets the customer choose between Stripe
+    and QR / bank transfer methods.
+    """
+    order = get_object_or_404(Order, id=order_id, customer=request.user)
+
+    if order.status not in ['pending', 'pending_payment', 'awaiting_payment']:
+        messages.info(request, 'This order does not need payment right now.')
+        return redirect('order_success', order_id=order.id)
+
+    context = get_payment_proof_context(order)
+    context.update({
+        'payment': order.payments.order_by('-created_at').first(),
+    })
+    return render(request, 'customers/payment_page.html', context)
+
+
+@login_required
+@require_http_methods(['POST'])
+def start_stripe_payment(request, order_id):
+    """
+    Creates a Stripe Checkout session for an existing order and redirects the
+    customer to Stripe.
+    """
+    order = get_object_or_404(Order, id=order_id, customer=request.user)
+
+    if order.status not in ['pending', 'pending_payment', 'awaiting_payment']:
+        messages.info(request, 'Stripe payment is not available for this order.')
+        return redirect('order_success', order_id=order.id)
+
+    session_id, error = create_stripe_checkout_session(order, request)
+    if error:
+        messages.error(request, f'Could not start Stripe payment: {error}')
+        return redirect('payment_page', order_id=order.id)
+
+    checkout_url = get_session_url(session_id)
+    if not checkout_url:
+        messages.error(request, 'Could not open Stripe checkout. Please try again.')
+        return redirect('payment_page', order_id=order.id)
+
+    return redirect(checkout_url)
+
 @login_required
 def add_to_cart(request):
     """
     Adds a product to the cart session using POST data.
-    This version avoids positional argument errors in URLs.
+    Returns JSON for AJAX requests, redirects otherwise.
     """
     if request.method == 'POST':
         product_id = request.POST.get('product_id')
         quantity = int(request.POST.get('quantity', 1))
-        
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
         cart = request.session.get('cart', {})
-        
+
         try:
             product = Product.objects.get(id=product_id)
-            # Add or update quantity
             cart[product_id] = cart.get(product_id, 0) + quantity
-            
             request.session['cart'] = cart
             request.session.modified = True
+
+            if is_ajax:
+                return JsonResponse({
+                    'success': True,
+                    'message': f'{product.name} added to cart!',
+                    'cart_count': sum(cart.values()),
+                })
             messages.success(request, f'{product.name} added to cart.')
+
         except Product.DoesNotExist:
+            if is_ajax:
+                return JsonResponse({'success': False, 'message': 'Product not found.'}, status=404)
             messages.error(request, 'Product not found.')
-            
+
     return redirect('product_list')
 
 @login_required
@@ -499,7 +560,7 @@ def submit_complaint(request):
             evidence_image=request.FILES.get('evidence_image')
         )
         messages.success(request, "Your complaint has been submitted successfully.")
-    return redirect('product_list')
+    return redirect('customer_support')
 
 
 # ============================================================================
@@ -628,6 +689,62 @@ def stripe_webhook(request):
 
 
 @login_required
+def customer_orders(request):
+    """
+    Dedicated orders page showing upcoming and previous orders.
+    Replaces the sidebar order widget from the product list page.
+    """
+    upcoming_statuses = ['pending', 'pending_payment', 'prepared', 'ready_for_delivery', 'out_for_delivery']
+    previous_statuses = ['approved', 'delivered', 'rejected']
+
+    upcoming_orders = Order.objects.filter(
+        customer=request.user,
+        status__in=upcoming_statuses
+    ).prefetch_related('items__product').order_by('-created_at')
+
+    previous_orders = Order.objects.filter(
+        customer=request.user,
+        status__in=previous_statuses
+    ).prefetch_related('items__product').order_by('-created_at')
+
+    completed_orders = Order.objects.filter(
+        customer=request.user,
+        status__in=['approved', 'delivered']
+    )
+
+    cart = request.session.get('cart', {})
+    cart_count = sum(cart.values())
+
+    return render(request, 'customers/customer_orders.html', {
+        'upcoming_orders': upcoming_orders,
+        'previous_orders': previous_orders,
+        'completed_orders': completed_orders,
+        'cart_count': cart_count,
+    })
+
+
+@login_required
+def customer_support(request):
+    complaints = Complaint.objects.filter(
+        customer=request.user
+    ).select_related('order').order_by('-created_at')
+
+    eligible_orders = Order.objects.filter(
+        customer=request.user,
+        status__in=['approved', 'delivered']
+    ).order_by('-created_at')
+
+    cart = request.session.get('cart', {})
+    cart_count = sum(cart.values())
+
+    return render(request, 'customers/customer_support.html', {
+        'complaints': complaints,
+        'eligible_orders': eligible_orders,
+        'cart_count': cart_count,
+    })
+
+
+@login_required
 def rejected_orders(request):
     """
     Display all rejected orders for the customer with rejection reasons.
@@ -645,11 +762,12 @@ def rejected_orders(request):
     paginator = Paginator(rejected_orders_qs, 10)
     page_number = request.GET.get('page', 1)
     try:
-        rejected_orders_page = paginator.page(page_number)
-    except PageNotAnInteger:
-        rejected_orders_page = paginator.page(1)
-    except EmptyPage:
-        rejected_orders_page = paginator.page(paginator.num_pages)
+        page_int = int(page_number)
+        if page_int < 1:
+            page_int = 1
+    except (TypeError, ValueError):
+        page_int = 1
+    rejected_orders_page = paginator.get_page(page_int)
     
     return render(request, 'customers/rejected_orders.html', {
         'rejected_orders': rejected_orders_page,
@@ -678,11 +796,12 @@ def awaiting_payment_orders(request):
     paginator = Paginator(awaiting_orders_qs, 10)
     page_number = request.GET.get('page', 1)
     try:
-        awaiting_orders_page = paginator.page(page_number)
-    except PageNotAnInteger:
-        awaiting_orders_page = paginator.page(1)
-    except EmptyPage:
-        awaiting_orders_page = paginator.page(paginator.num_pages)
+        page_int = int(page_number)
+        if page_int < 1:
+            page_int = 1
+    except (TypeError, ValueError):
+        page_int = 1
+    awaiting_orders_page = paginator.get_page(page_int)
     
     # Get payment methods for each order
     orders_with_methods = []

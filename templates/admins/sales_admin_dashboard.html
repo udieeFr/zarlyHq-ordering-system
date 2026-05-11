@@ -180,22 +180,14 @@
                                     <small class="text-muted">Placed {{ order.created_at|date:"d M Y H:i" }}</small>
                                 </td>
                                 <td>
-                                    {% if order.payment_proof %}
-                                    <span class="badge bg-success">Uploaded</span>
-                                    {% else %}
-                                    <span class="badge bg-secondary">Waiting</span>
-                                    {% endif %}
+                                    <span class="badge {{ order.payment_review_badge_class }}">{{ order.payment_review_badge }}</span>
                                 </td>
                                 <td>
-                                    {% if order.payment_proof %}
-                                    <span class="text-success">Ready for review</span>
-                                    {% else %}
-                                    <span class="text-muted">Awaiting customer</span>
-                                    {% endif %}
+                                    <span class="{{ order.payment_review_status_class }}">{{ order.payment_review_status }}</span>
                                 </td>
                                 <td class="text-end">
                                     <div class="position-relative order-proof-hover d-inline-block">
-                                        <a href="{% url 'admin_order_detail' order.id %}" class="btn btn-sm btn-dark">View & Sign</a>
+                                        <a href="{% url 'admin_order_detail' order.id %}" class="btn btn-sm btn-dark" title="{{ order.payment_review_tooltip }}">View & Sign</a>
                                         {% if order.payment_proof %}
                                         <div class="payment-proof-tooltip shadow-sm">
                                             <img src="{{ order.payment_proof.url }}" alt="Payment proof for order {{ order.id }}">
@@ -254,25 +246,7 @@
         </div>
 
         <!-- Role Information Card -->
-        <div class="content-card" style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);">
-            <h6 class="fw-bold mb-3" style="color: #0369a1;">Your Access</h6>
-            <small style="color: #0c4a6e;">
-                {% if request.user.is_superuser %}
-                    ✓ Full system access<br>
-                    ✓ User management<br>
-                    ✓ Analytics dashboard<br>
-                    ✓ Django administration
-                {% elif request.user.role == 'manager' %}
-                    ✓ Order management<br>
-                    ✓ Inventory management<br>
-                    ✓ Complaint resolution<br>
-                    ✓ Analytics dashboard
-                {% else %}
-                    ✓ Order management<br>
-                    ✓ Inventory management<br>
-                    ✓ Complaint resolution
-                {% endif %}
-            </small>
+        
         </div>
     </div>
 </div>

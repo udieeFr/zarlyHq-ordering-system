@@ -1,0 +1,315 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block page_title %}Support — Zarly BigFood{% endblock %}
+
+{% block content %}
+<style>
+  .support-page {
+    padding: 1.75rem 0 3rem;
+  }
+
+  .support-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .support-title {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--dark);
+  }
+
+  .support-subtitle {
+    margin: 0.2rem 0 0;
+    color: var(--muted);
+    font-size: 0.92rem;
+  }
+
+  .btn-new-complaint {
+    border: 1px solid var(--brand);
+    background: var(--brand);
+    color: #fff;
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+
+  .btn-new-complaint:hover {
+    background: var(--brand-dark);
+    border-color: var(--brand-dark);
+  }
+
+  .support-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1rem;
+  }
+
+  .support-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.1rem;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .support-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .support-order-ref {
+    display: block;
+    font-weight: 700;
+    color: var(--dark);
+  }
+
+  .support-date {
+    display: block;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  .support-status-pill,
+  .support-action-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 999px;
+    padding: 0.22rem 0.6rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+
+  .ssp-pending { background: var(--warning-bg); color: #92400e; border-color: #fde68a; }
+  .ssp-resolved { background: var(--success-bg); color: #065f46; border-color: #a7f3d0; }
+
+  .support-subject {
+    font-weight: 700;
+    color: var(--dark-2);
+    margin-bottom: 0.3rem;
+  }
+
+  .support-message {
+    color: var(--dark-3);
+    font-size: 0.88rem;
+    margin-bottom: 0.65rem;
+  }
+
+  .support-action-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .support-action-label {
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+
+  .sap-refund { background: #e0f2fe; color: #075985; border-color: #bae6fd; }
+  .sap-remake { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+  .sap-dismissed { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+
+  .support-evidence-link {
+    color: var(--brand-dark);
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+
+  .support-evidence-link:hover {
+    color: var(--brand);
+  }
+
+  .support-empty {
+    text-align: center;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    padding: 2rem 1.25rem;
+  }
+
+  .support-empty-icon {
+    display: inline-block;
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .btn-link-inline {
+    border: 0;
+    background: transparent;
+    color: var(--brand-dark);
+    text-decoration: underline;
+    padding: 0;
+    font-size: inherit;
+    cursor: pointer;
+  }
+
+  @media (max-width: 768px) {
+    .support-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .btn-new-complaint {
+      width: 100%;
+      text-align: center;
+    }
+  }
+</style>
+<div class="support-page">
+
+  <!-- ── Header ────────────────────────────────────────────── -->
+  <div class="support-header">
+    <div>
+      <h2 class="support-title">Support &amp; Complaints</h2>
+      <p class="support-subtitle">View your submitted complaints and refund status.</p>
+    </div>
+    {% if eligible_orders %}
+    <button type="button" class="btn-new-complaint" onclick="openComplaintModal()">
+      + New Complaint
+    </button>
+    {% endif %}
+  </div>
+
+  <!-- ── Complaints List ───────────────────────────────────── -->
+  {% if complaints %}
+  <div class="support-list">
+    {% for c in complaints %}
+    <div class="support-card">
+      <div class="support-card-header">
+        <div class="support-card-meta">
+          <span class="support-order-ref">Order #{{ c.order.id }}</span>
+          <span class="support-date">{{ c.created_at|date:"N j, Y" }} · {{ c.created_at|time:"g:i A" }}</span>
+        </div>
+        <span class="support-status-pill
+          {% if c.status == 'pending' %}ssp-pending
+          {% elif c.status == 'resolved' %}ssp-resolved
+          {% endif %}">
+          {% if c.status == 'pending' %}⏳ Pending Review
+          {% elif c.status == 'resolved' %}✅ Resolved
+          {% endif %}
+        </span>
+      </div>
+
+      <div class="support-subject">{{ c.subject }}</div>
+      <div class="support-message">{{ c.message }}</div>
+
+      {% if c.action_taken %}
+      <div class="support-action-row">
+        <span class="support-action-label">Admin action:</span>
+        <span class="support-action-pill
+          {% if c.action_taken == 'refund' %}sap-refund
+          {% elif c.action_taken == 'remake' %}sap-remake
+          {% elif c.action_taken == 'dismissed' %}sap-dismissed
+          {% endif %}">
+          {% if c.action_taken == 'refund' %}💸 Refund Initiated
+          {% elif c.action_taken == 'remake' %}🔄 Order Remade
+          {% elif c.action_taken == 'dismissed' %}✗ Dismissed
+          {% endif %}
+        </span>
+      </div>
+      {% endif %}
+
+      {% if c.evidence_image %}
+      <div class="support-evidence">
+        <a href="{{ c.evidence_image.url }}" target="_blank" class="support-evidence-link">
+          📎 View Evidence
+        </a>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="support-empty">
+    <span class="support-empty-icon">🎉</span>
+    <p class="fw-bold mb-1">No complaints yet</p>
+    <p class="text-muted" style="font-size:0.875rem;">
+      Had an issue with a completed order?
+      {% if eligible_orders %}
+        <button type="button" class="btn-link-inline" onclick="openComplaintModal()">File a complaint.</button>
+      {% else %}
+        Complete an order first to file a complaint.
+      {% endif %}
+    </p>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- ── Complaint Modal ────────────────────────────────────── -->
+<div class="modal fade" id="compModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content border-0 shadow rounded-4">
+      <div class="modal-header bg-danger text-white border-0">
+        <h5 class="modal-title fw-bold">New Complaint</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{% url 'submit_complaint' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-body p-4">
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Order</label>
+            <select name="order_id" id="complaintOrderSelect" class="form-select" required>
+              <option value="">-- Choose Order --</option>
+              {% for o in eligible_orders %}
+                <option value="{{ o.id }}">Order #{{ o.id }} (RM {{ o.total_amount }})</option>
+              {% endfor %}
+            </select>
+            <p class="text-muted small mt-1">Only completed or delivered orders can be reported.</p>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Subject</label>
+            <input type="text" name="subject" class="form-control" placeholder="Briefly describe the issue" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Message</label>
+            <textarea name="message" class="form-control" rows="4" placeholder="Explain the problem in detail..." required></textarea>
+          </div>
+          <div class="mb-0">
+            <label class="form-label small fw-bold">Upload Evidence (Image)</label>
+            <input type="file" name="evidence_image" class="form-control" accept="image/*">
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="submit" class="btn btn-danger w-100 py-2 fw-bold">Submit Complaint</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function openComplaintModal(orderId) {
+  const sel = document.getElementById('complaintOrderSelect');
+  if (sel && orderId) {
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === String(orderId)) {
+        sel.selectedIndex = i;
+        break;
+      }
+    }
+  }
+  new bootstrap.Modal(document.getElementById('compModal')).show();
+}
+</script>
+{% endblock %}

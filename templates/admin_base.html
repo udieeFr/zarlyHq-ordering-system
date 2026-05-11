@@ -10,20 +10,21 @@
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <style>
         :root {
-            --primary: #0f172a;
+            --primary:       #0f172a;
             --primary-light: #1e293b;
-            --accent: #3b82f6;
-            --accent-hover: #2563eb;
-            --bg-dark: #0f172a;
+            --accent:        #ff9933;
+            --accent-hover:  #e07e1e;
+            --accent-light:  #fff7ed;
+            --bg-dark:  #0f172a;
             --bg-light: #f8fafc;
-            --bg-card: #ffffff;
-            --text: #0f172a;
-            --text-muted: #64748b;
-            --border: #e2e8f0;
-            --danger: #ef4444;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --info: #0ea5e9;
+            --bg-card:  #ffffff;
+            --text:      #0f172a;
+            --text-muted:#64748b;
+            --border:    #e2e8f0;
+            --danger:    #ef4444;
+            --success:   #10b981;
+            --warning:   #f59e0b;
+            --info:      #0ea5e9;
         }
 
         * {
@@ -52,7 +53,8 @@
             left: 0;
             top: 0;
             height: 100vh;
-            overflow-y: auto;
+            display: flex;             /* FIXED: Using Flexbox for layout */
+            flex-direction: column;    /* FIXED: Stack items vertically */
             box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
             z-index: 1000;
         }
@@ -65,6 +67,7 @@
             align-items: center;
             gap: 0.75rem;
             margin-bottom: 1rem;
+            flex-shrink: 0;            /* FIXED: Keep logo from shrinking */
         }
 
         .sidebar-logo-icon {
@@ -85,7 +88,9 @@
 
         /* Sidebar Menu */
         .sidebar-menu {
-            padding: 0 0.75rem;
+            padding: 0 0.75rem 1rem 0.75rem; /* FIXED: Added bottom padding */
+            flex: 1;                         /* FIXED: Stretch to fill middle space */
+            overflow-y: auto;                /* FIXED: Allow only menu items to scroll */
         }
 
         .sidebar-section-title {
@@ -121,7 +126,7 @@
             background: var(--accent);
             color: white;
             font-weight: 600;
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 2px 10px rgba(255, 153, 51, 0.4);
         }
 
         .sidebar-menu-item-icon {
@@ -142,13 +147,11 @@
 
         /* User Info in Sidebar */
         .sidebar-user {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
+            /* FIXED: Removed absolute positioning */
             padding: 1rem;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
             background: rgba(0, 0, 0, 0.1);
+            flex-shrink: 0;  /* FIXED: Keep profile from shrinking */
         }
 
         .sidebar-user-info {
@@ -223,11 +226,14 @@
         .admin-navbar {
             background: white;
             border-bottom: 1px solid var(--border);
-            padding: 1rem 1.5rem;
+            padding: 0.875rem 1.5rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+            position: sticky;
+            top: 0;
+            z-index: 50;
         }
 
         .admin-navbar-title {
@@ -317,27 +323,22 @@
 </head>
 <body>
     <div class="admin-container">
-        <!-- Sidebar -->
         <aside class="admin-sidebar" id="adminSidebar">
-            <!-- Logo -->
             <div class="sidebar-logo">
-                <div class="sidebar-logo-icon">🍊</div>
+                <div class="sidebar-logo-icon"></div>
                 <div>
                     <div class="sidebar-logo-text">Zarly</div>
                     <div class="sidebar-logo-sub">Admin</div>
                 </div>
             </div>
 
-            <!-- Main Navigation -->
             <nav class="sidebar-menu">
-                <!-- Dashboard Section -->
                 <div class="sidebar-section-title">Main</div>
                 <a href="{% url 'sales_admin_dashboard' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'sales_admin_dashboard' %}active{% endif %}">
                     <span class="sidebar-menu-item-icon">📊</span>
                     <span class="sidebar-menu-item-text">Dashboard</span>
                 </a>
 
-                <!-- Orders Section -->
                 <div class="sidebar-section-title" style="margin-top: 1.5rem;">Orders</div>
                 <a href="{% url 'sales_admin_dashboard' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'sales_admin_dashboard' %}active{% endif %}">
                     <span class="sidebar-menu-item-icon">📦</span>
@@ -356,7 +357,6 @@
                     <span class="sidebar-menu-item-text">Delivery Orders</span>
                 </a>
 
-                <!-- Inventory Section -->
                 <div class="sidebar-section-title" style="margin-top: 1.5rem;">Management</div>
                 <a href="{% url 'inventory_list' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'inventory_list' %}active{% endif %}">
                     <span class="sidebar-menu-item-icon">📦</span>
@@ -367,7 +367,6 @@
                     <span class="sidebar-menu-item-text">Complaints</span>
                 </a>
 
-                <!-- Analytics Section (Manager Only) -->
                 {% if request.user.is_superuser or request.user.role == 'manager' %}
                 <div class="sidebar-section-title" style="margin-top: 1.5rem;">Analytics</div>
                 <a href="{% url 'manager_analytics_view' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'manager_analytics_view' %}active{% endif %}">
@@ -381,7 +380,6 @@
                 {% endif %}
             </nav>
 
-            <!-- User Info at Bottom -->
             <div class="sidebar-user">
                 <div class="sidebar-user-info">
                     <div class="sidebar-user-avatar">{{ request.user.username|first|upper }}</div>
@@ -404,9 +402,7 @@
             </div>
         </aside>
 
-        <!-- Main Content Area -->
         <div class="admin-main">
-            <!-- Top Navbar -->
             <nav class="admin-navbar">
                 <div class="admin-navbar-title">
                     {% block page_title %}Dashboard{% endblock %}
@@ -418,7 +414,6 @@
                 </div>
             </nav>
 
-            <!-- Content -->
             <div class="admin-content">
                 {% block content %}{% endblock %}
             </div>

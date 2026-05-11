@@ -150,5 +150,5 @@ STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', '')
 STRIPE_CURRENCY = os.getenv('STRIPE_CURRENCY', 'MYR')
 
 # For localhost testing: use ngrok or Stripe CLI to tunnel webhooks
-# Stripe CLI: stripe listen --forward-to localhost:8000/api/stripe/webhook/
+# Stripe CLI: stripe listen --forward-to localhost:8000/menu/stripe/webhook/
 STRIPE_WEBHOOK_TOLERANCE = 300  # Accept webhooks within 5 minutes of creation

@@ -1,0 +1,87 @@
+{% load static %}
+{% for p in products %}
+<div class="col-sm-6 col-lg-3">
+  <div class="card h-100 border-0 product-card {% if p.stock <= 0 %}out-of-stock{% endif %}">
+    {% if p.stock <= 0 %}
+      <span class="badge bg-danger stock-badge">SOLD OUT</span>
+    {% endif %}
+    <div class="product-image">
+      <img src="{% if p.image %}{{ p.image.url }}{% else %}{% static 'images/products/promo1.jpg' %}{% endif %}" alt="{{ p.name }}">
+      {% if p.category %}
+        <span class="category-chip">{{ p.category.name }}</span>
+      {% endif %}
+    </div>
+    <div class="card-body d-flex flex-column">
+      <h5 class="product-title">{{ p.name }}</h5>
+      <div class="product-meta-row">
+        <span class="stars">★★★★★</span>
+        <span class="rating-count">({{ p.stock|add:20 }})</span>
+        {% if p.stock > 0 %}
+          <span class="meta-dot">·</span>
+          <span class="stock-avail">{{ p.stock }} left</span>
+        {% endif %}
+      </div>
+      <div class="product-price-row">
+        <p class="price">RM {{ p.price }}</p>
+        {% if p.stock <= 0 %}
+          <span class="unavail-tag">Unavailable</span>
+        {% endif %}
+      </div>
+      <div class="product-actions">
+        {% if p.stock > 0 %}
+          <form method="post" action="{% url 'add_to_cart' %}" class="product-action-row" data-cart-form>
+            {% csrf_token %}
+            <input type="hidden" name="product_id" value="{{ p.id }}">
+            <input type="number" name="quantity" value="1" min="1" max="{{ p.stock }}" class="form-control quantity-input">
+            <button type="submit" class="btn add-cart-btn">Add</button>
+            <button type="button" class="icon-btn">♡</button>
+          </form>
+        {% else %}
+          <div class="product-action-row">
+            <button class="btn btn-secondary flex-grow-1 btn-sm" disabled>Out of Stock</button>
+            <button type="button" class="icon-btn">♡</button>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% empty %}
+<div class="col-12">
+  <div class="empty-state">
+    <span class="empty-state-icon">🔍</span>
+    <p class="fw-bold mb-1">No products found</p>
+    <p class="text-muted text-sm">Try a different category or filter.</p>
+  </div>
+</div>
+{% endfor %}
+
+{% if page_obj.has_other_pages %}
+<div class="col-12">
+  <nav aria-label="Product page navigation" class="pagination-wrapper mt-2">
+    <ul class="pagination justify-content-center">
+      {% if page_obj.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.allergy %}&allergy={{ request.GET.allergy }}{% endif %}">&#8592;</a>
+      </li>
+      {% else %}
+      <li class="page-item disabled"><span class="page-link">&#8592;</span></li>
+      {% endif %}
+      {% for num in paginator.page_range %}
+        {% if num >= page_obj.number|add:-2 and num <= page_obj.number|add:2 %}
+          <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+            <a class="page-link" href="?page={{ num }}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.allergy %}&allergy={{ request.GET.allergy }}{% endif %}">{{ num }}</a>
+          </li>
+        {% endif %}
+      {% endfor %}
+      {% if page_obj.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.allergy %}&allergy={{ request.GET.allergy }}{% endif %}">&#8594;</a>
+      </li>
+      {% else %}
+      <li class="page-item disabled"><span class="page-link">&#8594;</span></li>
+      {% endif %}
+    </ul>
+  </nav>
+</div>
+{% endif %}

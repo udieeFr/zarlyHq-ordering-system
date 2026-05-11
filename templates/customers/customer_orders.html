@@ -1,0 +1,228 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block page_title %}My Orders — Zarly BigFood{% endblock %}
+
+{% block content %}
+<div class="orders-page">
+
+  <!-- ── Upcoming Orders ──────────────────────────────── -->
+  <div class="orders-section-header">
+    <h2 class="orders-section-title">Upcoming orders</h2>
+  </div>
+
+  {% if upcoming_orders %}
+  <div class="upcoming-grid">
+    {% for o in upcoming_orders %}
+    <div class="upcoming-card">
+      <!-- Header: ID + status -->
+      <div class="upcoming-card-header">
+        <div>
+          <div class="upcoming-order-id">Order #{{ o.id }}</div>
+          <div class="upcoming-order-date">{{ o.created_at|date:"N j, Y" }} · {{ o.created_at|time:"g:i A" }}</div>
+        </div>
+        <span class="order-status-pill
+          {% if o.status == 'pending' %}status-pending
+          {% elif o.status == 'pending_payment' %}status-pay
+          {% elif o.status == 'prepared' %}status-preparing
+          {% elif o.status == 'ready_for_delivery' %}status-ready
+          {% elif o.status == 'out_for_delivery' %}status-on-way
+          {% endif %}">
+          {% if o.status == 'pending' %}⏳ Order Received
+          {% elif o.status == 'pending_payment' %}💳 Awaiting Payment
+          {% elif o.status == 'prepared' %}👨‍🍳 Preparing
+          {% elif o.status == 'ready_for_delivery' %}📦 Ready
+          {% elif o.status == 'out_for_delivery' %}🛵 On the Way
+          {% endif %}
+        </span>
+      </div>
+
+      <!-- Items list + button -->
+      <div class="upcoming-items-section">
+        <div class="upcoming-items-list">
+          {% for item in o.items.all|slice:":3" %}
+          <div class="upcoming-item-row">
+            <span class="upcoming-item-qty">{{ item.quantity }}×</span>
+            <span class="upcoming-item-name">{{ item.product.name }}</span>
+            <span class="upcoming-item-price">RM {{ item.unit_price }}</span>
+          </div>
+          {% endfor %}
+          {% if o.items.count > 3 %}
+          <div class="upcoming-item-more">+ {{ o.items.count|add:"-3" }} more item{{ o.items.count|add:"-3"|pluralize }}</div>
+          {% endif %}
+        </div>
+        <div class="upcoming-card-bottom">
+          <span class="upcoming-total-label">Total: <strong>RM {{ o.total_amount }}</strong></span>
+          <a href="{% url 'payment_page' o.id %}"
+             class="upcoming-track-btn {% if o.status == 'pending_payment' %}btn-pay{% endif %}">
+            {% if o.status == 'pending_payment' %}PAY NOW{% else %}TRACK{% endif %}
+          </a>
+        </div>
+      </div>
+
+      <!-- Progress steps -->
+      <div class="order-progress">
+        <div class="progress-step {% if o.status != 'pending' %}done{% else %}active{% endif %}">
+          <span>Placed</span>
+        </div>
+        <div class="progress-step
+          {% if o.status == 'pending_payment' %}active
+          {% elif o.status in 'prepared,ready_for_delivery,out_for_delivery' %}done
+          {% endif %}">
+          <span>Approved</span>
+        </div>
+        <div class="progress-step
+          {% if o.status == 'prepared' %}active
+          {% elif o.status == 'ready_for_delivery' or o.status == 'out_for_delivery' %}done
+          {% endif %}">
+          <span>Preparing</span>
+        </div>
+        <div class="progress-step
+          {% if o.status == 'out_for_delivery' %}active{% endif %}">
+          <span>On Way</span>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="orders-empty">
+    <span class="orders-empty-icon">🕐</span>
+    <p class="fw-bold mb-1">No upcoming orders</p>
+    <p class="text-muted" style="font-size:0.875rem;">Your active orders will appear here.</p>
+    <a href="{% url 'product_list' %}" class="btn btn-primary btn-sm mt-3">Browse Menu</a>
+  </div>
+  {% endif %}
+
+  <!-- ── Previous Orders ──────────────────────────────── -->
+  <div class="orders-section-header">
+    <h2 class="orders-section-title">Previous orders</h2>
+  </div>
+
+  {% if previous_orders %}
+  <div class="previous-grid">
+    {% for o in previous_orders %}
+    <div class="previous-card">
+      <!-- Header -->
+      <div class="prev-card-header">
+        <div class="prev-order-id">Order #{{ o.id }}</div>
+        <span class="order-status-pill
+          {% if o.status == 'approved' %}status-approved
+          {% elif o.status == 'delivered' %}status-delivered
+          {% elif o.status == 'rejected' %}status-rejected
+          {% endif %}">
+          {% if o.status == 'approved' %}✅ Completed
+          {% elif o.status == 'delivered' %}✅ Delivered
+          {% elif o.status == 'rejected' %}✗ Rejected
+          {% endif %}
+        </span>
+      </div>
+
+      <!-- Meta: date + time -->
+      <div class="prev-meta">
+        <span class="prev-meta-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          {{ o.created_at|date:"N j, Y" }}
+        </span>
+        <span class="prev-meta-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          {{ o.created_at|time:"g:i A" }}
+        </span>
+      </div>
+
+      <!-- Items preview -->
+      <div class="prev-items-list">
+        {% for item in o.items.all|slice:":2" %}
+        <div class="prev-item-row">
+          <span class="prev-item-qty">{{ item.quantity }}</span>
+          <span class="prev-item-name">{{ item.product.name }}</span>
+        </div>
+        {% endfor %}
+        {% with total=o.items.count %}
+          {% if total > 2 %}
+          <div class="prev-more">+ {{ total|add:"-2" }} more item{{ total|add:"-2"|pluralize }}</div>
+          {% endif %}
+        {% endwith %}
+      </div>
+
+      <!-- Actions -->
+      <div class="prev-card-actions">
+        <a href="{% url 'order_success' o.id %}" class="btn-prev-details">DETAILS</a>
+        {% if o.status == 'approved' or o.status == 'delivered' %}
+          <button type="button" class="btn-prev-complaint"
+                  onclick="openComplaint('{{ o.id }}')">COMPLAINT</button>
+        {% else %}
+          <button type="button" class="btn-prev-complaint" disabled style="opacity:0.4;cursor:not-allowed;">COMPLAINT</button>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="orders-empty">
+    <span class="orders-empty-icon">📋</span>
+    <p class="fw-bold mb-1">No previous orders yet</p>
+    <p class="text-muted" style="font-size:0.875rem;">Completed and past orders will show here.</p>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- ── Complaint Modal ────────────────────────────────── -->
+<div class="modal fade" id="compModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content border-0 shadow rounded-4">
+      <div class="modal-header bg-danger text-white border-0">
+        <h5 class="modal-title fw-bold">Customer Complaint</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{% url 'submit_complaint' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-body p-4">
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Order</label>
+            <select name="order_id" id="complaintOrderSelect" class="form-select" required>
+              <option value="">-- Choose Order --</option>
+              {% for o in completed_orders %}
+                <option value="{{ o.id }}">Order #{{ o.id }} (RM {{ o.total_amount }})</option>
+              {% endfor %}
+            </select>
+            <p class="text-muted small mt-1">Only completed orders with a signed receipt can be reported.</p>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Subject</label>
+            <input type="text" name="subject" class="form-control" placeholder="Briefly describe the issue" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Message</label>
+            <textarea name="message" class="form-control" rows="4" placeholder="Explain the problem in detail..." required></textarea>
+          </div>
+          <div class="mb-0">
+            <label class="form-label small fw-bold">Upload Evidence (Image)</label>
+            <input type="file" name="evidence_image" class="form-control">
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="submit" class="btn btn-danger w-100 py-2 fw-bold">Submit Complaint</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function openComplaint(orderId) {
+  const sel = document.getElementById('complaintOrderSelect');
+  if (sel) {
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === String(orderId)) {
+        sel.selectedIndex = i;
+        break;
+      }
+    }
+  }
+  const modal = new bootstrap.Modal(document.getElementById('compModal'));
+  modal.show();
+}
+</script>
+{% endblock %}
