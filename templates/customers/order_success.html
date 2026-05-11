@@ -225,6 +225,9 @@
                     <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-success py-3 fw-bold" download>
                         Download Signed Receipt (Proof of Integrity) 📄
                     </a>
+                    <a href="{% url 'verify_receipt' order.id %}" class="btn btn-outline-success py-2 fw-bold">
+                        Verify Receipt Authenticity 🔍
+                    </a>
                 {% elif order.status == 'pending' or order.status == 'pending_payment' or order.status == 'awaiting_payment' %}
                     <a href="{% url 'download_invoice' order.id %}" class="btn btn-outline-info py-3 fw-bold">
                         Download Payment Invoice 🧾

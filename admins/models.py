@@ -72,7 +72,7 @@ class DigitalSignature(models.Model):
     signature_hash = models.CharField(max_length=64)  
     pdf_path = models.FileField(upload_to='signed_pdfs/') 
     timestamp = models.DateTimeField(auto_now_add=True)
-    signature_value = models.TextField()
+    signature_value = models.TextField(blank=True, default='')
 
 class Payment(models.Model):
     """

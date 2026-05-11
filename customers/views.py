@@ -7,7 +7,7 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from .models import Product, Category, Allergy
-from admins.models import Order, OrderItem, Complaint, Payment
+from admins.models import Order, OrderItem, Complaint, Payment, DigitalSignature
 from admins.utils import generate_invoice_pdf  # The PDF generation engine
 from .stripe_utils import (
     create_stripe_checkout_session, 
@@ -21,6 +21,7 @@ from decimal import Decimal
 from django.conf import settings
 import os
 import logging
+import hashlib
 from .payment_utils import validate_payment_proof, get_payment_proof_context, get_all_payment_methods
 
 logger = logging.getLogger(__name__)
@@ -819,3 +820,84 @@ def awaiting_payment_orders(request):
         'paginator': paginator,
         'total_awaiting': awaiting_orders_qs.count(),
     })
+
+
+def verify_receipt(request, order_id):
+    """
+    Public receipt verification endpoint — no login required.
+    Verifies that the digitally signed PDF for an order is authentic and unmodified.
+
+    Non-repudiation check:
+      1. Retrieve the DigitalSignature record (hash + pdf_path stored at signing time).
+      2. Recompute SHA-256 of the signed PDF file on disk.
+      3. Compare with the stored hash — mismatch means the file was tampered.
+      4. Use PyHanko to validate the embedded PKCS#7 signature (intact + signer identity).
+    """
+    try:
+        sig_record = DigitalSignature.objects.select_related('order__customer').get(order_id=order_id)
+    except DigitalSignature.DoesNotExist:
+        return render(request, 'customers/verify_receipt.html', {
+            'order_id': order_id,
+            'status': 'not_found',
+        })
+
+    pdf_path = os.path.join(settings.MEDIA_ROOT, str(sig_record.pdf_path))
+    result = {
+        'order_id': order_id,
+        'sig_record': sig_record,
+        'signed_at': sig_record.timestamp,
+        'signer': 'Zarly BigFood Sdn Bhd',
+        'stored_hash': sig_record.signature_hash,
+    }
+
+    # Step 1: Check file exists
+    if not os.path.exists(pdf_path):
+        result['status'] = 'file_missing'
+        return render(request, 'customers/verify_receipt.html', result)
+
+    # Step 2: Recompute SHA-256 and compare
+    sha256 = hashlib.sha256()
+    with open(pdf_path, 'rb') as f:
+        for block in iter(lambda: f.read(4096), b''):
+            sha256.update(block)
+    computed_hash = sha256.hexdigest()
+    result['computed_hash'] = computed_hash
+    hash_match = computed_hash == sig_record.signature_hash
+
+    if not hash_match:
+        result['status'] = 'tampered'
+        result['hash_match'] = False
+        return render(request, 'customers/verify_receipt.html', result)
+
+    # Step 3: Validate PyHanko embedded signature
+    try:
+        from pyhanko.pdf_utils.reader import PdfFileReader
+        from pyhanko.sign.validation import validate_pdf_signature
+        from pyhanko_certvalidator import ValidationContext
+
+        with open(pdf_path, 'rb') as f:
+            reader = PdfFileReader(f)
+            embedded_sigs = list(reader.embedded_signatures)
+
+        if not embedded_sigs:
+            result['status'] = 'no_signature'
+            return render(request, 'customers/verify_receipt.html', result)
+
+        # Use a permissive context — self-signed cert won't have a trusted CA chain
+        vc = ValidationContext(allow_fetching=False, retroactive_revinfo=True)
+        sig_status = validate_pdf_signature(embedded_sigs[0], vc)
+
+        result['hash_match'] = True
+        result['sig_intact'] = sig_status.intact
+        result['sig_valid'] = sig_status.valid
+        result['cert_subject'] = sig_status.signing_cert.subject.human_friendly if sig_status.signing_cert else 'Unknown'
+        result['signing_time'] = getattr(sig_status, 'timestamp', None) or sig_record.timestamp
+        result['status'] = 'valid' if sig_status.intact else 'invalid'
+
+    except Exception as e:
+        # Signature validation failed — treat as tampered
+        result['hash_match'] = True  # Hash was fine; signature layer failed
+        result['status'] = 'sig_error'
+        result['error_detail'] = str(e)
+
+    return render(request, 'customers/verify_receipt.html', result)

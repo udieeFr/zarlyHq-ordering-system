@@ -1711,7 +1711,7 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
 }
 .btn-prev-details:hover { background: #b91c1c; color: #fff; transform: translateY(-1px); }
 
-.btn-prev-help {
+.btn-prev-complaint {
   background: transparent;
   color: var(--danger);
   border: 1.5px solid var(--danger);
@@ -1729,7 +1729,7 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
   font-family: inherit;
   transition: var(--transition);
 }
-.btn-prev-help:hover { background: var(--danger-bg); }
+.btn-prev-complaint:hover { background: var(--danger-bg); }
 
 .status-completed { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
 .status-delivered { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }

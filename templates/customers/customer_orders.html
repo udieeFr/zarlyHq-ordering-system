@@ -44,7 +44,7 @@
           <div class="upcoming-item-row">
             <span class="upcoming-item-qty">{{ item.quantity }}×</span>
             <span class="upcoming-item-name">{{ item.product.name }}</span>
-            <span class="upcoming-item-price">RM {{ item.unit_price }}</span>
+            <span class="upcoming-item-price">RM {{ item.product.price }}</span>
           </div>
           {% endfor %}
           {% if o.items.count > 3 %}

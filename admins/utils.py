@@ -1,6 +1,7 @@
 
 import os
 import hashlib
+import base64
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from django.conf import settings
@@ -8,6 +9,7 @@ from django.conf import settings
 # PyHanko Imports
 from pyhanko.sign import signers, fields
 from pyhanko.pdf_utils.incremental_writer import IncrementalPdfFileWriter
+from pyhanko.pdf_utils.reader import PdfFileReader
 
 def generate_invoice_pdf(order):
     """Generates a PDF receipt using ReportLab"""
@@ -82,10 +84,24 @@ def sign_pdf_digitally(input_pdf_path, order_id):
                 signer=signer, output=outf,
             )
 
-    # 4. Calculate Hash untuk simpan dalam database & comparison
+    # 4. Calculate SHA-256 hash of signed file for integrity verification
     sha256_hash = hashlib.sha256()
     with open(signed_path, "rb") as f:
         for byte_block in iter(lambda: f.read(4096), b""):
             sha256_hash.update(byte_block)
-            
-    return signed_path, sha256_hash.hexdigest()
+
+    # 5. Extract the raw PKCS#7 signature bytes embedded by PyHanko
+    # These are the actual cryptographic signature bytes (RSA-encrypted hash),
+    # stored separately from the PDF so they can be inspected or re-verified independently.
+    signature_value = ''
+    try:
+        with open(signed_path, 'rb') as f:
+            reader = PdfFileReader(f)
+            embedded_sigs = list(reader.embedded_signatures)
+            if embedded_sigs:
+                pkcs7_bytes = embedded_sigs[0].pkcs7_content
+                signature_value = base64.b64encode(pkcs7_bytes).decode('utf-8')
+    except Exception:
+        pass  # Non-fatal: hash is still the primary integrity check
+
+    return signed_path, sha256_hash.hexdigest(), signature_value

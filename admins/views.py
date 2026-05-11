@@ -41,11 +41,12 @@ def order_has_confirmed_payment(order):
 def finalize_order_approval(order, user):
     """Signs the invoice and marks the order as approved."""
     raw_pdf = generate_invoice_pdf(order)
-    signed_path, doc_hash = sign_pdf_digitally(raw_pdf, order.id)
+    signed_path, doc_hash, sig_value = sign_pdf_digitally(raw_pdf, order.id)
     DigitalSignature.objects.create(
         order=order,
         signature_hash=doc_hash,
         pdf_path=os.path.join('signed_pdfs', os.path.basename(signed_path)),
+        signature_value=sig_value,
     )
     order.status = 'approved'
     order.approved_at = timezone.now()
@@ -714,14 +715,34 @@ def delivery_orders_list(request):
     if order_by in ['ready_for_delivery_at', '-ready_for_delivery_at', 'total_amount', '-total_amount', 'customer__username']:
         queryset = queryset.order_by(order_by)
 
+    in_delivery_orders = queryset.filter(status__in=['ready_for_delivery', 'out_for_delivery'])
+    delivered_orders = queryset.filter(status='delivered')
+
     return render(request, 'admins/delivery_orders.html', {
-        'delivery_orders': queryset,
+        'in_delivery_orders': in_delivery_orders,
+        'delivered_orders': delivered_orders,
         'search_query': search_query,
         'status_filter': status_filter,
         'days_filter': days_filter,
         'order_count_filter': order_count_filter,
         'order_by': order_by,
     })
+
+@sales_admin_required
+def update_order_tracking(request, order_id):
+    """Update tracking number for an order in delivery."""
+    order = get_object_or_404(Order, id=order_id, status__in=['ready_for_delivery', 'out_for_delivery'])
+    
+    if request.method == 'POST':
+        tracking_number = request.POST.get('tracking_number', '').strip()
+        if tracking_number:
+            order.tracking_number = tracking_number
+            order.save()
+            messages.success(request, f"Tracking number updated for Order #{order.id}.")
+        else:
+            messages.warning(request, "Tracking number cannot be empty.")
+    
+    return redirect('delivery_orders_list')
 
 @sales_admin_required
 def mark_orders_prepared(request):

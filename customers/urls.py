@@ -33,4 +33,5 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('submit-complaint/', views.submit_complaint, name='submit_complaint'),
     path('support/', views.customer_support, name='customer_support'),
+    path('verify/<int:order_id>/', views.verify_receipt, name='verify_receipt'),
 ]

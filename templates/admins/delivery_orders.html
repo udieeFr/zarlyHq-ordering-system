@@ -3,6 +3,25 @@
 {% block page_title %}Delivery Orders{% endblock %}
 
 {% block content %}
+<style>
+    .sortable-header {
+        cursor: pointer;
+        user-select: none;
+        white-space: nowrap;
+    }
+
+    .sortable-header .sort-indicator {
+        margin-left: 0.35rem;
+        font-size: 0.78rem;
+        opacity: 0.6;
+    }
+
+    .sortable-header.sort-asc .sort-indicator,
+    .sortable-header.sort-desc .sort-indicator {
+        opacity: 1;
+    }
+</style>
+
 <!-- Page Header -->
 <div class="page-header">
     <h1>Delivery Orders</h1>
@@ -56,30 +75,86 @@
     </form>
 </div>
 
-<!-- Delivery Orders Table -->
-<div class="content-card">
+<!-- Delivery Orders In Process Table -->
+<div class="content-card mb-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="fw-bold mb-0">Delivery Orders ({{ delivery_orders|length }})</h5>
+        <h5 class="fw-bold mb-0">Delivery Orders (In Process) ({{ in_delivery_orders|length }})</h5>
     </div>
 
     <div class="table-responsive">
-        <table class="table table-hover align-middle">
+        <table class="table table-hover align-middle sortable-table">
             <thead>
                 <tr>
-                    <th>Order #</th>
-                    <th>Customer</th>
-                    <th>Delivery Contact</th>
-                    <th>Courier / Tracking</th>
-                    <th>Status</th>
-                    <th>Amount</th>
-                    <th>Assigned</th>
-                    <th>Actions</th>
+                    <th class="sortable-header" data-sort-type="number">Order #<span class="sort-indicator">↕</span></th>
+                    <th class="sortable-header" data-sort-type="text">Customer<span class="sort-indicator">↕</span></th>
+                    <th class="sortable-header" data-sort-type="text">Delivery Contact<span class="sort-indicator">↕</span></th>
+                    <th class="sortable-header" data-sort-type="text">Courier / Tracking<span class="sort-indicator">↕</span></th>
+                    <th class="sortable-header" data-sort-type="text">Status<span class="sort-indicator">↕</span></th>
+                    <th class="sortable-header" data-sort-type="number">Amount<span class="sort-indicator">↕</span></th>
+                    <th class="sortable-header" data-sort-type="number">Assigned<span class="sort-indicator">↕</span></th>
+                    <th class="sortable-header" data-sort-type="text">Actions<span class="sort-indicator">↕</span></th>
                 </tr>
             </thead>
             <tbody>
-                {% for order in delivery_orders %}
+                {% for order in in_delivery_orders %}
                 <tr>
-                    <td><a href="{% url 'admin_order_detail' order.id %}">#{{ order.id }}</a></td>
+                    <td data-sort="{{ order.id }}"><a href="{% url 'admin_order_detail' order.id %}">#{{ order.id }}</a></td>
+                    <td>{{ order.customer.username }}<br>{{ order.full_name }}</td>
+                    <td>{{ order.phone_number }}</td>
+                    <td>
+                        <form method="post" action="{% url 'update_order_tracking' order.id %}" class="d-inline-block w-100">
+                            {% csrf_token %}
+                            <div class="input-group input-group-sm">
+                                <input type="text" name="tracking_number" class="form-control" placeholder="Enter tracking #" value="{{ order.tracking_number|default:'' }}" maxlength="100">
+                                <button type="submit" class="btn btn-outline-primary" title="Save tracking number">✓</button>
+                            </div>
+                        </form>
+                    </td>
+                    <td>{{ order.get_status_display }}</td>
+                    <td data-sort="{{ order.total_amount }}">{{ order.total_amount|floatformat:2 }}</td>
+                    <td data-sort="{% if order.delivery_assigned_at %}{{ order.delivery_assigned_at|date:'U' }}{% else %}0{% endif %}">{% if order.delivery_assigned_at %}{{ order.delivery_assigned_at|date:'M d, Y H:i' }}{% else %}-{% endif %}</td>
+                    <td>
+                        {% if order.status == 'ready_for_delivery' %}
+                        <a href="{% url 'mark_order_out_for_delivery' order.id %}" class="btn btn-sm btn-warning mb-1">Out for Delivery</a>
+                        {% else %}
+                        <a href="{% url 'mark_order_delivered' order.id %}" class="btn btn-sm btn-success mb-1">Delivered</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr class="empty-row">
+                    <td colspan="8" class="text-center text-muted py-4">No in-process delivery orders found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Delivered Orders Table -->
+<div class="content-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold mb-0">Delivered Orders ({{ delivered_orders|length }})</h5>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle sortable-table">
+            <thead>
+                <tr>
+                    <th class="sortable-header" data-sort-type="number">Order #<span class="sort-indicator">↕</span></th>
+                    <th class="sortable-header" data-sort-type="text">Customer<span class="sort-indicator">↕</span></th>
+                    <th class="sortable-header" data-sort-type="text">Delivery Contact<span class="sort-indicator">↕</span></th>
+                    <th class="sortable-header" data-sort-type="text">Courier / Tracking<span class="sort-indicator">↕</span></th>
+                    <th class="sortable-header" data-sort-type="text">Status<span class="sort-indicator">↕</span></th>
+                    <th class="sortable-header" data-sort-type="number">Amount<span class="sort-indicator">↕</span></th>
+                    <th class="sortable-header" data-sort-type="number">Assigned<span class="sort-indicator">↕</span></th>
+                    <th class="sortable-header" data-sort-type="text">Actions<span class="sort-indicator">↕</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in delivered_orders %}
+                <tr>
+                    <td data-sort="{{ order.id }}"><a href="{% url 'admin_order_detail' order.id %}">#{{ order.id }}</a></td>
                     <td>{{ order.customer.username }}<br>{{ order.full_name }}</td>
                     <td>{{ order.phone_number }}</td>
                     <td>
@@ -87,25 +162,76 @@
                         {% if order.tracking_number %}{{ order.tracking_number }}{% else %}<span class="text-muted">No tracking</span>{% endif %}
                     </td>
                     <td>{{ order.get_status_display }}</td>
-                    <td>{{ order.total_amount|floatformat:2 }}</td>
-                    <td>{% if order.delivery_assigned_at %}{{ order.delivery_assigned_at|date:'M d, Y H:i' }}{% else %}-{% endif %}</td>
-                    <td>
-                        {% if order.status == 'ready_for_delivery' %}
-                        <a href="{% url 'mark_order_out_for_delivery' order.id %}" class="btn btn-sm btn-warning mb-1">Out for Delivery</a>
-                        {% elif order.status == 'out_for_delivery' %}
-                        <a href="{% url 'mark_order_delivered' order.id %}" class="btn btn-sm btn-success mb-1">Delivered</a>
-                        {% else %}
-                        <span class="text-muted">Completed</span>
-                        {% endif %}
-                    </td>
+                    <td data-sort="{{ order.total_amount }}">{{ order.total_amount|floatformat:2 }}</td>
+                    <td data-sort="{% if order.delivery_assigned_at %}{{ order.delivery_assigned_at|date:'U' }}{% else %}0{% endif %}">{% if order.delivery_assigned_at %}{{ order.delivery_assigned_at|date:'M d, Y H:i' }}{% else %}-{% endif %}</td>
+                    <td><span class="text-muted">Completed</span></td>
                 </tr>
                 {% empty %}
-                <tr>
-                    <td colspan="8" class="text-center text-muted py-4">No delivery orders found.</td>
+                <tr class="empty-row">
+                    <td colspan="8" class="text-center text-muted py-4">No delivered orders found.</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const tables = document.querySelectorAll('.sortable-table');
+
+    function getCellValue(cell, sortType) {
+        const raw = (cell.dataset.sort !== undefined ? cell.dataset.sort : cell.textContent).trim();
+        if (sortType === 'number') {
+            const parsed = parseFloat(raw);
+            return Number.isNaN(parsed) ? -Infinity : parsed;
+        }
+        return raw.toLowerCase();
+    }
+
+    tables.forEach(function (table) {
+        const headers = table.querySelectorAll('thead .sortable-header');
+        const tbody = table.querySelector('tbody');
+
+        headers.forEach(function (header, index) {
+            header.addEventListener('click', function () {
+                const currentDir = header.dataset.sortDirection === 'asc' ? 'asc' : 'desc';
+                const nextDir = currentDir === 'asc' ? 'desc' : 'asc';
+                const sortType = header.dataset.sortType || 'text';
+
+                headers.forEach(function (h) {
+                    h.classList.remove('sort-asc', 'sort-desc');
+                    h.dataset.sortDirection = '';
+                });
+
+                header.dataset.sortDirection = nextDir;
+                header.classList.add(nextDir === 'asc' ? 'sort-asc' : 'sort-desc');
+
+                const rows = Array.from(tbody.querySelectorAll('tr')).filter(function (row) {
+                    return !row.classList.contains('empty-row');
+                });
+
+                rows.sort(function (a, b) {
+                    const aCell = a.children[index];
+                    const bCell = b.children[index];
+                    const aVal = getCellValue(aCell, sortType);
+                    const bVal = getCellValue(bCell, sortType);
+
+                    if (aVal < bVal) {
+                        return nextDir === 'asc' ? -1 : 1;
+                    }
+                    if (aVal > bVal) {
+                        return nextDir === 'asc' ? 1 : -1;
+                    }
+                    return 0;
+                });
+
+                rows.forEach(function (row) {
+                    tbody.appendChild(row);
+                });
+            });
+        });
+    });
+});
+</script>
 {% endblock %}
