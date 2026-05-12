@@ -233,6 +233,12 @@
                         Download Payment Invoice 🧾
                     </a>
                 {% endif %}
+                {% if order.tracking_number and order.status == 'ready_for_delivery' or order.tracking_number and order.status == 'out_for_delivery' or order.tracking_number and order.status == 'delivered' %}
+                    <a href="https://www.citylinkexpress.com/track-your-shipment/?trackingNo={{ order.tracking_number }}"
+                       class="btn btn-warning py-3 fw-bold" target="_blank" rel="noopener noreferrer">
+                        🚚 Track Shipment{% if order.courier_name %} ({{ order.courier_name }}){% endif %}
+                    </a>
+                {% endif %}
                 <a href="{% url 'product_list' %}" class="btn btn-link text-muted mt-2">Return to Catalog</a>
             </div>
         </div>

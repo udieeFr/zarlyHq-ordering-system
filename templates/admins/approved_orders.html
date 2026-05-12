@@ -97,9 +97,9 @@
                     <td class="text-end">
                         <div class="btn-group" role="group">
                             <a href="{% url 'admin_order_detail' order.id %}" class="btn btn-sm btn-outline-dark">View</a>
-                            <a href="{% url 'print_order_summary' order.id %}" class="btn btn-sm btn-outline-primary" target="_blank">Print Summary</a>
+                            <a href="{% url 'print_order_summary' order.id %}" class="btn btn-sm btn-outline-primary" target="_blank">View Receipt</a>
                             {% if order.digital_signature %}
-                            <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-sm btn-outline-success" download>📄 Signed PDF</a>
+                            <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-sm btn-outline-success" download>Download Signed Receipt</a>
                             {% endif %}
                         </div>
                     </td>

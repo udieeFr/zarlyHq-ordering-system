@@ -115,7 +115,12 @@
                     <td data-sort="{% if order.delivery_assigned_at %}{{ order.delivery_assigned_at|date:'U' }}{% else %}0{% endif %}">{% if order.delivery_assigned_at %}{{ order.delivery_assigned_at|date:'M d, Y H:i' }}{% else %}-{% endif %}</td>
                     <td>
                         {% if order.status == 'ready_for_delivery' %}
-                        <a href="{% url 'mark_order_out_for_delivery' order.id %}" class="btn btn-sm btn-warning mb-1">Out for Delivery</a>
+                            {% if order.tracking_number %}
+                            <a href="{% url 'mark_order_out_for_delivery' order.id %}" class="btn btn-sm btn-warning mb-1">Out for Delivery</a>
+                            {% else %}
+                            <button class="btn btn-sm btn-warning mb-1" disabled title="Enter a tracking number first">Out for Delivery</button>
+                            <small class="d-block text-danger" style="font-size:0.7rem;">Tracking # required</small>
+                            {% endif %}
                         {% else %}
                         <a href="{% url 'mark_order_delivered' order.id %}" class="btn btn-sm btn-success mb-1">Delivered</a>
                         {% endif %}

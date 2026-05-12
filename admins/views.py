@@ -920,7 +920,7 @@ def reject_order(request, order_id):
             rejection_reason = RejectionReason.objects.get(id=rejection_reason_id)
         except:
             pass
-    
+     
     # Update order status
     order.status = 'rejected'
     order.save()

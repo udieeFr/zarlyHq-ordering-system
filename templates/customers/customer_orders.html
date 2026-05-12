@@ -18,7 +18,7 @@
       <!-- Header: ID + status -->
       <div class="upcoming-card-header">
         <div>
-          <div class="upcoming-order-id">Order #{{ o.id }}</div>
+          <a href="{% url 'order_success' o.id %}" class="upcoming-order-id" style="text-decoration:none;color:inherit;">Order #{{ o.id }}</a>
           <div class="upcoming-order-date">{{ o.created_at|date:"N j, Y" }} · {{ o.created_at|time:"g:i A" }}</div>
         </div>
         <span class="order-status-pill
@@ -53,10 +53,16 @@
         </div>
         <div class="upcoming-card-bottom">
           <span class="upcoming-total-label">Total: <strong>RM {{ o.total_amount }}</strong></span>
-          <a href="{% url 'payment_page' o.id %}"
-             class="upcoming-track-btn {% if o.status == 'pending_payment' %}btn-pay{% endif %}">
-            {% if o.status == 'pending_payment' %}PAY NOW{% else %}TRACK{% endif %}
-          </a>
+          {% if o.status == 'pending_payment' %}
+            <a href="{% url 'payment_page' o.id %}" class="upcoming-track-btn btn-pay">PAY NOW</a>
+          {% elif o.tracking_number %}
+            <a href="https://www.citylinkexpress.com/track-your-shipment/?trackingNo={{ o.tracking_number }}"
+               class="upcoming-track-btn" target="_blank" rel="noopener noreferrer" style="background:#f59e0b;color:#fff;">
+              🚚 TRACK
+            </a>
+          {% else %}
+            <a href="{% url 'order_success' o.id %}" class="upcoming-track-btn">TRACK</a>
+          {% endif %}
         </div>
       </div>
 
