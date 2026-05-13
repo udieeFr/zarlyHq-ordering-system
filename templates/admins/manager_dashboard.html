@@ -1,0 +1,613 @@
+{% extends 'admin_base.html' %}
+{% load static %}
+
+{% block page_title %}Manager Dashboard{% endblock %}
+
+{% block content %}
+<style>
+  /* ── Soft UI overrides for ZarlyHQ brand ── */
+  :root {
+    --soft-radius: 1rem;
+    --soft-shadow: 0 4px 24px rgba(15,23,42,.08), 0 1.5px 6px rgba(15,23,42,.04);
+    --soft-shadow-lg: 0 20px 60px rgba(15,23,42,.12);
+    --zarly-orange: #ff9933;
+    --zarly-orange-light: #fff7ed;
+    --zarly-navy: #0f172a;
+  }
+
+  /* Hero banner */
+  .dash-hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #1f2937 100%);
+    border-radius: var(--soft-radius);
+    padding: 1.75rem 2rem;
+    margin-bottom: 1.75rem;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--soft-shadow-lg);
+  }
+  .dash-hero::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 220px; height: 220px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,153,51,.22) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .dash-hero::after {
+    content: '';
+    position: absolute;
+    bottom: -80px; left: 30%;
+    width: 300px; height: 180px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,153,51,.10) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .dash-hero-title {
+    font-size: 1.75rem;
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    color: #fff;
+    margin-bottom: 0.25rem;
+    position: relative;
+  }
+  .dash-hero-title span { color: var(--zarly-orange); }
+  .dash-hero-sub { color: rgba(255,255,255,.65); font-size: 0.9rem; position: relative; margin-bottom: 1.1rem; }
+  .dash-hero-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; position: relative; }
+  .dash-chip {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    padding: 0.35rem 0.8rem; border-radius: 999px;
+    font-size: 0.78rem; font-weight: 600;
+    text-decoration: none; transition: all .2s;
+  }
+  .dash-chip-orange { background: var(--zarly-orange); color: #fff; }
+  .dash-chip-orange:hover { background: #e07e1e; color: #fff; }
+  .dash-chip-ghost { background: rgba(255,255,255,.12); color: rgba(255,255,255,.9); border: 1px solid rgba(255,255,255,.2); }
+  .dash-chip-ghost:hover { background: rgba(255,255,255,.2); color: #fff; }
+
+  /* ── Soft KPI Cards ── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+  @media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 700px)  { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 480px)  { .kpi-grid { grid-template-columns: 1fr; } }
+
+  .kpi-card {
+    background: #fff;
+    border-radius: var(--soft-radius);
+    padding: 1.25rem 1.4rem;
+    box-shadow: var(--soft-shadow);
+    position: relative;
+    overflow: hidden;
+    transition: transform .2s, box-shadow .2s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--soft-shadow-lg); }
+  .kpi-icon-wrap {
+    width: 44px; height: 44px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem; margin-bottom: 0.75rem;
+    box-shadow: 0 4px 14px rgba(0,0,0,.15);
+  }
+  .kpi-icon-orange { background: linear-gradient(135deg, #ff9933, #f97316); }
+  .kpi-icon-green  { background: linear-gradient(135deg, #10b981, #059669); }
+  .kpi-icon-blue   { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+  .kpi-icon-purple { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+  .kpi-icon-red    { background: linear-gradient(135deg, #ef4444, #dc2626); }
+  .kpi-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #64748b; margin-bottom: 0.2rem; }
+  .kpi-value { font-size: 1.7rem; font-weight: 900; color: #0f172a; line-height: 1.1; }
+  .kpi-sub { font-size: 0.75rem; color: #94a3b8; margin-top: 0.2rem; }
+  .kpi-accent-bar {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 4px; border-radius: var(--soft-radius) 0 0 var(--soft-radius);
+  }
+  .bar-orange { background: linear-gradient(180deg, #ff9933, #f97316); }
+  .bar-green  { background: linear-gradient(180deg, #10b981, #059669); }
+  .bar-blue   { background: linear-gradient(180deg, #3b82f6, #2563eb); }
+  .bar-purple { background: linear-gradient(180deg, #8b5cf6, #7c3aed); }
+  .bar-red    { background: linear-gradient(180deg, #ef4444, #dc2626); }
+
+  /* ── Soft content panels ── */
+  .soft-card {
+    background: #fff;
+    border-radius: var(--soft-radius);
+    box-shadow: var(--soft-shadow);
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+  }
+  .soft-card-header {
+    padding: 1.1rem 1.4rem 0.75rem;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;
+  }
+  .soft-card-title { font-size: 0.88rem; font-weight: 800; color: #0f172a; letter-spacing: -.01em; }
+  .soft-card-body { padding: 1.2rem 1.4rem; }
+  .soft-card-body.p0 { padding: 0; }
+
+  /* ── Chart containers ── */
+  .chart-wrap { position: relative; height: 220px; }
+
+  /* ── Two-column layout ── */
+  .dash-row { display: grid; gap: 1rem; margin-bottom: 0; }
+  .dash-row-2 { grid-template-columns: 1fr 1fr; }
+  .dash-row-3 { grid-template-columns: 2fr 1fr; }
+  @media (max-width: 960px) { .dash-row-2, .dash-row-3 { grid-template-columns: 1fr; } }
+
+  /* ── Status chips ── */
+  .status-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+  @media (max-width: 700px) { .status-grid { grid-template-columns: repeat(2, 1fr); } }
+  .status-chip {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 0.6rem 0.75rem; font-size: 0.8rem;
+  }
+  .status-chip .sc-count { font-size: 1.3rem; font-weight: 900; color: #0f172a; line-height: 1; }
+  .status-chip .sc-label { font-size: 0.7rem; color: #64748b; margin-top: 0.15rem; }
+
+  /* ── Table overrides ── */
+  .soft-table { width: 100%; font-size: 0.82rem; border-collapse: collapse; }
+  .soft-table th { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #64748b; padding: 0.65rem 1rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+  .soft-table td { padding: 0.7rem 1rem; border-bottom: 1px solid #f1f5f9; color: #1e293b; vertical-align: middle; }
+  .soft-table tr:last-child td { border-bottom: none; }
+  .soft-table tr:hover td { background: #fafbfc; }
+
+  /* ── Tier pills ── */
+  .tier-pill { display:inline-block; padding:.15rem .55rem; border-radius:999px; font-size:.68rem; font-weight:700; text-transform:uppercase; }
+  .tier-bronze   { background:#fef3c7; color:#92400e; }
+  .tier-silver   { background:#e2e8f0; color:#475569; }
+  .tier-gold     { background:#fef9c3; color:#854d0e; }
+  .tier-platinum { background:#dbeafe; color:#1e40af; }
+
+  /* ── Audit pill ── */
+  .audit-pill {
+    font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+    padding: 0.1rem 0.45rem; border-radius: 999px; background:#f1f5f9; color:#334155;
+  }
+  .audit-pill.act-order_approved, .audit-pill.act-signature_created, .audit-pill.act-payment_verified { background:#ecfdf5; color:#065f46; }
+  .audit-pill.act-order_rejected, .audit-pill.act-login_failed, .audit-pill.act-payment_rejected { background:#fef2f2; color:#991b1b; }
+  .audit-pill.act-login_success { background:#eff6ff; color:#1e40af; }
+  .audit-pill.act-complaint_submitted { background:#fffbeb; color:#92400e; }
+  .audit-pill.act-refund_issued    { background:#ecfdf5; color:#065f46; }
+  .audit-pill.act-refund_processed { background:#ecfdf5; color:#065f46; }
+  .audit-pill.act-refund_failed    { background:#fef2f2; color:#991b1b; }
+  .audit-pill.act-refund_manual    { background:#fef9c3; color:#854d0e; }
+
+  /* ── View-all link ── */
+  .view-all { font-size: 0.78rem; font-weight: 600; color: var(--zarly-orange); text-decoration: none; white-space: nowrap; }
+  .view-all:hover { color: #e07e1e; text-decoration: underline; }
+
+  /* ── Top products bar ── */
+  .prod-bar-wrap { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.85rem; }
+  .prod-bar-wrap:last-child { margin-bottom: 0; }
+  .prod-bar-label { font-size: 0.8rem; font-weight: 600; color: #1e293b; min-width: 120px; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .prod-bar-track { flex: 1; background: #f1f5f9; border-radius: 999px; height: 8px; overflow: hidden; }
+  .prod-bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #ff9933, #f97316); transition: width .8s cubic-bezier(.4,0,.2,1); }
+  .prod-bar-count { font-size: 0.78rem; font-weight: 700; color: #64748b; min-width: 36px; text-align: right; }
+
+  /* Revenue range pills */
+  .range-pills { display: flex; gap: 0.4rem; }
+  .range-pill { font-size: 0.72rem; font-weight: 600; padding: 0.2rem 0.55rem; border-radius: 999px; background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; cursor: pointer; transition: all .15s; }
+  .range-pill.active, .range-pill:hover { background: var(--zarly-orange); color: #fff; border-color: var(--zarly-orange); }
+</style>
+
+<!-- ── Hero ──────────────────────────────────────────────── -->
+<div class="dash-hero">
+  <div class="dash-hero-title">Zarly <span>BigFood</span> Dashboard</div>
+  <div class="dash-hero-sub">Executive summary — revenue, operations, customers & security · {{ request.user.first_name|default:request.user.username }}</div>
+  <div class="dash-hero-chips">
+    <a href="{% url 'customers_crm_list' %}" class="dash-chip dash-chip-orange">👥 Customer CRM</a>
+    <a href="{% url 'audit_log_list' %}" class="dash-chip dash-chip-ghost">🛡️ Audit Log</a>
+    <a href="{% url 'admin_complaints_list' %}" class="dash-chip dash-chip-ghost">🚨 Complaints</a>
+    <a href="{% url 'sales_admin_dashboard' %}" class="dash-chip dash-chip-ghost">📋 Order Ops</a>
+    <a href="{% url 'refund_list' %}" class="dash-chip dash-chip-ghost {% if pending_refunds_count %}dash-chip-orange{% endif %}">💸 Refunds{% if pending_refunds_count %} ({{ pending_refunds_count }}){% endif %}</a>
+  </div>
+</div>
+
+<!-- ── KPI Grid ───────────────────────────────────────────── -->
+<div class="kpi-grid">
+  <div class="kpi-card">
+    <div class="kpi-accent-bar bar-green"></div>
+    <div class="kpi-icon-wrap kpi-icon-green">💰</div>
+    <div class="kpi-label">Today's Revenue</div>
+    <div class="kpi-value">RM {{ revenue_today|floatformat:2 }}</div>
+    <div class="kpi-sub">Approved + Delivered</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-accent-bar bar-orange"></div>
+    <div class="kpi-icon-wrap kpi-icon-orange">📦</div>
+    <div class="kpi-label">Orders Today</div>
+    <div class="kpi-value">{{ orders_today }}</div>
+    <div class="kpi-sub">{{ orders_week }} this week</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-accent-bar bar-blue"></div>
+    <div class="kpi-icon-wrap kpi-icon-blue">🏠</div>
+    <div class="kpi-label">Delivery Rate</div>
+    <div class="kpi-value">{{ delivery_rate }}%</div>
+    <div class="kpi-sub">{{ status_breakdown.delivered }} delivered of {{ total_orders }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-accent-bar bar-red"></div>
+    <div class="kpi-icon-wrap kpi-icon-red">🚨</div>
+    <div class="kpi-label">Open Complaints</div>
+    <div class="kpi-value">{{ pending_complaints }}</div>
+    <div class="kpi-sub">{{ resolved_complaints }} resolved</div>
+  </div>
+  <div class="kpi-card" style="cursor:pointer;" onclick="window.location='{% url 'refund_list' %}?status=manual'">
+    <div class="kpi-accent-bar bar-purple"></div>
+    <div class="kpi-icon-wrap kpi-icon-purple">💸</div>
+    <div class="kpi-label">Pending Refunds</div>
+    <div class="kpi-value {% if pending_refunds_count %}text-danger{% endif %}">{{ pending_refunds_count }}</div>
+    <div class="kpi-sub">manual + failed — action required</div>
+  </div>
+</div>
+
+<!-- ── Revenue chart + Donut ─────────────────────────────── -->
+<div class="dash-row dash-row-3" style="margin-bottom:1rem;">
+
+  <div class="soft-card">
+    <div class="soft-card-header">
+      <span class="soft-card-title">📈 Revenue — Last 30 Days</span>
+      <div class="range-pills">
+        <span class="range-pill active" onclick="setRange(30,this)">30d</span>
+        <span class="range-pill" onclick="setRange(14,this)">14d</span>
+        <span class="range-pill" onclick="setRange(7,this)">7d</span>
+      </div>
+    </div>
+    <div class="soft-card-body">
+      <div style="font-size:0.78rem;color:#64748b;margin-bottom:0.75rem;">
+        Month total: <strong style="color:#0f172a;">RM {{ revenue_month|floatformat:2 }}</strong>
+        &nbsp;·&nbsp; All time: <strong style="color:#0f172a;">RM {{ revenue_all_time|floatformat:2 }}</strong>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="revenueChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="soft-card">
+    <div class="soft-card-header">
+      <span class="soft-card-title">🍩 Order Status</span>
+    </div>
+    <div class="soft-card-body">
+      <div class="chart-wrap" style="height:180px;">
+        <canvas id="statusChart"></canvas>
+      </div>
+      <div style="margin-top:0.75rem;font-size:0.75rem;color:#64748b;text-align:center;">
+        {{ total_orders }} total orders
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Operations + Top Products ─────────────────────────── -->
+<div class="dash-row dash-row-2" style="margin-bottom:1rem;">
+
+  <div class="soft-card">
+    <div class="soft-card-header">
+      <span class="soft-card-title">⚡ Operations Snapshot</span>
+    </div>
+    <div class="soft-card-body">
+      <div class="status-grid">
+        <div class="status-chip"><div class="sc-count">{{ status_breakdown.pending }}</div><div class="sc-label">⏳ Pending</div></div>
+        <div class="status-chip"><div class="sc-count">{{ status_breakdown.pending_payment }}</div><div class="sc-label">💳 Awaiting Payment</div></div>
+        <div class="status-chip"><div class="sc-count">{{ status_breakdown.approved }}</div><div class="sc-label">✅ Approved</div></div>
+        <div class="status-chip"><div class="sc-count">{{ status_breakdown.prepared }}</div><div class="sc-label">👨‍🍳 Preparing</div></div>
+        <div class="status-chip"><div class="sc-count">{{ status_breakdown.ready_for_delivery }}</div><div class="sc-label">📦 Ready</div></div>
+        <div class="status-chip"><div class="sc-count">{{ status_breakdown.out_for_delivery }}</div><div class="sc-label">🛵 Out for Delivery</div></div>
+        <div class="status-chip"><div class="sc-count">{{ status_breakdown.delivered }}</div><div class="sc-label">🏠 Delivered</div></div>
+        <div class="status-chip"><div class="sc-count">{{ status_breakdown.rejected }}</div><div class="sc-label">❌ Rejected</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="soft-card">
+    <div class="soft-card-header">
+      <span class="soft-card-title">🏆 Top Products</span>
+    </div>
+    <div class="soft-card-body">
+      {% if top_products %}
+        {% with max_qty=top_products.0.qty %}
+        {% for p in top_products %}
+        <div class="prod-bar-wrap">
+          <span class="prod-bar-label" title="{{ p.product__name }}">{{ p.product__name }}</span>
+          <div class="prod-bar-track">
+            <div class="prod-bar-fill" style="width:{% if max_qty %}{% widthratio p.qty max_qty 100 %}%{% else %}0%{% endif %}"></div>
+          </div>
+          <span class="prod-bar-count">×{{ p.qty }}</span>
+        </div>
+        {% endfor %}
+        {% endwith %}
+      {% else %}
+        <div class="text-center text-muted py-3" style="font-size:0.85rem;">No order data yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Revenue KPIs Row ───────────────────────────────────── -->
+<div class="kpi-grid" style="grid-template-columns: repeat(4,1fr); margin-bottom:1.5rem;">
+  <div class="kpi-card">
+    <div class="kpi-accent-bar bar-green"></div>
+    <div class="kpi-label">Today</div>
+    <div class="kpi-value" style="font-size:1.25rem;">RM {{ revenue_today|floatformat:2 }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-accent-bar bar-green"></div>
+    <div class="kpi-label">Last 7 Days</div>
+    <div class="kpi-value" style="font-size:1.25rem;">RM {{ revenue_week|floatformat:2 }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-accent-bar bar-green"></div>
+    <div class="kpi-label">Last 30 Days</div>
+    <div class="kpi-value" style="font-size:1.25rem;">RM {{ revenue_month|floatformat:2 }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-accent-bar bar-orange"></div>
+    <div class="kpi-label">All Time</div>
+    <div class="kpi-value" style="font-size:1.25rem;">RM {{ revenue_all_time|floatformat:2 }}</div>
+  </div>
+</div>
+
+<!-- ── CRM + Complaints ───────────────────────────────────── -->
+<div class="dash-row dash-row-2" style="margin-bottom:1rem;">
+
+  <div class="soft-card">
+    <div class="soft-card-header">
+      <span class="soft-card-title">👥 Top Customers</span>
+      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+        <span class="tier-pill tier-platinum">Platinum {{ tier_map.platinum|default:0 }}</span>
+        <span class="tier-pill tier-gold">Gold {{ tier_map.gold|default:0 }}</span>
+        <span class="tier-pill tier-silver">Silver {{ tier_map.silver|default:0 }}</span>
+        <span class="tier-pill tier-bronze">Bronze {{ tier_map.bronze|default:0 }}</span>
+        <a href="{% url 'customers_crm_list' %}" class="view-all">View all →</a>
+      </div>
+    </div>
+    <div class="soft-card-body p0">
+      <table class="soft-table">
+        <thead>
+          <tr><th>Customer</th><th>Tier</th><th>Lifetime Spend</th><th>Orders</th></tr>
+        </thead>
+        <tbody>
+          {% for p in top_customers %}
+          <tr>
+            <td><a href="{% url 'customer_crm_detail' p.user.id %}" style="color:#0f172a;font-weight:600;text-decoration:none;">{{ p.user.username }}</a></td>
+            <td><span class="tier-pill tier-{{ p.loyalty_tier }}">{{ p.get_loyalty_tier_display }}</span></td>
+            <td style="font-weight:700;color:#10b981;">RM {{ p.total_spent|floatformat:2 }}</td>
+            <td>{{ p.total_orders }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-center text-muted py-3">No customer data yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="soft-card">
+    <div class="soft-card-header">
+      <span class="soft-card-title">🚨 Recent Complaints</span>
+      <a href="{% url 'admin_complaints_list' %}" class="view-all">View all →</a>
+    </div>
+    <div class="soft-card-body" style="padding-bottom:.75rem;">
+      <div style="display:flex;gap:.75rem;margin-bottom:1rem;">
+        <div class="kpi-card" style="flex:1;padding:.85rem 1rem;margin-bottom:0;">
+          <div class="kpi-accent-bar bar-orange"></div>
+          <div class="kpi-label">Pending</div>
+          <div class="kpi-value" style="font-size:1.4rem;">{{ pending_complaints }}</div>
+        </div>
+        <div class="kpi-card" style="flex:1;padding:.85rem 1rem;margin-bottom:0;">
+          <div class="kpi-accent-bar bar-green"></div>
+          <div class="kpi-label">Resolved</div>
+          <div class="kpi-value" style="font-size:1.4rem;">{{ resolved_complaints }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="soft-card-body p0">
+      <table class="soft-table">
+        <thead><tr><th>Order</th><th>Customer</th><th>Subject</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for c in recent_complaints %}
+          <tr>
+            <td><a href="{% url 'admin_order_detail' c.order.id %}" style="color:#ff9933;font-weight:600;text-decoration:none;">#{{ c.order.id }}</a></td>
+            <td>{{ c.customer.username }}</td>
+            <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ c.subject }}</td>
+            <td>
+              {% if c.status == 'pending' %}
+              <span style="background:#fff7ed;color:#c2410c;font-size:.68rem;font-weight:700;padding:.15rem .45rem;border-radius:999px;">Pending</span>
+              {% else %}
+              <span style="background:#ecfdf5;color:#065f46;font-size:.68rem;font-weight:700;padding:.15rem .45rem;border-radius:999px;">Resolved</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-center text-muted py-3">No complaints yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Refunds ────────────────────────────────────────────── -->
+{% if recent_refunds %}
+<div class="soft-card" style="margin-bottom:1rem;">
+  <div class="soft-card-header">
+    <span class="soft-card-title">💸 Recent Refunds</span>
+    <a href="{% url 'refund_list' %}" class="view-all">View all →</a>
+  </div>
+  <div class="soft-card-body p0">
+    <table class="soft-table">
+      <thead>
+        <tr><th>Refund #</th><th>Order</th><th>Customer</th><th>Amount</th><th>Status</th><th>Created</th></tr>
+      </thead>
+      <tbody>
+        {% for r in recent_refunds %}
+        <tr>
+          <td style="font-weight:700;">#{{ r.id }}</td>
+          <td><a href="{% url 'admin_order_detail' r.order.id %}" style="color:#ff9933;font-weight:600;text-decoration:none;">#{{ r.order.id }}</a></td>
+          <td>{{ r.order.customer.username }}</td>
+          <td style="font-weight:700;color:#0f172a;">RM {{ r.amount|floatformat:2 }}</td>
+          <td>
+            {% if r.status == 'succeeded' %}
+              <span style="background:#ecfdf5;color:#065f46;font-size:.68rem;font-weight:700;padding:.15rem .45rem;border-radius:999px;">Issued</span>
+            {% elif r.status == 'manual' %}
+              <span style="background:#fffbeb;color:#92400e;font-size:.68rem;font-weight:700;padding:.15rem .45rem;border-radius:999px;">Manual Needed</span>
+            {% elif r.status == 'failed' %}
+              <span style="background:#fef2f2;color:#991b1b;font-size:.68rem;font-weight:700;padding:.15rem .45rem;border-radius:999px;">Failed</span>
+            {% else %}
+              <span style="background:#f1f5f9;color:#475569;font-size:.68rem;font-weight:700;padding:.15rem .45rem;border-radius:999px;">{{ r.get_status_display }}</span>
+            {% endif %}
+          </td>
+          <td style="color:#94a3b8;font-size:.75rem;white-space:nowrap;">{{ r.created_at|date:"d M H:i" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Audit Log ──────────────────────────────────────────── -->
+<div class="soft-card">
+  <div class="soft-card-header">
+    <span class="soft-card-title">🛡️ Recent Security Events</span>
+    <a href="{% url 'audit_log_list' %}" class="view-all">Full log →</a>
+  </div>
+  <div class="soft-card-body p0">
+    <table class="soft-table">
+      <thead>
+        <tr><th>Time</th><th>Actor</th><th>Action</th><th>Description</th><th>IP</th></tr>
+      </thead>
+      <tbody>
+        {% for log in recent_audit %}
+        <tr>
+          <td style="white-space:nowrap;color:#94a3b8;font-size:.75rem;">{{ log.timestamp|date:"d M H:i:s" }}</td>
+          <td>{% if log.actor %}<span style="font-weight:600;">{{ log.actor.username }}</span>{% else %}<span style="color:#94a3b8;">system</span>{% endif %}</td>
+          <td><span class="audit-pill act-{{ log.action_type }}">{{ log.get_action_type_display }}</span></td>
+          <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#64748b;">{{ log.description|default:'—' }}</td>
+          <td style="font-family:monospace;font-size:.72rem;color:#94a3b8;">{{ log.ip_address|default:'—' }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center text-muted py-3">No audit entries yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+  const allLabels   = {{ chart_labels|safe }};
+  const allRevenue  = {{ chart_revenue|safe }};
+
+  // ── Revenue Line Chart ──────────────────────────────────
+  const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+
+  const gradientFill = revenueCtx.createLinearGradient(0, 0, 0, 220);
+  gradientFill.addColorStop(0,   'rgba(255,153,51,.28)');
+  gradientFill.addColorStop(1,   'rgba(255,153,51,0)');
+
+  let revenueChart = new Chart(revenueCtx, {
+    type: 'line',
+    data: {
+      labels: allLabels,
+      datasets: [{
+        label: 'Revenue (RM)',
+        data: allRevenue,
+        borderColor: '#ff9933',
+        borderWidth: 2.5,
+        backgroundColor: gradientFill,
+        pointBackgroundColor: '#ff9933',
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        tension: 0.42,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0f172a',
+          titleColor: '#94a3b8',
+          bodyColor: '#fff',
+          padding: 10,
+          callbacks: {
+            label: ctx => ' RM ' + ctx.parsed.y.toFixed(2)
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: 10 }
+        },
+        y: {
+          grid: { color: 'rgba(0,0,0,.05)' },
+          ticks: {
+            color: '#94a3b8', font: { size: 10 },
+            callback: v => 'RM ' + v.toLocaleString()
+          }
+        }
+      }
+    }
+  });
+
+  function setRange(days, el) {
+    document.querySelectorAll('.range-pill').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    const sliced = allLabels.slice(-days);
+    const data   = allRevenue.slice(-days);
+    revenueChart.data.labels   = sliced;
+    revenueChart.data.datasets[0].data = data;
+    revenueChart.update();
+  }
+
+  // ── Status Donut Chart ──────────────────────────────────
+  const statusCtx = document.getElementById('statusChart').getContext('2d');
+  new Chart(statusCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Pending','Awaiting Pay','Approved','Preparing','Ready','Out for Delivery','Delivered','Rejected'],
+      datasets: [{
+        data: [
+          {{ status_breakdown.pending }},
+          {{ status_breakdown.pending_payment }},
+          {{ status_breakdown.approved }},
+          {{ status_breakdown.prepared }},
+          {{ status_breakdown.ready_for_delivery }},
+          {{ status_breakdown.out_for_delivery }},
+          {{ status_breakdown.delivered }},
+          {{ status_breakdown.rejected }}
+        ],
+        backgroundColor: ['#f59e0b','#3b82f6','#10b981','#8b5cf6','#06b6d4','#6366f1','#ff9933','#ef4444'],
+        borderWidth: 2,
+        borderColor: '#fff',
+        hoverOffset: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '68%',
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { color: '#64748b', font: { size: 10 }, padding: 8, boxWidth: 10 }
+        },
+        tooltip: {
+          backgroundColor: '#0f172a',
+          titleColor: '#94a3b8',
+          bodyColor: '#fff',
+          padding: 10,
+        }
+      }
+    }
+  });
+</script>
+{% endblock %}

@@ -47,6 +47,12 @@ class Order(models.Model):
                                              related_name='delivery_assigned_orders', limit_choices_to={'role__in': ['sales_admin', 'manager']})
     delivered_at = models.DateTimeField(null=True, blank=True)
 
+    # Remake / priority fields
+    is_remake = models.BooleanField(default=False)
+    remake_of = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True,
+                                  related_name='remakes')
+    is_priority = models.BooleanField(default=False)
+
     @property
     def address_summary(self):
         if self.formatted_address:
@@ -305,6 +311,10 @@ class AuditLog(models.Model):
         ('tracking_updated', 'Tracking Number Updated'),
         ('inventory_updated', 'Inventory Updated'),
         ('product_added', 'Product Added'),
+        ('refund_issued', 'Refund Issued'),
+        ('refund_failed', 'Refund Failed'),
+        ('refund_manual', 'Manual Refund Flagged'),
+        ('refund_processed', 'Manual Refund Processed'),
     )
 
     actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
@@ -367,3 +377,41 @@ class Notification(models.Model):
             self.is_read = True
             self.read_at = timezone.now()
             self.save(update_fields=['is_read', 'read_at'])
+
+
+class Refund(models.Model):
+    """
+    Tracks every refund attempt — automatic (Stripe) or manual (bank transfer / DuitNow).
+    Created on order rejection or complaint resolution with action_taken='refund'.
+    """
+    STATUS_CHOICES = (
+        ('pending',    'Pending'),
+        ('succeeded',  'Refund Issued'),
+        ('failed',     'Failed'),
+        ('manual',     'Manual Refund Required'),
+    )
+    SOURCE_CHOICES = (
+        ('order_rejection', 'Order Rejection'),
+        ('complaint',       'Customer Complaint'),
+    )
+
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='refunds')
+    payment = models.ForeignKey(Payment, on_delete=models.SET_NULL, null=True, blank=True,
+                                related_name='refunds')
+    complaint = models.ForeignKey(Complaint, on_delete=models.SET_NULL, null=True, blank=True,
+                                  related_name='refund_record')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    source = models.CharField(max_length=30, choices=SOURCE_CHOICES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    stripe_refund_id = models.CharField(max_length=255, blank=True)
+    reason = models.TextField(blank=True)
+    processed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                     related_name='processed_refunds')
+    created_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Refund #{self.id} — Order #{self.order.id} ({self.get_status_display()})"

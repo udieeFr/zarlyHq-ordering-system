@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Q, Sum
 from datetime import timedelta
-from .models import Order, DigitalSignature, Complaint, PrepGroup, Payment, AuditLog, Notification
+from .models import Order, OrderItem, DigitalSignature, Complaint, PrepGroup, Payment, AuditLog, Notification
 from .utils import generate_invoice_pdf, sign_pdf_digitally
 from .notifications import log_audit, notify, notify_admins
 from customers.auth_utils import (
@@ -139,30 +139,126 @@ def dashboard_home(request):
     """
     if request.user.role == 'customer':
         return redirect('product_list')
-    elif request.user.role in ['sales_admin', 'manager'] or request.user.is_superuser:
+    elif request.user.role == 'manager' or request.user.is_superuser:
+        return redirect('manager_analytics_view')
+    elif request.user.role == 'sales_admin':
         return redirect('sales_admin_dashboard')
     else:
         messages.error(request, "Your role is not configured. Please contact support.")
         return redirect('product_list')
 
-@login_required
-@role_required('manager', 'sales_admin')
+@manager_required
 def manager_analytics_view(request):
-    """
-    Manager analytics dashboard showing business metrics.
-    Accessible to: Manager, Superuser
-    """
-    # TODO: Implement manager analytics with charts and metrics
-    total_orders = Order.objects.count()
-    approved_orders = Order.objects.filter(status='approved').count()
-    pending_orders = Order.objects.filter(status='pending').count()
-    total_revenue = sum(o.total_amount for o in Order.objects.filter(status='approved'))
-    
-    return render(request, 'admins/manager_analytics.html', {
+    """Manager dashboard — revenue, CRM summary, recent audit trail, complaints."""
+    import json
+    from customers.models import CustomerProfile
+    from django.db.models import Count, FloatField
+    from django.db.models.functions import TruncDate
+
+    now = timezone.now()
+    today = now.date()
+    week_ago = now - timedelta(days=7)
+    month_ago = now - timedelta(days=30)
+
+    # --- Revenue ---
+    completed_statuses = ['approved', 'delivered']
+    all_completed = Order.objects.filter(status__in=completed_statuses)
+    revenue_today    = all_completed.filter(approved_at__date=today).aggregate(t=Sum('total_amount'))['t'] or 0
+    revenue_week     = all_completed.filter(approved_at__gte=week_ago).aggregate(t=Sum('total_amount'))['t'] or 0
+    revenue_month    = all_completed.filter(approved_at__gte=month_ago).aggregate(t=Sum('total_amount'))['t'] or 0
+    revenue_all_time = all_completed.aggregate(t=Sum('total_amount'))['t'] or 0
+
+    # --- Daily revenue for last 30 days (Chart.js) ---
+    daily_qs = (
+        all_completed
+        .filter(approved_at__gte=month_ago)
+        .annotate(day=TruncDate('approved_at'))
+        .values('day')
+        .annotate(total=Sum('total_amount'))
+        .order_by('day')
+    )
+    daily_map = {row['day']: float(row['total'] or 0) for row in daily_qs}
+    chart_labels = []
+    chart_revenue = []
+    for i in range(29, -1, -1):
+        d = today - timedelta(days=i)
+        chart_labels.append(d.strftime('%d %b'))
+        chart_revenue.append(daily_map.get(d, 0))
+
+    # --- Order volume ---
+    orders_today = Order.objects.filter(created_at__date=today).count()
+    orders_week  = Order.objects.filter(created_at__gte=week_ago).count()
+    status_breakdown = {
+        'pending':             Order.objects.filter(status='pending').count(),
+        'pending_payment':     Order.objects.filter(status='pending_payment').count(),
+        'approved':            Order.objects.filter(status='approved').count(),
+        'prepared':            Order.objects.filter(status='prepared').count(),
+        'ready_for_delivery':  Order.objects.filter(status='ready_for_delivery').count(),
+        'out_for_delivery':    Order.objects.filter(status='out_for_delivery').count(),
+        'delivered':           Order.objects.filter(status='delivered').count(),
+        'rejected':            Order.objects.filter(status='rejected').count(),
+    }
+    total_orders = sum(status_breakdown.values())
+    delivered_count = status_breakdown['delivered']
+    delivery_rate = round((delivered_count / total_orders * 100) if total_orders > 0 else 0, 1)
+
+    # --- Top 5 products by order count ---
+    top_products = (
+        OrderItem.objects
+        .values('product__name')
+        .annotate(qty=Sum('quantity'), revenue=Sum('subtotal'))
+        .order_by('-qty')[:5]
+    )
+
+    # --- CRM summary ---
+    tier_counts = CustomerProfile.objects.values('loyalty_tier').annotate(n=Count('id')).order_by('loyalty_tier')
+    tier_map = {t['loyalty_tier']: t['n'] for t in tier_counts}
+    top_customers = CustomerProfile.objects.select_related('user').order_by('-total_spent')[:5]
+    total_customers = CustomerProfile.objects.count()
+
+    # --- Complaints ---
+    pending_complaints  = Complaint.objects.filter(status='pending').count()
+    resolved_complaints = Complaint.objects.filter(status='resolved').count()
+    recent_complaints   = Complaint.objects.select_related('order', 'customer').order_by('-created_at')[:5]
+
+    # --- Audit log preview ---
+    recent_audit = AuditLog.objects.select_related('actor').order_by('-timestamp')[:10]
+
+    # --- Refunds ---
+    from admins.models import Refund
+    pending_refunds_count = Refund.objects.filter(status__in=['manual', 'failed']).count()
+    recent_refunds = Refund.objects.select_related('order', 'order__customer').order_by('-created_at')[:5]
+
+    return render(request, 'admins/manager_dashboard.html', {
+        # Revenue
+        'revenue_today': revenue_today,
+        'revenue_week': revenue_week,
+        'revenue_month': revenue_month,
+        'revenue_all_time': revenue_all_time,
+        # Chart data (JSON-safe)
+        'chart_labels': json.dumps(chart_labels),
+        'chart_revenue': json.dumps(chart_revenue),
+        # Orders
+        'orders_today': orders_today,
+        'orders_week': orders_week,
+        'status_breakdown': status_breakdown,
         'total_orders': total_orders,
-        'approved_orders': approved_orders,
-        'pending_orders': pending_orders,
-        'total_revenue': total_revenue,
+        'delivery_rate': delivery_rate,
+        # Top products
+        'top_products': list(top_products),
+        # CRM
+        'tier_map': tier_map,
+        'top_customers': top_customers,
+        'total_customers': total_customers,
+        # Complaints
+        'pending_complaints': pending_complaints,
+        'resolved_complaints': resolved_complaints,
+        'recent_complaints': recent_complaints,
+        # Audit
+        'recent_audit': recent_audit,
+        # Refunds
+        'pending_refunds_count': pending_refunds_count,
+        'recent_refunds': recent_refunds,
     })
 
 # --- INVENTORY MANAGEMENT (STAGED CHANGES) ---
@@ -1047,6 +1143,10 @@ def reject_order(request, order_id):
            link=f"/rejected-orders/",
            notification_type='order_update')
 
+    # Auto-refund if the customer had already paid via Stripe
+    from admins.refund_utils import process_refund
+    process_refund(order, source='order_rejection', request=request)
+
     return redirect('sales_admin_dashboard')
 
 # --- COMPLAINTS ---
@@ -1080,13 +1180,27 @@ def resolve_complaint(request, complaint_id):
             log_audit(request, 'complaint_resolved', target=complaint,
                       description=f"Complaint #{complaint.id} resolved",
                       metadata={'action_taken': action})
-            notify(complaint.customer,
-                   title="Complaint resolved",
-                   message=f"Your complaint on Order #{complaint.order.id} has been reviewed. "
-                           f"Outcome: {complaint.get_action_taken_display()}.",
-                   link="/support/",
-                   notification_type='complaint')
-            messages.success(request, f"Complaint resolved: {complaint.get_action_taken_display()}")
+
+            if action == 'refund':
+                from admins.refund_utils import process_refund
+                process_refund(complaint.order, source='complaint',
+                               request=request, complaint=complaint)
+                messages.success(request, f"Complaint resolved — refund initiated for Order #{complaint.order.id}.")
+
+            elif action == 'remake':
+                from admins.refund_utils import remake_order
+                new_order = remake_order(complaint.order, resolved_by=request.user, request=request)
+                messages.success(request, f"Complaint resolved — remake Order #{new_order.id} created with priority.")
+
+            else:
+                # dismissed
+                notify(complaint.customer,
+                       title="Complaint reviewed",
+                       message=f"Your complaint on Order #{complaint.order.id} has been reviewed. "
+                               f"Outcome: {complaint.get_action_taken_display()}.",
+                       link="/support/",
+                       notification_type='complaint')
+                messages.success(request, f"Complaint resolved: {complaint.get_action_taken_display()}")
         else:
             messages.error(request, "Please select an action before resolving.")
         return redirect('admin_complaints_list')
@@ -1095,7 +1209,7 @@ def resolve_complaint(request, complaint_id):
 
 # --- AUDIT LOG ---
 
-@sales_admin_required
+@manager_required
 def audit_log_list(request):
     """Filterable view of the security audit trail."""
     logs = AuditLog.objects.select_related('actor').all()
@@ -1149,9 +1263,72 @@ def audit_log_list(request):
     })
 
 
+# --- REFUND MANAGEMENT ---
+
+@manager_required
+def refund_list(request):
+    """Manager view — lists all refund records filterable by status."""
+    from admins.models import Refund
+
+    status_filter = request.GET.get('status', '').strip()
+    refunds = Refund.objects.select_related('order', 'order__customer', 'processed_by', 'complaint')
+
+    if status_filter:
+        refunds = refunds.filter(status=status_filter)
+
+    pending_manual_count = Refund.objects.filter(status__in=['manual', 'failed']).count()
+
+    return render(request, 'admins/refund_list.html', {
+        'refunds': refunds,
+        'status_filter': status_filter,
+        'pending_manual_count': pending_manual_count,
+        'status_choices': Refund.STATUS_CHOICES,
+    })
+
+
+@manager_required
+def mark_refund_processed(request, refund_id):
+    """Mark a manual/failed refund as completed after the manager does the bank transfer."""
+    from admins.models import Refund
+
+    if request.method != 'POST':
+        return redirect('refund_list')
+
+    refund = get_object_or_404(Refund, id=refund_id)
+
+    if refund.status not in ('manual', 'failed', 'pending'):
+        messages.warning(request, f"Refund #{refund.id} is already {refund.get_status_display()}.")
+        return redirect('refund_list')
+
+    bank_reference = request.POST.get('bank_reference', '').strip()
+    notes = request.POST.get('notes', '').strip()
+
+    refund.status = 'succeeded'
+    refund.processed_by = request.user
+    refund.processed_at = timezone.now()
+    extra = f' | Bank ref: {bank_reference}' if bank_reference else ''
+    extra += f' | Notes: {notes}' if notes else ''
+    refund.reason = (refund.reason or '') + f' | Manually processed by {request.user.username}{extra}'
+    refund.save(update_fields=['status', 'processed_by', 'processed_at', 'reason'])
+
+    log_audit(request, 'refund_processed', target=refund,
+              description=f'Manual refund #{refund.id} processed for Order #{refund.order.id} — RM {refund.amount}',
+              metadata={'bank_reference': bank_reference, 'notes': notes, 'amount': str(refund.amount)})
+
+    notify(refund.order.customer,
+           title='Refund completed',
+           message=f'Your refund of RM {refund.amount} for Order #{refund.order.id} '
+                   f'has been transferred to your account. Please allow 1–3 business days.',
+           link=f'/order-details/{refund.order.id}/',
+           notification_type='payment')
+
+    messages.success(request, f"Refund #{refund.id} marked as processed (RM {refund.amount}).")
+    return redirect('refund_list')
+
+
 # --- CUSTOMER CRM ---
 
-@sales_admin_required
+@manager_required
 def customers_crm_list(request):
     """List all customers with CRM-relevant data: lifetime value, loyalty tier, order count."""
     from customers.models import CustomerProfile, User
@@ -1190,7 +1367,7 @@ def customers_crm_list(request):
     })
 
 
-@sales_admin_required
+@manager_required
 def customer_crm_detail(request, user_id):
     """Detail view of a single customer for CRM purposes."""
     from customers.models import CustomerProfile, User

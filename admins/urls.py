@@ -40,6 +40,10 @@ urlpatterns = [
     # Audit Log (security trail)
     path('audit-log/', views.audit_log_list, name='audit_log_list'),
 
+    # Refund Management
+    path('refunds/', views.refund_list, name='refund_list'),
+    path('refunds/<int:refund_id>/processed/', views.mark_refund_processed, name='mark_refund_processed'),
+
     # Customer CRM
     path('customers/', views.customers_crm_list, name='customers_crm_list'),
     path('customers/<int:user_id>/', views.customer_crm_detail, name='customer_crm_detail'),

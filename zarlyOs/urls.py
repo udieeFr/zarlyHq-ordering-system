@@ -27,7 +27,9 @@ def home_redirect(request):
     if request.user.is_authenticated:
         if request.user.role == 'customer':
             return redirect('product_list')
-        elif request.user.role in ['sales_admin', 'manager'] or request.user.is_superuser:
+        elif request.user.role == 'manager' or request.user.is_superuser:
+            return redirect('manager_analytics_view')
+        elif request.user.role == 'sales_admin':
             return redirect('sales_admin_dashboard')
         else:
             return redirect('product_list')
