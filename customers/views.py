@@ -9,6 +9,7 @@ from django.views.decorators.csrf import csrf_exempt
 from .models import Product, Category, Allergy
 from admins.models import Order, OrderItem, Complaint, Payment, DigitalSignature
 from admins.utils import generate_invoice_pdf  # The PDF generation engine
+from admins.notifications import log_audit, notify, notify_admins
 from .stripe_utils import (
     create_stripe_checkout_session, 
     get_session_url,
@@ -205,11 +206,20 @@ def upload_payment_proof(request, order_id):
                 payment.save()
             
             messages.success(
-                request, 
+                request,
                 "✓ Payment proof uploaded successfully! The admin will review it within 1-2 hours."
             )
             logger.info(f"Payment proof uploaded for Order #{order.id} by {request.user.username}")
-            
+
+            log_audit(request, 'payment_proof_uploaded', target=order,
+                      description=f"Customer uploaded payment proof for Order #{order.id}")
+            notify_admins(
+                title="Payment proof submitted",
+                message=f"{request.user.username} uploaded a payment receipt for Order #{order.id}. Please verify.",
+                link=f"/dashboard/pending-payment-orders/",
+                notification_type='payment',
+            )
+
             return redirect('order_success', order_id=order.id)
             
         except Exception as e:
@@ -417,6 +427,16 @@ def submit_order(request):
             item['product'].stock -= item['quantity']
             item['product'].save()
         
+        log_audit(request, 'order_created', target=order,
+                  description=f"Customer placed Order #{order.id}",
+                  metadata={'total': str(total_price), 'items': len(cart_items)})
+        notify_admins(
+            title="New order received",
+            message=f"Customer {request.user.username} placed Order #{order.id} for RM {total_price}.",
+            link=f"/dashboard/order/{order.id}/detail/",
+            notification_type='admin_alert',
+        )
+
         # Handle payment method selection
         payment_method = request.POST.get('payment_method')
         
@@ -542,6 +562,9 @@ def order_success(request, order_id):
 
 def logout_view(request):
     """Log user out"""
+    if request.user.is_authenticated:
+        log_audit(request, 'logout', target=request.user,
+                  description=f"Logout: {request.user.username}", actor=request.user)
     logout(request)
     messages.success(request, "You have been logged out.")
     return redirect('product_list')
@@ -552,13 +575,22 @@ def submit_complaint(request):
     if request.method == 'POST':
         order_id = request.POST.get('order_id')
         order = get_object_or_404(Order, id=order_id, customer=request.user)
-        
-        Complaint.objects.create(
+
+        complaint = Complaint.objects.create(
             order=order,
             customer=request.user,
             subject=request.POST.get('subject'),
             message=request.POST.get('message'),
             evidence_image=request.FILES.get('evidence_image')
+        )
+        log_audit(request, 'complaint_submitted', target=complaint,
+                  description=f"Complaint filed on Order #{order.id}",
+                  metadata={'subject': complaint.subject[:200]})
+        notify_admins(
+            title="New customer complaint",
+            message=f"{request.user.username} filed a complaint on Order #{order.id}: {complaint.subject[:120]}",
+            link=f"/dashboard/complaints/{complaint.id}/",
+            notification_type='complaint',
         )
         messages.success(request, "Your complaint has been submitted successfully.")
     return redirect('customer_support')
@@ -900,4 +932,49 @@ def verify_receipt(request, order_id):
         result['status'] = 'sig_error'
         result['error_detail'] = str(e)
 
+    log_audit(request, 'receipt_verified', target=sig_record,
+              description=f"Receipt verification check on Order #{order_id}",
+              metadata={'result_status': result.get('status', 'unknown'),
+                        'hash_match': bool(result.get('hash_match', False))})
+
     return render(request, 'customers/verify_receipt.html', result)
+
+
+# ============================================================================
+# NOTIFICATIONS
+# ============================================================================
+
+@login_required
+def notifications_list(request):
+    """Show all of the current user's notifications, newest first."""
+    from admins.models import Notification
+    qs = Notification.objects.filter(recipient=request.user)
+    unread_count = qs.filter(is_read=False).count()
+    cart = request.session.get('cart', {})
+    return render(request, 'customers/notifications.html', {
+        'notifications': qs[:100],
+        'unread_count': unread_count,
+        'cart_count': sum(cart.values()),
+    })
+
+
+@login_required
+def notification_open(request, notification_id):
+    """Mark a single notification as read and redirect to its link."""
+    from admins.models import Notification
+    notif = get_object_or_404(Notification, id=notification_id, recipient=request.user)
+    notif.mark_read()
+    if notif.link:
+        return redirect(notif.link)
+    return redirect('notifications_list')
+
+
+@login_required
+def notifications_mark_all_read(request):
+    """Mark all notifications for the current user as read."""
+    from admins.models import Notification
+    from django.utils import timezone as tz
+    Notification.objects.filter(recipient=request.user, is_read=False).update(
+        is_read=True, read_at=tz.now()
+    )
+    return redirect('notifications_list')

@@ -158,6 +158,16 @@
 
             <!-- Right Side -->
             <div class="navbar-right">
+                <!-- Notifications bell (customers only) -->
+                {% if request.user.is_authenticated and request.user.role == 'customer' %}
+                <div class="cart-badge" style="margin-right:0.25rem;">
+                    <a href="{% url 'notifications_list' %}" class="cart-link" title="Notifications">🔔</a>
+                    {% if unread_notification_count %}
+                    <span class="badge-count">{{ unread_notification_count }}</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+
                 <!-- Cart -->
                 <div class="cart-badge">
                     <a href="{% url 'cart' %}" class="cart-link" title="Cart">🛒</a>

@@ -7,8 +7,9 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Q, Sum
 from datetime import timedelta
-from .models import Order, DigitalSignature, Complaint, PrepGroup, Payment
+from .models import Order, DigitalSignature, Complaint, PrepGroup, Payment, AuditLog, Notification
 from .utils import generate_invoice_pdf, sign_pdf_digitally
+from .notifications import log_audit, notify, notify_admins
 from customers.auth_utils import (
     sales_admin_required, 
     manager_required, 
@@ -38,11 +39,11 @@ def order_has_confirmed_payment(order):
     return bool(order.payment_proof) or has_stripe_payment
 
 
-def finalize_order_approval(order, user):
+def finalize_order_approval(order, user, request=None):
     """Signs the invoice and marks the order as approved."""
     raw_pdf = generate_invoice_pdf(order)
     signed_path, doc_hash, sig_value = sign_pdf_digitally(raw_pdf, order.id)
-    DigitalSignature.objects.create(
+    sig_record = DigitalSignature.objects.create(
         order=order,
         signature_hash=doc_hash,
         pdf_path=os.path.join('signed_pdfs', os.path.basename(signed_path)),
@@ -52,6 +53,25 @@ def finalize_order_approval(order, user):
     order.approved_at = timezone.now()
     order.approved_by = user
     order.save()
+
+    # Audit + notification + CRM update
+    log_audit(request, 'signature_created', target=sig_record,
+              description=f"Signed receipt generated for Order #{order.id}",
+              metadata={'order_id': order.id, 'sha256': doc_hash}, actor=user)
+    log_audit(request, 'order_approved', target=order,
+              description=f"Order #{order.id} approved", actor=user)
+    notify(order.customer,
+           title="Your order has been approved ✅",
+           message=f"Order #{order.id} is now approved and signed. You can download your signed receipt.",
+           link=f"/order-details/{order.id}/",
+           notification_type='order_update')
+    # Update CRM profile
+    try:
+        from customers.models import CustomerProfile
+        profile, _ = CustomerProfile.objects.get_or_create(user=order.customer)
+        profile.recalculate()
+    except Exception:
+        pass
 
 def unified_login(request):
     """
@@ -67,12 +87,16 @@ def unified_login(request):
         if form.is_valid():
             user = form.get_user()
             login(request, user)
-
+            log_audit(request, 'login_success', target=user,
+                      description=f"Login: {user.username}", actor=user)
             # Always redirect by role after login so staff land on the right area.
             # This avoids stale ?next=... values sending sales admins somewhere else.
             dashboard_url = get_user_dashboard_url(user)
             return redirect(dashboard_url)
         else:
+            log_audit(request, 'login_failed',
+                      description=f"Failed login attempt for username '{request.POST.get('username', '')[:50]}'",
+                      metadata={'username': request.POST.get('username', '')[:50]})
             messages.error(request, "Invalid username or password.")
     else:
         form = AuthenticationForm()
@@ -98,6 +122,9 @@ def custom_login(request):
 @login_required
 def logout_view(request):
     """Handles user logout."""
+    user_at_logout = request.user
+    log_audit(request, 'logout', target=user_at_logout,
+              description=f"Logout: {user_at_logout.username}", actor=user_at_logout)
     logout(request)
     messages.success(request, "You have been logged out successfully.")
     return redirect('product_list')
@@ -450,7 +477,10 @@ def approve_pending_payment(request, order_id):
         return redirect('pending_payment_orders_list')
 
     # Finalize approval (signs invoice and moves to 'approved')
-    finalize_order_approval(order, request.user)
+    finalize_order_approval(order, request.user, request=request)
+
+    log_audit(request, 'payment_verified', target=order,
+              description=f"Payment verified for Order #{order.id}")
 
     messages.success(request, f"Order #{order.id} payment approved and signed.")
     return redirect('pending_payment_orders_list')
@@ -472,6 +502,16 @@ def reject_pending_payment(request, order_id):
     
     # Update Payment record status
     Payment.objects.filter(order=order, payment_method='manual').update(status='rejected')
+
+    log_audit(request, 'payment_rejected', target=order,
+              description=f"Manual payment proof rejected for Order #{order.id}",
+              metadata={'reason': rejection_reason})
+    notify(order.customer,
+           title="Payment proof rejected ⚠️",
+           message=f"Your payment proof for Order #{order.id} was rejected. Reason: {rejection_reason}. "
+                   f"Please upload a new proof.",
+           link=f"/order-details/{order.id}/",
+           notification_type='payment')
     
     # Send notification email to customer
     try:
@@ -639,6 +679,8 @@ def mark_prep_group_ready(request, group_id):
             messages.error(request, 'No prepared orders are available in this prep group.')
             return redirect('prep_group_detail', group_id=prep_group.group_id)
 
+        order_list = list(orders)
+
         orders.update(
             status='ready_for_delivery',
             ready_for_delivery_at=timezone.now(),
@@ -648,6 +690,18 @@ def mark_prep_group_ready(request, group_id):
             delivery_assigned_at=timezone.now(),
             delivery_assigned_by=request.user
         )
+
+        log_audit(request, 'order_ready_for_delivery', target=prep_group,
+                  description=f"Prep group {prep_group.group_id} marked ready for delivery",
+                  metadata={'courier': courier_name or '', 'tracking': tracking_number or '',
+                            'order_ids': [o.id for o in order_list]})
+        for o in order_list:
+            notify(o.customer,
+                   title="Your order is ready for delivery 📦",
+                   message=f"Order #{o.id} has been packed and assigned to "
+                           f"{courier_name or 'a courier'}.",
+                   link=f"/order-details/{o.id}/",
+                   notification_type='delivery')
 
         messages.success(request, f'Prep group {prep_group.group_id} marked as ready for delivery.')
         return redirect('delivery_orders_list')
@@ -660,6 +714,14 @@ def mark_order_out_for_delivery(request, order_id):
     order = get_object_or_404(Order, id=order_id, status='ready_for_delivery')
     order.status = 'out_for_delivery'
     order.save()
+    log_audit(request, 'order_out_for_delivery', target=order,
+              description=f"Order #{order.id} out for delivery")
+    notify(order.customer,
+           title="Your order is on the way 🛵",
+           message=f"Order #{order.id} has been dispatched. "
+                   f"{'Track it with Citylink: ' + order.tracking_number if order.tracking_number else ''}",
+           link=f"/order-details/{order.id}/",
+           notification_type='delivery')
     messages.success(request, f"Order #{order.id} marked as Out for Delivery.")
     return redirect('delivery_orders_list')
 
@@ -670,6 +732,20 @@ def mark_order_delivered(request, order_id):
     order.status = 'delivered'
     order.delivered_at = timezone.now()
     order.save()
+    log_audit(request, 'order_delivered', target=order,
+              description=f"Order #{order.id} delivered")
+    notify(order.customer,
+           title="Order delivered ✅",
+           message=f"Order #{order.id} has been delivered. We hope you enjoyed it!",
+           link=f"/order-details/{order.id}/",
+           notification_type='delivery')
+    # Recalculate CRM stats
+    try:
+        from customers.models import CustomerProfile
+        profile, _ = CustomerProfile.objects.get_or_create(user=order.customer)
+        profile.recalculate()
+    except Exception:
+        pass
     messages.success(request, f"Order #{order.id} marked as Delivered.")
     return redirect('delivery_orders_list')
 
@@ -736,12 +812,16 @@ def update_order_tracking(request, order_id):
     if request.method == 'POST':
         tracking_number = request.POST.get('tracking_number', '').strip()
         if tracking_number:
+            old_tn = order.tracking_number
             order.tracking_number = tracking_number
             order.save()
+            log_audit(request, 'tracking_updated', target=order,
+                      description=f"Tracking # set on Order #{order.id}",
+                      metadata={'old': old_tn or '', 'new': tracking_number})
             messages.success(request, f"Tracking number updated for Order #{order.id}.")
         else:
             messages.warning(request, "Tracking number cannot be empty.")
-    
+
     return redirect('delivery_orders_list')
 
 @sales_admin_required
@@ -766,12 +846,25 @@ def mark_orders_prepared(request):
         )
         prep_group.orders.set(orders)
 
+        # Snapshot order list BEFORE marking as prepared (update() invalidates queryset)
+        order_list = list(orders)
+
         # Mark orders as prepared
         orders.update(
             status='prepared',
             prepared_at=timezone.now(),
             prepared_by=request.user
         )
+
+        log_audit(request, 'order_prepared', target=prep_group,
+                  description=f"Created {prep_group.group_id} with {len(order_list)} orders",
+                  metadata={'order_ids': [o.id for o in order_list]})
+        for o in order_list:
+            notify(o.customer,
+                   title="Your order is being prepared 👨‍🍳",
+                   message=f"Order #{o.id} is now being prepared in the kitchen.",
+                   link=f"/orders/",
+                   notification_type='order_update')
 
         messages.success(request, f"Created prep group {prep_group.group_id} with {prep_group.total_orders} orders.")
         return redirect('prep_group_detail', group_id=prep_group.group_id)
@@ -783,7 +876,7 @@ def set_pending_payment(request, order_id):
     """Marks order as accepted and requests payment from customer."""
     order = get_object_or_404(Order, id=order_id)
     if order_has_confirmed_payment(order):
-        finalize_order_approval(order, request.user)
+        finalize_order_approval(order, request.user, request=request)
         messages.success(request, f"Order #{order.id} approved and signed.")
     else:
         order.status = 'pending_payment'
@@ -803,7 +896,7 @@ def bulk_accept_orders(request):
 
         for order in pending_orders:
             if order_has_confirmed_payment(order):
-                finalize_order_approval(order, request.user)
+                finalize_order_approval(order, request.user, request=request)
                 approved_count += 1
             else:
                 # If payment isn't confirmed yet, move to pending_payment
@@ -887,7 +980,7 @@ def approve_order(request, order_id):
     if order_has_confirmed_payment(order):
         # Payment confirmed - approve and sign invoice
         try:
-            finalize_order_approval(order, request.user)
+            finalize_order_approval(order, request.user, request=request)
             messages.success(request, f"Order #{order.id} Approved and Digitally Signed.")
         except Exception as e:
             messages.error(request, f"Error signing document: {str(e)}")
@@ -943,7 +1036,17 @@ def reject_order(request, order_id):
         messages.warning(request, f"Order #{order.id} Rejected and customer notified via email.")
     except Exception as e:
         messages.warning(request, f"Order #{order.id} Rejected but failed to send email: {str(e)}")
-    
+
+    log_audit(request, 'order_rejected', target=order,
+              description=f"Order #{order.id} rejected",
+              metadata={'reason': custom_reason or (rejection_reason.reason_text if rejection_reason else '')})
+    notify(order.customer,
+           title="Order rejected ❌",
+           message=f"Order #{order.id} has been rejected. Reason: "
+                   f"{custom_reason or (rejection_reason.customer_message if rejection_reason else 'Please contact support.')}",
+           link=f"/rejected-orders/",
+           notification_type='order_update')
+
     return redirect('sales_admin_dashboard')
 
 # --- COMPLAINTS ---
@@ -974,8 +1077,139 @@ def resolve_complaint(request, complaint_id):
             complaint.action_taken = action
             complaint.status = 'resolved'
             complaint.save()
+            log_audit(request, 'complaint_resolved', target=complaint,
+                      description=f"Complaint #{complaint.id} resolved",
+                      metadata={'action_taken': action})
+            notify(complaint.customer,
+                   title="Complaint resolved",
+                   message=f"Your complaint on Order #{complaint.order.id} has been reviewed. "
+                           f"Outcome: {complaint.get_action_taken_display()}.",
+                   link="/support/",
+                   notification_type='complaint')
             messages.success(request, f"Complaint resolved: {complaint.get_action_taken_display()}")
         else:
             messages.error(request, "Please select an action before resolving.")
         return redirect('admin_complaints_list')
     return redirect('admin_complaint_detail', complaint_id=complaint.id)
+
+
+# --- AUDIT LOG ---
+
+@sales_admin_required
+def audit_log_list(request):
+    """Filterable view of the security audit trail."""
+    logs = AuditLog.objects.select_related('actor').all()
+
+    action_filter = request.GET.get('action', '').strip()
+    if action_filter:
+        logs = logs.filter(action_type=action_filter)
+
+    actor_filter = request.GET.get('actor', '').strip()
+    if actor_filter:
+        logs = logs.filter(actor__username__icontains=actor_filter)
+
+    target_filter = request.GET.get('target_model', '').strip()
+    if target_filter:
+        logs = logs.filter(target_model__iexact=target_filter)
+
+    days_filter = request.GET.get('days', '').strip()
+    if days_filter:
+        try:
+            cutoff = timezone.now() - timedelta(days=int(days_filter))
+            logs = logs.filter(timestamp__gte=cutoff)
+        except ValueError:
+            pass
+
+    search_query = request.GET.get('q', '').strip()
+    if search_query:
+        logs = logs.filter(
+            Q(description__icontains=search_query) |
+            Q(ip_address__icontains=search_query) |
+            Q(actor__username__icontains=search_query)
+        )
+
+    # Limit to a reasonable page size
+    try:
+        limit = int(request.GET.get('count', '200'))
+        limit = max(1, min(limit, 1000))
+    except ValueError:
+        limit = 200
+    logs = logs[:limit]
+
+    return render(request, 'admins/audit_log.html', {
+        'logs': logs,
+        'action_choices': AuditLog.ACTION_CHOICES,
+        'action_filter': action_filter,
+        'actor_filter': actor_filter,
+        'target_filter': target_filter,
+        'days_filter': days_filter,
+        'search_query': search_query,
+        'count_limit': limit,
+        'total_count': AuditLog.objects.count(),
+    })
+
+
+# --- CUSTOMER CRM ---
+
+@sales_admin_required
+def customers_crm_list(request):
+    """List all customers with CRM-relevant data: lifetime value, loyalty tier, order count."""
+    from customers.models import CustomerProfile, User
+
+    # Make sure every customer has a profile (lazy provisioning)
+    customers_qs = User.objects.filter(role='customer')
+    for u in customers_qs:
+        CustomerProfile.objects.get_or_create(user=u)
+
+    profiles = CustomerProfile.objects.select_related('user').all()
+
+    search_query = request.GET.get('q', '').strip()
+    if search_query:
+        profiles = profiles.filter(
+            Q(user__username__icontains=search_query) |
+            Q(user__email__icontains=search_query) |
+            Q(user__first_name__icontains=search_query) |
+            Q(user__last_name__icontains=search_query)
+        )
+
+    tier_filter = request.GET.get('tier', '').strip()
+    if tier_filter:
+        profiles = profiles.filter(loyalty_tier=tier_filter)
+
+    order_by = request.GET.get('order_by', '-total_spent')
+    if order_by in ['-total_spent', 'total_spent', '-total_orders', 'total_orders',
+                    '-last_order_at', 'user__username', '-created_at']:
+        profiles = profiles.order_by(order_by)
+
+    return render(request, 'admins/customers_crm.html', {
+        'profiles': profiles,
+        'tier_choices': CustomerProfile.LOYALTY_TIER_CHOICES,
+        'search_query': search_query,
+        'tier_filter': tier_filter,
+        'order_by': order_by,
+    })
+
+
+@sales_admin_required
+def customer_crm_detail(request, user_id):
+    """Detail view of a single customer for CRM purposes."""
+    from customers.models import CustomerProfile, User
+    customer = get_object_or_404(User, id=user_id, role='customer')
+    profile, _ = CustomerProfile.objects.get_or_create(user=customer)
+    profile.recalculate()
+
+    if request.method == 'POST':
+        profile.admin_notes = request.POST.get('admin_notes', '').strip()
+        profile.save(update_fields=['admin_notes', 'updated_at'])
+        messages.success(request, "Customer notes saved.")
+        return redirect('customer_crm_detail', user_id=customer.id)
+
+    orders = Order.objects.filter(customer=customer).order_by('-created_at')[:20]
+    complaints = Complaint.objects.filter(customer=customer).order_by('-created_at')[:20]
+
+    return render(request, 'admins/customer_crm_detail.html', {
+        'customer': customer,
+        'profile': profile,
+        'orders': orders,
+        'complaints': complaints,
+    })

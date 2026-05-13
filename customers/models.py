@@ -49,3 +49,60 @@ class Product(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class CustomerProfile(models.Model):
+    """
+    Extended CRM data for customers. Tracks lifetime value, loyalty tier,
+    preferences, and admin notes. Auto-maintained on order events.
+    """
+    LOYALTY_TIER_CHOICES = (
+        ('bronze', 'Bronze'),
+        ('silver', 'Silver'),
+        ('gold', 'Gold'),
+        ('platinum', 'Platinum'),
+    )
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='customer_profile',
+                                limit_choices_to={'role': 'customer'})
+    total_orders = models.PositiveIntegerField(default=0)
+    total_spent = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    last_order_at = models.DateTimeField(null=True, blank=True)
+    loyalty_tier = models.CharField(max_length=20, choices=LOYALTY_TIER_CHOICES, default='bronze')
+    marketing_opt_in = models.BooleanField(default=True)
+    preferred_payment_method = models.CharField(max_length=50, blank=True)
+    default_phone = models.CharField(max_length=20, blank=True)
+    default_address = models.TextField(blank=True)
+    admin_notes = models.TextField(blank=True, help_text="Internal CRM notes — not visible to customer")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['loyalty_tier', '-total_spent']),
+            models.Index(fields=['-last_order_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} — {self.get_loyalty_tier_display()} (RM {self.total_spent})"
+
+    def recalculate(self):
+        """Recompute totals from order history. Call after order approval/delivery."""
+        from admins.models import Order
+        completed = Order.objects.filter(
+            customer=self.user,
+            status__in=['approved', 'delivered']
+        )
+        self.total_orders = completed.count()
+        self.total_spent = sum((o.total_amount for o in completed), start=0)
+        latest = completed.order_by('-created_at').first()
+        self.last_order_at = latest.created_at if latest else None
+        if self.total_spent >= 5000:
+            self.loyalty_tier = 'platinum'
+        elif self.total_spent >= 2000:
+            self.loyalty_tier = 'gold'
+        elif self.total_spent >= 500:
+            self.loyalty_tier = 'silver'
+        else:
+            self.loyalty_tier = 'bronze'
+        self.save()

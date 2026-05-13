@@ -36,4 +36,11 @@ urlpatterns = [
     path('complaints/', views.admin_complaints_list, name='admin_complaints_list'),
     path('complaints/<int:complaint_id>/', views.admin_complaint_detail, name='admin_complaint_detail'),
     path('complaints/<int:complaint_id>/resolve/', views.resolve_complaint, name='resolve_complaint'),
+
+    # Audit Log (security trail)
+    path('audit-log/', views.audit_log_list, name='audit_log_list'),
+
+    # Customer CRM
+    path('customers/', views.customers_crm_list, name='customers_crm_list'),
+    path('customers/<int:user_id>/', views.customer_crm_detail, name='customer_crm_detail'),
 ]

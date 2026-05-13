@@ -34,4 +34,9 @@ urlpatterns = [
     path('submit-complaint/', views.submit_complaint, name='submit_complaint'),
     path('support/', views.customer_support, name='customer_support'),
     path('verify/<int:order_id>/', views.verify_receipt, name='verify_receipt'),
+
+    # Notifications
+    path('notifications/', views.notifications_list, name='notifications_list'),
+    path('notifications/<int:notification_id>/open/', views.notification_open, name='notification_open'),
+    path('notifications/mark-all-read/', views.notifications_mark_all_read, name='notifications_mark_all_read'),
 ]

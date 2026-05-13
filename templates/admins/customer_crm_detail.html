@@ -1,0 +1,93 @@
+{% extends 'admin_base.html' %}
+
+{% block page_title %}Customer: {{ customer.username }}{% endblock %}
+
+{% block content %}
+<style>
+    .crm-stat-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1rem 1.25rem; }
+    .crm-stat-card .label { font-size:0.75rem; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; }
+    .crm-stat-card .value { font-size:1.5rem; font-weight:800; color:#0f172a; }
+    .tier-pill { display:inline-block; padding:0.18rem 0.6rem; border-radius:999px; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; }
+    .tier-bronze { background:#fef3c7; color:#92400e; }
+    .tier-silver { background:#e2e8f0; color:#475569; }
+    .tier-gold { background:#fef9c3; color:#854d0e; }
+    .tier-platinum { background:#dbeafe; color:#1e40af; }
+</style>
+
+<div class="page-header">
+    <h1>{{ customer.username }}</h1>
+    <p>{{ customer.email }} · <span class="tier-pill tier-{{ profile.loyalty_tier }}">{{ profile.get_loyalty_tier_display }}</span></p>
+</div>
+
+<div class="mb-4">
+    <a href="{% url 'customers_crm_list' %}" class="btn btn-outline-secondary">← Back to Customers</a>
+</div>
+
+<!-- Stats -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="crm-stat-card"><div class="label">Total Orders</div><div class="value">{{ profile.total_orders }}</div></div></div>
+    <div class="col-md-3"><div class="crm-stat-card"><div class="label">Lifetime Spend</div><div class="value">RM {{ profile.total_spent|floatformat:2 }}</div></div></div>
+    <div class="col-md-3"><div class="crm-stat-card"><div class="label">Last Order</div><div class="value">{% if profile.last_order_at %}{{ profile.last_order_at|date:"d M Y" }}{% else %}—{% endif %}</div></div></div>
+    <div class="col-md-3"><div class="crm-stat-card"><div class="label">Customer Since</div><div class="value">{{ customer.date_joined|date:"M Y" }}</div></div></div>
+</div>
+
+<!-- Admin notes -->
+<div class="content-card mb-4">
+    <h5 class="fw-bold mb-3">Internal Notes <small class="text-muted">(only visible to staff)</small></h5>
+    <form method="post">
+        {% csrf_token %}
+        <textarea name="admin_notes" rows="4" class="form-control mb-3" placeholder="Notes about this customer — allergies they've mentioned, VIP status, complaints history...">{{ profile.admin_notes }}</textarea>
+        <button type="submit" class="btn btn-primary">Save Notes</button>
+    </form>
+</div>
+
+<!-- Recent orders -->
+<div class="content-card mb-4">
+    <h5 class="fw-bold mb-3">Recent Orders ({{ orders|length }})</h5>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead class="table-light">
+                <tr><th>Order #</th><th>Date</th><th>Status</th><th>Total</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+                {% for o in orders %}
+                <tr>
+                    <td><strong>#{{ o.id }}</strong></td>
+                    <td>{{ o.created_at|date:"d M Y H:i" }}</td>
+                    <td>{{ o.get_status_display }}</td>
+                    <td>RM {{ o.total_amount|floatformat:2 }}</td>
+                    <td><a href="{% url 'admin_order_detail' o.id %}" class="btn btn-sm btn-outline-primary">View</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="text-center text-muted py-4">No orders yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Complaints -->
+<div class="content-card">
+    <h5 class="fw-bold mb-3">Complaints ({{ complaints|length }})</h5>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead class="table-light">
+                <tr><th>Date</th><th>Order</th><th>Subject</th><th>Status</th><th>Action Taken</th></tr>
+            </thead>
+            <tbody>
+                {% for c in complaints %}
+                <tr>
+                    <td>{{ c.created_at|date:"d M Y" }}</td>
+                    <td>#{{ c.order.id }}</td>
+                    <td>{{ c.subject }}</td>
+                    <td>{{ c.get_status_display }}</td>
+                    <td>{% if c.action_taken %}{{ c.get_action_taken_display }}{% else %}—{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="text-center text-muted py-4">No complaints filed.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

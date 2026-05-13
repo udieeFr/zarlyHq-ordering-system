@@ -1,0 +1,101 @@
+{% extends 'admin_base.html' %}
+
+{% block page_title %}Customers (CRM){% endblock %}
+
+{% block content %}
+<style>
+    .tier-pill {
+        display: inline-block;
+        padding: 0.18rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    .tier-bronze { background:#fef3c7; color:#92400e; }
+    .tier-silver { background:#e2e8f0; color:#475569; }
+    .tier-gold { background:#fef9c3; color:#854d0e; }
+    .tier-platinum { background:#dbeafe; color:#1e40af; }
+</style>
+
+<div class="page-header">
+    <h1>Customers</h1>
+    <p>Customer relationship overview — lifetime value, loyalty tier, last activity.</p>
+</div>
+
+<div class="mb-4">
+    <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
+</div>
+
+<div class="content-card mb-4">
+    <form method="get" class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label">Search</label>
+            <input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="Username, email, name">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Loyalty tier</label>
+            <select name="tier" class="form-select">
+                <option value="">All tiers</option>
+                {% for code, label in tier_choices %}
+                <option value="{{ code }}" {% if tier_filter == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Sort by</label>
+            <select name="order_by" class="form-select">
+                <option value="-total_spent" {% if order_by == '-total_spent' %}selected{% endif %}>Highest spend</option>
+                <option value="total_spent" {% if order_by == 'total_spent' %}selected{% endif %}>Lowest spend</option>
+                <option value="-total_orders" {% if order_by == '-total_orders' %}selected{% endif %}>Most orders</option>
+                <option value="-last_order_at" {% if order_by == '-last_order_at' %}selected{% endif %}>Most recent activity</option>
+                <option value="user__username" {% if order_by == 'user__username' %}selected{% endif %}>Username (A-Z)</option>
+                <option value="-created_at" {% if order_by == '-created_at' %}selected{% endif %}>Newest customer</option>
+            </select>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary w-100">Apply</button>
+        </div>
+    </form>
+</div>
+
+<div class="content-card">
+    <h5 class="fw-bold mb-3">All Customers ({{ profiles|length }})</h5>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Customer</th>
+                    <th>Email</th>
+                    <th>Tier</th>
+                    <th>Orders</th>
+                    <th>Lifetime Spend</th>
+                    <th>Last Order</th>
+                    <th class="text-end">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in profiles %}
+                <tr>
+                    <td>
+                        <strong>{{ p.user.username }}</strong><br>
+                        <small class="text-muted">{{ p.user.first_name }} {{ p.user.last_name }}</small>
+                    </td>
+                    <td>{{ p.user.email }}</td>
+                    <td><span class="tier-pill tier-{{ p.loyalty_tier }}">{{ p.get_loyalty_tier_display }}</span></td>
+                    <td class="fw-bold">{{ p.total_orders }}</td>
+                    <td class="fw-bold">RM {{ p.total_spent|floatformat:2 }}</td>
+                    <td>{% if p.last_order_at %}{{ p.last_order_at|date:"d M Y" }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                    <td class="text-end">
+                        <a href="{% url 'customer_crm_detail' p.user.id %}" class="btn btn-sm btn-outline-primary">View</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="text-center text-muted py-4">No customers match your filters.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

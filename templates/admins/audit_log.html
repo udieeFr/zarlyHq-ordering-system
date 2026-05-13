@@ -1,0 +1,139 @@
+{% extends 'admin_base.html' %}
+
+{% block page_title %}Audit Log{% endblock %}
+
+{% block content %}
+<style>
+    .audit-table { font-size: 0.85rem; }
+    .audit-table td { vertical-align: top; padding: 0.55rem 0.6rem; }
+    .audit-action-pill {
+        display: inline-block;
+        padding: 0.15rem 0.55rem;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        background: #f1f5f9;
+        color: #334155;
+    }
+    .audit-action-pill.act-order_approved,
+    .audit-action-pill.act-signature_created,
+    .audit-action-pill.act-payment_verified,
+    .audit-action-pill.act-receipt_verified { background:#ecfdf5; color:#065f46; }
+    .audit-action-pill.act-order_rejected,
+    .audit-action-pill.act-payment_rejected,
+    .audit-action-pill.act-login_failed { background:#fef2f2; color:#991b1b; }
+    .audit-action-pill.act-login_success { background:#eff6ff; color:#1e40af; }
+    .audit-action-pill.act-complaint_submitted,
+    .audit-action-pill.act-complaint_resolved { background:#fffbeb; color:#92400e; }
+    .audit-meta {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.72rem;
+        color: #64748b;
+        white-space: pre-wrap;
+        word-break: break-all;
+        margin: 0;
+    }
+    .audit-ip { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; }
+</style>
+
+<div class="page-header">
+    <h1>Security Audit Log</h1>
+    <p>Immutable record of every security-relevant action — non-repudiation at the system level.</p>
+</div>
+
+<div class="mb-4">
+    <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
+    <span class="text-muted ms-3">Total entries on record: <strong>{{ total_count }}</strong></span>
+</div>
+
+<!-- Filters -->
+<div class="content-card mb-4">
+    <form method="get" class="row g-3">
+        <div class="col-md-3">
+            <label class="form-label">Search description / IP / actor</label>
+            <input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="e.g. Order #14, 192.168...">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Action</label>
+            <select name="action" class="form-select">
+                <option value="">All actions</option>
+                {% for code, label in action_choices %}
+                <option value="{{ code }}" {% if action_filter == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Actor (username)</label>
+            <input type="text" name="actor" value="{{ actor_filter }}" class="form-control" placeholder="username">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Target type</label>
+            <input type="text" name="target_model" value="{{ target_filter }}" class="form-control" placeholder="Order, Payment...">
+        </div>
+        <div class="col-md-1">
+            <label class="form-label">Days</label>
+            <input type="number" name="days" value="{{ days_filter }}" class="form-control" placeholder="7">
+        </div>
+        <div class="col-md-1">
+            <label class="form-label">Limit</label>
+            <input type="number" name="count" value="{{ count_limit }}" class="form-control" min="1" max="1000">
+        </div>
+        <div class="col-md-1 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary w-100">Filter</button>
+        </div>
+    </form>
+</div>
+
+<!-- Audit Log Table -->
+<div class="content-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold mb-0">Audit Entries ({{ logs|length }})</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle audit-table">
+            <thead class="table-light">
+                <tr>
+                    <th style="width:160px;">Timestamp</th>
+                    <th style="width:130px;">Actor</th>
+                    <th style="width:170px;">Action</th>
+                    <th>Description</th>
+                    <th style="width:120px;">Target</th>
+                    <th style="width:130px;">IP</th>
+                    <th>Metadata</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td>{{ log.timestamp|date:"d M Y H:i:s" }}</td>
+                    <td>
+                        {% if log.actor %}<strong>{{ log.actor.username }}</strong><br>
+                            <small class="text-muted">{{ log.actor.role|default:'—' }}</small>
+                        {% else %}<span class="text-muted">system</span>{% endif %}
+                    </td>
+                    <td>
+                        <span class="audit-action-pill act-{{ log.action_type }}">
+                            {{ log.get_action_type_display }}
+                        </span>
+                    </td>
+                    <td>{{ log.description|default:'—' }}</td>
+                    <td>
+                        {% if log.target_model %}{{ log.target_model }} #{{ log.target_id }}
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td class="audit-ip">{{ log.ip_address|default:'—' }}</td>
+                    <td>
+                        {% if log.metadata %}<pre class="audit-meta">{{ log.metadata }}</pre>
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="text-center text-muted py-4">No audit entries match your filters.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

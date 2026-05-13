@@ -1,11 +1,11 @@
 {% extends 'admin_base.html' %}
 
-{% block page_title %}Prep Group {{ prep_group.group_id }}{% endblock %}
+{% block page_title %}Order Preparation {{ prep_group.group_id }}{% endblock %}
 
 {% block content %}
 <!-- Page Header -->
 <div class="page-header">
-    <h1>Prep Group {{ prep_group.group_id }}</h1>
+    <h1>Order Preparation {{ prep_group.group_id }}</h1>
     <p>Created {{ prep_group.created_at|date:"d M Y H:i" }} by 
         {% if prep_group.created_by %}
             {{ prep_group.created_by.username }}

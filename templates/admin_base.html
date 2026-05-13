@@ -350,7 +350,7 @@
                 </a>
                 <a href="{% url 'prepared_orders_list' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'prepared_orders_list' %}active{% endif %}">
                     <span class="sidebar-menu-item-icon">📦</span>
-                    <span class="sidebar-menu-item-text">Prep Groups</span>
+                    <span class="sidebar-menu-item-text">Order Preparation</span>
                 </a>
                 <a href="{% url 'delivery_orders_list' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'delivery_orders_list' %}active{% endif %}">
                     <span class="sidebar-menu-item-icon">🚚</span>
@@ -365,6 +365,14 @@
                 <a href="{% url 'admin_complaints_list' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'admin_complaints_list' %}active{% endif %}">
                     <span class="sidebar-menu-item-icon">🚨</span>
                     <span class="sidebar-menu-item-text">Complaints</span>
+                </a>
+                <a href="{% url 'customers_crm_list' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'customers_crm_list' or request.resolver_match.url_name == 'customer_crm_detail' %}active{% endif %}">
+                    <span class="sidebar-menu-item-icon">👥</span>
+                    <span class="sidebar-menu-item-text">Customers</span>
+                </a>
+                <a href="{% url 'audit_log_list' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'audit_log_list' %}active{% endif %}">
+                    <span class="sidebar-menu-item-icon">🔐</span>
+                    <span class="sidebar-menu-item-text">Audit Log</span>
                 </a>
 
                 {% if request.user.is_superuser or request.user.role == 'manager' %}

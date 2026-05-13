@@ -5,7 +5,7 @@
 {% block content %}
 <!-- Page Header -->
 <div class="page-header">
-    <h1>Prep Groups</h1>
+    <h1>Order Preparation</h1>
     <p>Groups of orders that have been prepared together</p>
 </div>
 
@@ -52,7 +52,7 @@
 <!-- Prepared Orders Table -->
 <div class="content-card">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="fw-bold mb-0">Prep Groups ({{ prep_groups|length }})</h5>
+        <h5 class="fw-bold mb-0">Order Preparation ({{ prep_groups|length }})</h5>
         <small class="text-muted">Click group ID to view details</small>
     </div>
     <div class="table-responsive">
@@ -91,13 +91,13 @@
                     <td class="text-end">
                         <div class="btn-group" role="group">
                             <a href="{% url 'prep_group_detail' group.group_id %}" class="btn btn-sm btn-outline-dark">View Group</a>
-                            <button onclick="printGroup('{{ group.group_id }}')" class="btn btn-sm btn-outline-primary">Print Prep List</button>
+                            <button onclick="printGroup('{{ group.group_id }}')" class="btn btn-sm btn-outline-primary">Print Preparation List</button>
                         </div>
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" class="text-center text-muted py-4">No prep groups found.</td>
+                    <td colspan="6" class="text-center text-muted py-4">No order preparation groups found.</td>
                 </tr>
                 {% endfor %}
             </tbody>

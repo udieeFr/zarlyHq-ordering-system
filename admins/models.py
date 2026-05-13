@@ -275,3 +275,95 @@ class RejectedOrder(models.Model):
         if self.custom_reason:
             return self.custom_reason
         return self.rejection_reason.customer_message if self.rejection_reason else "Your order was rejected."
+
+
+class AuditLog(models.Model):
+    """
+    Immutable audit trail of every security-relevant action in the system.
+    Supports the non-repudiation theme: every action is attributable to an actor,
+    timestamped, and traceable to a source IP.
+    """
+    ACTION_CHOICES = (
+        ('order_created', 'Order Created'),
+        ('order_approved', 'Order Approved'),
+        ('order_rejected', 'Order Rejected'),
+        ('order_prepared', 'Order Prepared'),
+        ('order_ready_for_delivery', 'Marked Ready for Delivery'),
+        ('order_out_for_delivery', 'Marked Out for Delivery'),
+        ('order_delivered', 'Order Delivered'),
+        ('payment_initiated', 'Payment Initiated'),
+        ('payment_verified', 'Payment Verified'),
+        ('payment_rejected', 'Payment Rejected'),
+        ('payment_proof_uploaded', 'Payment Proof Uploaded'),
+        ('signature_created', 'Digital Signature Created'),
+        ('receipt_verified', 'Receipt Verification Performed'),
+        ('complaint_submitted', 'Complaint Submitted'),
+        ('complaint_resolved', 'Complaint Resolved'),
+        ('login_success', 'Login Success'),
+        ('login_failed', 'Login Failed'),
+        ('logout', 'Logout'),
+        ('tracking_updated', 'Tracking Number Updated'),
+        ('inventory_updated', 'Inventory Updated'),
+        ('product_added', 'Product Added'),
+    )
+
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                              related_name='audit_logs')
+    action_type = models.CharField(max_length=50, choices=ACTION_CHOICES, db_index=True)
+    target_model = models.CharField(max_length=50, blank=True,
+                                    help_text="e.g., 'Order', 'Payment', 'Complaint'")
+    target_id = models.PositiveIntegerField(null=True, blank=True)
+    description = models.TextField(blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['actor', '-timestamp']),
+            models.Index(fields=['action_type', '-timestamp']),
+            models.Index(fields=['target_model', 'target_id']),
+        ]
+
+    def __str__(self):
+        who = self.actor.username if self.actor else 'system'
+        return f"[{self.timestamp:%Y-%m-%d %H:%M}] {self.get_action_type_display()} by {who}"
+
+
+class Notification(models.Model):
+    """In-app notifications shown to users with a bell icon and unread counter."""
+    TYPE_CHOICES = (
+        ('order_update', 'Order Update'),
+        ('payment', 'Payment'),
+        ('delivery', 'Delivery'),
+        ('complaint', 'Complaint'),
+        ('admin_alert', 'Admin Alert'),
+        ('system', 'System'),
+    )
+
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    title = models.CharField(max_length=200)
+    message = models.TextField()
+    link = models.CharField(max_length=500, blank=True,
+                            help_text="Optional URL to navigate to when clicked")
+    notification_type = models.CharField(max_length=30, choices=TYPE_CHOICES, default='system')
+    is_read = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['recipient', 'is_read', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.recipient.username}: {self.title}"
+
+    def mark_read(self):
+        if not self.is_read:
+            self.is_read = True
+            self.read_at = timezone.now()
+            self.save(update_fields=['is_read', 'read_at'])
