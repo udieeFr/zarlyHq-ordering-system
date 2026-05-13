@@ -1,0 +1,97 @@
+{% extends 'admin_base.html' %}
+{% block page_title %}{% if editing %}Edit{% else %}New{% endif %} Email Template{% endblock %}
+{% block content %}
+<style>
+  .placeholder-chips { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:.75rem; }
+  .ph-chip {
+    font-size:.73rem; font-weight:600; padding:.2rem .55rem; border-radius:6px;
+    background:#f1f5f9; color:#475569; cursor:pointer; border:1px solid #e2e8f0;
+    transition:background .15s;
+  }
+  .ph-chip:hover { background:#ff9933; color:#fff; border-color:#ff9933; }
+  .preview-pane {
+    border:1.5px solid #e2e8f0; border-radius:10px; min-height:200px;
+    padding:1rem; background:#fafafa; font-size:.85rem;
+  }
+</style>
+
+<div class="page-header">
+    <h1>{% if editing %}Edit{% else %}New{% endif %} Email Template</h1>
+</div>
+<div class="mb-3">
+    <a href="{% url 'email_template_list' %}" class="btn btn-outline-secondary">← Back to Templates</a>
+</div>
+
+{% if messages %}{% for msg in messages %}
+<div class="alert alert-{{ msg.tags }} alert-dismissible fade show">{{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endfor %}{% endif %}
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="content-card p-4">
+      <form method="POST">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label fw-bold">Template Name</label>
+          <input type="text" name="name" class="form-control" required
+                 value="{% if editing %}{{ tmpl.name }}{% endif %}"
+                 placeholder="e.g. Monthly Promo — Gold Customers">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Email Subject</label>
+          <input type="text" name="subject" class="form-control" required
+                 value="{% if editing %}{{ tmpl.subject }}{% endif %}"
+                 placeholder="e.g. Special offer just for you, {{customer_name}}!">
+        </div>
+        <div class="mb-1">
+          <label class="form-label fw-bold">Body (HTML supported)</label>
+        </div>
+        <div class="placeholder-chips">
+          <span class="ph-chip" onclick="insertPlaceholder('{{customer_name}}')">{{customer_name}}</span>
+          <span class="ph-chip" onclick="insertPlaceholder('{{loyalty_tier}}')">{{loyalty_tier}}</span>
+          <span class="ph-chip" onclick="insertPlaceholder('{{last_order_date}}')">{{last_order_date}}</span>
+          <span class="ph-chip" onclick="insertPlaceholder('{{company_name}}')">{{company_name}}</span>
+        </div>
+        <textarea name="body_html" id="bodyField" class="form-control font-monospace" rows="14"
+                  required oninput="updatePreview(this.value)"
+                  placeholder="Write your email body here. Use the placeholders above to personalise.">{% if editing %}{{ tmpl.body_html }}{% endif %}</textarea>
+        <div class="mt-3 d-flex gap-2">
+          <button type="submit" class="btn btn-primary">{% if editing %}Save Changes{% else %}Create Template{% endif %}</button>
+          <a href="{% url 'email_template_list' %}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="content-card p-4">
+      <h6 class="fw-bold mb-3">Live Preview</h6>
+      <div class="preview-pane" id="previewPane">
+        {% if editing %}{{ tmpl.body_html }}{% else %}<span class="text-muted">Start typing to see a preview…</span>{% endif %}
+      </div>
+      <p class="text-muted mt-2" style="font-size:.75rem;">Placeholders will be replaced with real customer data when sent.</p>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function insertPlaceholder(text) {
+    const field = document.getElementById('bodyField');
+    const start = field.selectionStart, end = field.selectionEnd;
+    field.value = field.value.substring(0, start) + text + field.value.substring(end);
+    field.selectionStart = field.selectionEnd = start + text.length;
+    field.focus();
+    updatePreview(field.value);
+  }
+
+  function updatePreview(html) {
+    document.getElementById('previewPane').innerHTML = html || '<span class="text-muted">Start typing…</span>';
+  }
+
+  {% if editing %}
+  updatePreview(document.getElementById('bodyField').value);
+  {% endif %}
+</script>
+{% endblock %}

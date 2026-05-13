@@ -1,0 +1,36 @@
+{% extends 'admin_base.html' %}
+{% block page_title %}Campaign History{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Campaign History</h1>
+    <p>All email campaigns sent by your team.</p>
+</div>
+<div class="mb-3 d-flex gap-2">
+    <a href="{% url 'campaign_compose' %}" class="btn btn-primary">+ New Campaign</a>
+    <a href="{% url 'email_template_list' %}" class="btn btn-outline-secondary">Manage Templates</a>
+</div>
+
+<div class="content-card">
+  <table class="table table-hover align-middle">
+    <thead class="table-light">
+      <tr><th>Campaign</th><th>Template</th><th>Sent By</th><th>Date</th><th>Recipients</th><th>Sent</th><th>Skipped</th><th>Failed</th></tr>
+    </thead>
+    <tbody>
+      {% for c in campaigns %}
+      <tr>
+        <td><strong>{{ c.name }}</strong></td>
+        <td>{{ c.template.name|default:"(deleted)" }}</td>
+        <td>{{ c.sent_by.username|default:"—" }}</td>
+        <td style="white-space:nowrap;">{{ c.sent_at|date:"d M Y H:i" }}</td>
+        <td>{{ c.total_recipients }}</td>
+        <td><span class="badge bg-success">{{ c.sent_count }}</span></td>
+        <td><span class="badge bg-warning text-dark">{{ c.skipped_count }}</span></td>
+        <td><span class="badge bg-danger">{{ c.failed_count }}</span></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8" class="text-center text-muted py-4">No campaigns sent yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

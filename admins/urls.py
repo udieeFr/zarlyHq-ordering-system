@@ -47,4 +47,12 @@ urlpatterns = [
     # Customer CRM
     path('customers/', views.customers_crm_list, name='customers_crm_list'),
     path('customers/<int:user_id>/', views.customer_crm_detail, name='customer_crm_detail'),
+
+    # Email Campaigns
+    path('email-templates/', views.email_template_list, name='email_template_list'),
+    path('email-templates/create/', views.email_template_create, name='email_template_create'),
+    path('email-templates/<int:template_id>/edit/', views.email_template_edit, name='email_template_edit'),
+    path('email-templates/<int:template_id>/delete/', views.email_template_delete, name='email_template_delete'),
+    path('campaigns/compose/', views.campaign_compose, name='campaign_compose'),
+    path('campaigns/history/', views.campaign_history, name='campaign_history'),
 ]

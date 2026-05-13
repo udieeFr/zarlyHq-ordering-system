@@ -415,3 +415,65 @@ class Refund(models.Model):
 
     def __str__(self):
         return f"Refund #{self.id} — Order #{self.order.id} ({self.get_status_display()})"
+
+
+class EmailTemplate(models.Model):
+    """Reusable campaign email templates, created by managers."""
+    name    = models.CharField(max_length=200)
+    subject = models.CharField(max_length=500)
+    # Supports {{customer_name}}, {{loyalty_tier}}, {{last_order_date}}, {{company_name}}
+    body_html = models.TextField(help_text="HTML body. Use {{customer_name}}, {{loyalty_tier}}, {{last_order_date}}.")
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                   related_name='email_templates')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_active  = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.name
+
+
+class EmailCampaign(models.Model):
+    """Records every bulk email blast sent by a sales admin or manager."""
+    name      = models.CharField(max_length=200)
+    template  = models.ForeignKey(EmailTemplate, on_delete=models.SET_NULL, null=True,
+                                  related_name='campaigns')
+    sent_by   = models.ForeignKey(User, on_delete=models.SET_NULL, null=True,
+                                  related_name='sent_campaigns')
+    sent_at   = models.DateTimeField(auto_now_add=True)
+    total_recipients = models.PositiveIntegerField(default=0)
+    sent_count       = models.PositiveIntegerField(default=0)
+    skipped_count    = models.PositiveIntegerField(default=0)
+    failed_count     = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['-sent_at']
+
+    def __str__(self):
+        return f"Campaign '{self.name}' — {self.sent_at:%Y-%m-%d}"
+
+
+class EmailLog(models.Model):
+    """One row per email sent (or attempted) to a customer — used for rate limiting."""
+    STATUS_CHOICES = (
+        ('sent',    'Sent'),
+        ('failed',  'Failed'),
+        ('skipped', 'Skipped'),
+    )
+    customer  = models.ForeignKey(User, on_delete=models.CASCADE, related_name='email_logs')
+    campaign  = models.ForeignKey(EmailCampaign, on_delete=models.SET_NULL, null=True, blank=True,
+                                  related_name='logs')
+    subject   = models.CharField(max_length=500)
+    status    = models.CharField(max_length=10, choices=STATUS_CHOICES)
+    reason    = models.CharField(max_length=300, blank=True)
+    sent_at   = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-sent_at']
+        indexes  = [models.Index(fields=['customer', '-sent_at'])]
+
+    def __str__(self):
+        return f"EmailLog [{self.status}] → {self.customer.email} — {self.subject[:40]}"

@@ -13,15 +13,37 @@
         text-transform: uppercase;
         letter-spacing: 0.04em;
     }
-    .tier-bronze { background:#fef3c7; color:#92400e; }
-    .tier-silver { background:#e2e8f0; color:#475569; }
-    .tier-gold { background:#fef9c3; color:#854d0e; }
+    .tier-bronze   { background:#fef3c7; color:#92400e; }
+    .tier-silver   { background:#e2e8f0; color:#475569; }
+    .tier-gold     { background:#fef9c3; color:#854d0e; }
     .tier-platinum { background:#dbeafe; color:#1e40af; }
+
+    .campaign-bar {
+        display: none;
+        position: sticky; bottom: 1.25rem; z-index: 100;
+        background: #0f172a; color: #fff;
+        border-radius: 14px; padding: 0.9rem 1.4rem;
+        box-shadow: 0 8px 32px rgba(15,23,42,.3);
+        align-items: center; gap: 1rem; flex-wrap: wrap;
+        animation: slideUp .2s ease;
+    }
+    .campaign-bar.visible { display: flex; }
+    @keyframes slideUp { from { transform:translateY(20px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+    .campaign-count { font-size: .88rem; font-weight: 700; }
+    .campaign-count span { color: #ff9933; }
+    .btn-campaign {
+        background: linear-gradient(135deg, #ff9933, #f97316);
+        color: #fff; border: none; padding: .5rem 1.2rem;
+        border-radius: 10px; font-weight: 700; font-size: .85rem;
+        cursor: pointer; transition: opacity .15s;
+    }
+    .btn-campaign:hover { opacity: .88; }
+    .btn-clear { background: transparent; color: rgba(255,255,255,.6); border: none; font-size: .8rem; cursor: pointer; }
 </style>
 
 <div class="page-header">
     <h1>Customers</h1>
-    <p>Customer relationship overview — lifetime value, loyalty tier, last activity.</p>
+    <p>Customer relationship overview — lifetime value, loyalty tier, last activity. Select customers to send a campaign email.</p>
 </div>
 
 <div class="mb-4">
@@ -61,41 +83,102 @@
 </div>
 
 <div class="content-card">
-    <h5 class="fw-bold mb-3">All Customers ({{ profiles|length }})</h5>
+    <div class="d-flex align-items-center justify-content-between mb-3" style="flex-wrap:wrap;gap:.5rem;">
+        <h5 class="fw-bold mb-0">All Customers ({{ profiles|length }})</h5>
+        <div style="display:flex;gap:.5rem;">
+            <button class="btn btn-sm btn-outline-secondary" onclick="selectAll()">Select All</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="clearAll()">Clear</button>
+        </div>
+    </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle">
             <thead class="table-light">
                 <tr>
+                    <th style="width:36px;"></th>
                     <th>Customer</th>
                     <th>Email</th>
+                    <th>Phone</th>
                     <th>Tier</th>
                     <th>Orders</th>
                     <th>Lifetime Spend</th>
                     <th>Last Order</th>
+                    <th>Opt-in</th>
                     <th class="text-end">Action</th>
                 </tr>
             </thead>
             <tbody>
                 {% for p in profiles %}
-                <tr>
+                <tr class="{% if not p.marketing_opt_in %}table-secondary{% endif %}">
+                    <td>
+                        {% if p.marketing_opt_in %}
+                        <input type="checkbox" class="customer-check form-check-input" value="{{ p.user.id }}" onchange="updateBar()">
+                        {% else %}
+                        <span title="Opted out" style="color:#94a3b8;font-size:.8rem;">—</span>
+                        {% endif %}
+                    </td>
                     <td>
                         <strong>{{ p.user.username }}</strong><br>
                         <small class="text-muted">{{ p.user.first_name }} {{ p.user.last_name }}</small>
                     </td>
                     <td>{{ p.user.email }}</td>
+                    <td style="font-size:.82rem;color:#475569;">{{ p.default_phone|default:"—" }}</td>
                     <td><span class="tier-pill tier-{{ p.loyalty_tier }}">{{ p.get_loyalty_tier_display }}</span></td>
                     <td class="fw-bold">{{ p.total_orders }}</td>
                     <td class="fw-bold">RM {{ p.total_spent|floatformat:2 }}</td>
                     <td>{% if p.last_order_at %}{{ p.last_order_at|date:"d M Y" }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                    <td>
+                        {% if p.marketing_opt_in %}
+                        <span style="color:#10b981;font-weight:700;font-size:.78rem;">Yes</span>
+                        {% else %}
+                        <span style="color:#94a3b8;font-size:.78rem;">No</span>
+                        {% endif %}
+                    </td>
                     <td class="text-end">
                         <a href="{% url 'customer_crm_detail' p.user.id %}" class="btn btn-sm btn-outline-primary">View</a>
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="7" class="text-center text-muted py-4">No customers match your filters.</td></tr>
+                <tr><td colspan="10" class="text-center text-muted py-4">No customers match your filters.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+
+<!-- Sticky campaign bar -->
+<div class="campaign-bar" id="campaignBar">
+    <div class="campaign-count">
+        <span id="selectedCount">0</span> customer(s) selected
+    </div>
+    <button class="btn-campaign" onclick="sendCampaign()">📧 Send Campaign Email</button>
+    <button class="btn-clear" onclick="clearAll()">Clear selection</button>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function updateBar() {
+    const checked = document.querySelectorAll('.customer-check:checked');
+    document.getElementById('selectedCount').textContent = checked.length;
+    document.getElementById('campaignBar').classList.toggle('visible', checked.length > 0);
+  }
+
+  function selectAll() {
+    document.querySelectorAll('.customer-check').forEach(cb => cb.checked = true);
+    updateBar();
+  }
+
+  function clearAll() {
+    document.querySelectorAll('.customer-check').forEach(cb => cb.checked = false);
+    updateBar();
+  }
+
+  function sendCampaign() {
+    const ids = Array.from(document.querySelectorAll('.customer-check:checked')).map(cb => cb.value);
+    if (!ids.length) return;
+    const params = ids.map(id => 'ids=' + id).join('&');
+    window.location.href = "{% url 'campaign_compose' %}?" + params;
+  }
+</script>
 {% endblock %}

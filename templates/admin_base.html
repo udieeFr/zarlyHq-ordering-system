@@ -399,6 +399,14 @@
                     <span class="sidebar-menu-item-icon">💸</span>
                     <span class="sidebar-menu-item-text">Refunds</span>
                 </a>
+                <a href="{% url 'email_template_list' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'email_template_list' %}active{% endif %}">
+                    <span class="sidebar-menu-item-icon">📝</span>
+                    <span class="sidebar-menu-item-text">Email Templates</span>
+                </a>
+                <a href="{% url 'campaign_history' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'campaign_history' %}active{% endif %}">
+                    <span class="sidebar-menu-item-icon">📊</span>
+                    <span class="sidebar-menu-item-text">Campaign History</span>
+                </a>
 
                 <div class="sidebar-section-title">Order Operations</div>
                 <a href="{% url 'sales_admin_dashboard' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'sales_admin_dashboard' %}active{% endif %}">
@@ -446,6 +454,10 @@
                 <a href="{% url 'admin_complaints_list' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'admin_complaints_list' %}active{% endif %}">
                     <span class="sidebar-menu-item-icon">🚨</span>
                     <span class="sidebar-menu-item-text">Complaints</span>
+                </a>
+                <a href="{% url 'campaign_compose' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'campaign_compose' %}active{% endif %}">
+                    <span class="sidebar-menu-item-icon">📧</span>
+                    <span class="sidebar-menu-item-text">Send Campaign</span>
                 </a>
                 {% endif %}
 

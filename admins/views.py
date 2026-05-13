@@ -1390,3 +1390,130 @@ def customer_crm_detail(request, user_id):
         'orders': orders,
         'complaints': complaints,
     })
+
+
+# --- EMAIL CAMPAIGNS ---
+
+@manager_required
+def email_template_list(request):
+    """Manager: list and create email templates."""
+    from admins.models import EmailTemplate
+    templates = EmailTemplate.objects.select_related('created_by').all()
+    return render(request, 'admins/email_template_list.html', {'templates': templates})
+
+
+@manager_required
+def email_template_create(request):
+    """Manager: create a new email template."""
+    from admins.models import EmailTemplate
+    if request.method == 'POST':
+        name      = request.POST.get('name', '').strip()
+        subject   = request.POST.get('subject', '').strip()
+        body_html = request.POST.get('body_html', '').strip()
+        if name and subject and body_html:
+            t = EmailTemplate.objects.create(
+                name=name, subject=subject, body_html=body_html,
+                created_by=request.user,
+            )
+            log_audit(request, 'inventory_updated', target=t,
+                      description=f'Email template "{t.name}" created')
+            messages.success(request, f'Template "{t.name}" created.')
+            return redirect('email_template_list')
+        messages.error(request, 'All fields are required.')
+    return render(request, 'admins/email_template_form.html', {'editing': False})
+
+
+@manager_required
+def email_template_edit(request, template_id):
+    """Manager: edit an existing email template."""
+    from admins.models import EmailTemplate
+    tmpl = get_object_or_404(EmailTemplate, id=template_id)
+    if request.method == 'POST':
+        tmpl.name      = request.POST.get('name', tmpl.name).strip()
+        tmpl.subject   = request.POST.get('subject', tmpl.subject).strip()
+        tmpl.body_html = request.POST.get('body_html', tmpl.body_html).strip()
+        tmpl.save(update_fields=['name', 'subject', 'body_html', 'updated_at'])
+        messages.success(request, f'Template "{tmpl.name}" updated.')
+        return redirect('email_template_list')
+    return render(request, 'admins/email_template_form.html', {'editing': True, 'tmpl': tmpl})
+
+
+@manager_required
+def email_template_delete(request, template_id):
+    """Manager: delete an email template."""
+    from admins.models import EmailTemplate
+    tmpl = get_object_or_404(EmailTemplate, id=template_id)
+    if request.method == 'POST':
+        name = tmpl.name
+        tmpl.delete()
+        messages.success(request, f'Template "{name}" deleted.')
+    return redirect('email_template_list')
+
+
+@sales_admin_required
+def campaign_compose(request):
+    """
+    Sales admin: select customers and a template, then preview before sending.
+    GET  — show form with pre-selected customer IDs (from CRM list checkboxes).
+    POST — confirm and fire blast_campaign.
+    """
+    from admins.models import EmailTemplate, EmailCampaign
+    from admins.email_utils import blast_campaign
+    from customers.models import CustomerProfile, User as CustomerUser
+
+    templates = EmailTemplate.objects.filter(is_active=True)
+
+    if request.method == 'POST':
+        customer_ids  = request.POST.getlist('customer_ids')
+        template_id   = request.POST.get('template_id')
+        campaign_name = request.POST.get('campaign_name', '').strip()
+
+        if not customer_ids or not template_id or not campaign_name:
+            messages.error(request, 'Campaign name, template, and at least one recipient are required.')
+            return redirect('campaign_compose')
+
+        tmpl = get_object_or_404(EmailTemplate, id=template_id, is_active=True)
+        customers_qs = CustomerUser.objects.filter(id__in=customer_ids, role='customer')
+
+        campaign = EmailCampaign.objects.create(
+            name=campaign_name,
+            template=tmpl,
+            sent_by=request.user,
+            total_recipients=customers_qs.count(),
+        )
+
+        results = blast_campaign(customers_qs, tmpl, campaign, sender=request.user)
+
+        log_audit(request, 'inventory_updated', target=campaign,
+                  description=f'Campaign "{campaign_name}" sent — {campaign.sent_count} sent, '
+                              f'{campaign.skipped_count} skipped, {campaign.failed_count} failed',
+                  metadata={'sent': campaign.sent_count, 'skipped': campaign.skipped_count,
+                            'failed': campaign.failed_count})
+
+        return render(request, 'admins/campaign_result.html', {
+            'campaign': campaign,
+            'results': results,
+        })
+
+    # GET — pre-load selected customers from query param
+    customer_ids = request.GET.getlist('ids')
+    selected_customers = []
+    if customer_ids:
+        from customers.models import User as CustomerUser
+        selected_customers = CustomerUser.objects.filter(id__in=customer_ids, role='customer')
+
+    from admins.email_utils import MONTHLY_CAMPAIGN_LIMIT
+    return render(request, 'admins/campaign_compose.html', {
+        'templates': templates,
+        'selected_customers': selected_customers,
+        'customer_ids': customer_ids,
+        'monthly_limit': MONTHLY_CAMPAIGN_LIMIT,
+    })
+
+
+@manager_required
+def campaign_history(request):
+    """Manager: view all past campaigns."""
+    from admins.models import EmailCampaign
+    campaigns = EmailCampaign.objects.select_related('sent_by', 'template').all()
+    return render(request, 'admins/campaign_history.html', {'campaigns': campaigns})
