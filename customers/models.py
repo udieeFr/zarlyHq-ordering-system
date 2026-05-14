@@ -45,6 +45,7 @@ class Product(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
     weight_grams = models.IntegerField(default=0)
     stock = models.IntegerField(default=0)
+    image = models.ImageField(upload_to='products/', null=True, blank=True)
     allergies = models.ManyToManyField(Allergy, blank=True)
 
     def __str__(self):

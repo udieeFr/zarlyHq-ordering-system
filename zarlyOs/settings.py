@@ -134,6 +134,9 @@ STATICFILES_DIRS = [                        # Where Django looks for your own st
 ]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # use own cutom user model, bukan default
 AUTH_USER_MODEL = 'customers.User'
 

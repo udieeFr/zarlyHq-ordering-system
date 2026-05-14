@@ -336,32 +336,42 @@ def clear_stock_staging(request):
     messages.info(request, "All pending changes have been cleared.")
     return redirect('inventory_list')
 
-@sales_admin_required
+@manager_required
 def add_product(request):
-    """Form and logic to add a new item to the inventory."""
+    """Add a new product to the menu. Manager-only."""
     if request.method == 'POST':
-        name = request.POST.get('name')
+        name = request.POST.get('name', '').strip()
         price = request.POST.get('price')
-        stock = request.POST.get('stock')
+        stock = request.POST.get('stock', 0)
+        weight_grams = request.POST.get('weight_grams') or None
         category_id = request.POST.get('category')
-        
+
+        if not name or not price or not category_id:
+            messages.error(request, "Name, price, and category are required.")
+            return render(request, 'admins/add_product.html', {
+                'categories': Category.objects.all(),
+                'allergies': Allergy.objects.all(),
+            })
+
         product = Product.objects.create(
             name=name,
             price=price,
             stock=stock,
-            category_id=category_id
+            weight_grams=weight_grams,
+            category_id=category_id,
+            image=request.FILES.get('image') or None,
         )
-        
-        allergy_ids = request.POST.getlist('allergies')
-        if allergy_ids:
-            product.allergies.set(allergy_ids)
-        
+        product.allergies.set(request.POST.getlist('allergies'))
+
+        log_audit(request, 'inventory_updated', target=product,
+                  description=f"New product '{name}' added by {request.user.username}",
+                  metadata={'price': str(price), 'stock': stock, 'category_id': category_id})
         messages.success(request, f"Product '{name}' added successfully.")
         return redirect('inventory_list')
 
     return render(request, 'admins/add_product.html', {
         'categories': Category.objects.all(),
-        'allergies': Allergy.objects.all()
+        'allergies': Allergy.objects.all(),
     })
 
 @manager_required
@@ -377,6 +387,10 @@ def edit_product(request, product_id):
         category_id = request.POST.get('category')
         if category_id:
             product.category_id = category_id
+        if request.FILES.get('image'):
+            product.image = request.FILES['image']
+        elif request.POST.get('clear_image'):
+            product.image = None
         product.save()
         product.allergies.set(request.POST.getlist('allergies'))
         log_audit(request, 'inventory_updated', target=product,
