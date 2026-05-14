@@ -239,6 +239,12 @@
                         🚚 Track Shipment{% if order.courier_name %} ({{ order.courier_name }}){% endif %}
                     </a>
                 {% endif %}
+                {% if order.status == 'pending' %}
+                <button type="button" class="btn btn-outline-danger py-2 fw-bold mt-1"
+                        onclick="document.getElementById('cancelModal').style.display='flex'">
+                    Cancel Order
+                </button>
+                {% endif %}
                 <a href="{% url 'product_list' %}" class="btn btn-link text-muted mt-2">Return to Catalog</a>
             </div>
         </div>
@@ -294,4 +300,32 @@
         }
     });
 </script>
+
+{% if order.status == 'pending' %}
+<!-- Cancel order modal -->
+<div id="cancelModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:16px;padding:2rem;max-width:440px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);">
+    <h5 style="font-weight:800;color:#0f172a;margin-bottom:.5rem;">Cancel Order #{{ order.id }}?</h5>
+    <p style="color:#6b7280;font-size:.88rem;margin-bottom:1.25rem;">
+      This cannot be undone. Your cart items' stock will be restored.
+      {% if order.payments.exists %}If you already paid, a refund will be processed.{% endif %}
+    </p>
+    <form method="POST" action="{% url 'cancel_order' order.id %}">
+      {% csrf_token %}
+      <div style="margin-bottom:1rem;">
+        <label style="font-size:.8rem;font-weight:700;color:#374151;display:block;margin-bottom:.3rem;">
+          Reason <span style="color:#9ca3af;font-weight:500;">(optional)</span>
+        </label>
+        <input type="text" name="cancel_reason" class="form-control"
+               placeholder="e.g. Changed my mind, ordered by mistake…">
+      </div>
+      <div style="display:flex;gap:.75rem;">
+        <button type="button" class="btn btn-outline-secondary flex-fill"
+                onclick="document.getElementById('cancelModal').style.display='none'">Keep Order</button>
+        <button type="submit" class="btn btn-danger flex-fill fw-bold">Yes, Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

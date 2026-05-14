@@ -180,12 +180,7 @@ def upload_payment_proof(request, order_id):
             return redirect('order_success', order_id=order.id)
         
         try:
-            # Save proof to order - order stays in 'pending' status
-            # Admin will move it to 'accepted' or 'awaiting_payment' after review
-            order.payment_proof = proof_file
-            order.save()
-            
-            # Update or create Payment record
+            # Save proof to the Payment record (single source of truth)
             payment, created = Payment.objects.get_or_create(
                 order=order,
                 payment_method='manual',
@@ -196,9 +191,7 @@ def upload_payment_proof(request, order_id):
                     'proof_image': proof_file,
                 }
             )
-            
             if not created:
-                # Update existing payment record
                 payment.status = 'pending'
                 payment.amount = order.total_amount
                 payment.currency = settings.STRIPE_CURRENCY
@@ -319,22 +312,25 @@ def cart_view(request):
 
 @login_required
 def update_cart(request):
-    """Update item quantities or remove them if quantity is zero"""
+    """Update item quantities or remove them if quantity is zero. Handles clear_cart too."""
     if request.method == 'POST':
+        if request.POST.get('clear_cart'):
+            request.session['cart'] = {}
+            request.session.modified = True
+            return redirect('cart')
+
         product_id = request.POST.get('product_id')
         quantity = int(request.POST.get('quantity', 0))
-        
+
         cart = request.session.get('cart', {})
-        
+
         if quantity > 0:
             cart[product_id] = quantity
         else:
-            if product_id in cart:
-                del cart[product_id]
-        
+            cart.pop(product_id, None)
+
         request.session['cart'] = cart
         request.session.modified = True
-        messages.success(request, 'Cart updated!')
 
     return redirect('cart')
 
@@ -355,15 +351,26 @@ def remove_from_cart(request):
 
 @login_required
 def checkout(request):
-    """Display checkout page"""
+    """Display checkout page with auto-fill from last order and profile."""
     cart_items, total_price = get_cart_from_session(request)
     if not cart_items:
         messages.warning(request, 'Your cart is empty!')
         return redirect('product_list')
 
+    from customers.models import CustomerProfile
+    from admins.models import Order as AdminOrder
+    profile, _ = CustomerProfile.objects.get_or_create(user=request.user)
+
+    last_order = AdminOrder.objects.filter(
+        customer=request.user,
+        street_address__isnull=False,
+    ).exclude(street_address='').order_by('-created_at').first()
+
     return render(request, 'customers/checkout.html', {
         'cart_items': cart_items,
-        'total_price': total_price
+        'total_price': total_price,
+        'profile': profile,
+        'last_order': last_order,
     })
 
 @login_required
@@ -427,6 +434,8 @@ def submit_order(request):
             item['product'].stock -= item['quantity']
             item['product'].save()
         
+        from admins.models import OrderEvent
+        OrderEvent.objects.create(order=order, status='pending', actor=request.user)
         log_audit(request, 'order_created', target=order,
                   description=f"Customer placed Order #{order.id}",
                   metadata={'total': str(total_price), 'items': len(cart_items)})
@@ -437,8 +446,18 @@ def submit_order(request):
             notification_type='admin_alert',
         )
 
-        # Handle payment method selection
+        # Persist preferred payment method to profile for next auto-fill
         payment_method = request.POST.get('payment_method')
+        try:
+            from customers.models import CustomerProfile
+            profile, _ = CustomerProfile.objects.get_or_create(user=request.user)
+            if profile.preferred_payment_method != payment_method:
+                profile.preferred_payment_method = payment_method
+                profile.save(update_fields=['preferred_payment_method', 'updated_at'])
+        except Exception:
+            pass
+
+        # Handle payment method selection
         
         if payment_method == 'stripe':
             # Create Stripe Checkout Session
@@ -820,9 +839,11 @@ def awaiting_payment_orders(request):
     
     # Get all pending payment orders for this customer
     awaiting_orders_qs = Order.objects.filter(
-        customer=request.user, 
+        customer=request.user,
         status='pending_payment',
-        payment_proof__isnull=True  # No proof uploaded yet
+    ).exclude(
+        payments__payment_method='manual',
+        payments__proof_image__isnull=False,
     ).order_by('-created_at')
     
     # Pagination
@@ -978,3 +999,86 @@ def notifications_mark_all_read(request):
         is_read=True, read_at=tz.now()
     )
     return redirect('notifications_list')
+
+
+@login_required
+def cancel_order(request, order_id):
+    """
+    Let a customer cancel their own order while it is still pending.
+    Restores stock, logs the cancellation, and notifies admins.
+    Only allowed when status == 'pending'.
+    """
+    from admins.models import Order as AdminOrder
+    from admins.notifications import log_audit, notify, notify_admins
+
+    if request.method != 'POST':
+        return redirect('customer_orders')
+
+    order = get_object_or_404(AdminOrder, id=order_id, customer=request.user)
+
+    if order.status != 'pending':
+        messages.error(request, f"Order #{order.id} can no longer be cancelled — it is already {order.get_status_display()}.")
+        return redirect('order_success', order_id=order.id)
+
+    reason = request.POST.get('cancel_reason', '').strip() or 'No reason provided'
+
+    # Restore stock for each item
+    for item in order.items.select_related('product').all():
+        item.product.stock += item.quantity
+        item.product.save(update_fields=['stock'])
+
+    order.status = 'cancelled'
+    order.order_notes = (order.order_notes or '') + f'\n[CANCELLED by customer: {reason}]'
+    order.save(update_fields=['status', 'order_notes'])
+
+    from admins.models import OrderEvent
+    OrderEvent.objects.create(order=order, status='cancelled', actor=request.user, note=reason)
+
+    log_audit(request, 'order_cancelled', target=order,
+              description=f'Customer cancelled Order #{order.id}. Reason: {reason}',
+              metadata={'reason': reason, 'amount': str(order.total_amount)})
+
+    notify_admins(
+        title='Order cancelled by customer',
+        message=f'Customer {request.user.username} cancelled Order #{order.id} (RM {order.total_amount}). Reason: {reason}',
+        link=f'/dashboard/order/{order.id}/detail/',
+        notification_type='admin_alert',
+    )
+
+    # Trigger refund if customer already paid via Stripe
+    stripe_payment = order.payments.filter(payment_method='stripe', status='succeeded').first()
+    if stripe_payment:
+        from admins.refund_utils import process_refund
+        process_refund(order, source='customer_cancellation', request=request)
+
+    messages.success(request, f"Order #{order.id} has been cancelled. If you paid, a refund will be processed shortly.")
+    return redirect('customer_orders')
+
+
+@login_required
+def reorder(request, order_id):
+    """Repopulate the cart from a past order, then go straight to checkout."""
+    from admins.models import Order as AdminOrder
+    order = get_object_or_404(AdminOrder, id=order_id, customer=request.user)
+
+    cart = {}
+    out_of_stock = []
+    for item in order.items.select_related('product').all():
+        product = item.product
+        if product.stock < 1:
+            out_of_stock.append(product.name)
+            continue
+        qty = min(item.quantity, product.stock)
+        cart[str(product.id)] = cart.get(str(product.id), 0) + qty
+
+    request.session['cart'] = cart
+    request.session.modified = True
+
+    if out_of_stock:
+        messages.warning(request, f"Some items were out of stock and skipped: {', '.join(out_of_stock)}.")
+    if cart:
+        messages.success(request, f"Cart loaded from Order #{order.id}. Review and confirm your details.")
+        return redirect('checkout')
+    else:
+        messages.error(request, "None of the items from that order are currently in stock.")
+        return redirect('customer_orders')

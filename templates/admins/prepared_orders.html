@@ -59,7 +59,7 @@
         <table class="table table-hover align-middle">
             <thead class="table-light">
                 <tr>
-                    <th>Group ID</th>
+                    <th>Preparation ID</th>
                     <th>Created</th>
                     <th>Orders</th>
                     <th>Total Amount</th>
@@ -90,7 +90,7 @@
                     </td>
                     <td class="text-end">
                         <div class="btn-group" role="group">
-                            <a href="{% url 'prep_group_detail' group.group_id %}" class="btn btn-sm btn-outline-dark">View Group</a>
+                            <a href="{% url 'prep_group_detail' group.group_id %}" class="btn btn-sm btn-outline-dark">View Details</a>
                             <button onclick="printGroup('{{ group.group_id }}')" class="btn btn-sm btn-outline-primary">Print Preparation List</button>
                         </div>
                     </td>

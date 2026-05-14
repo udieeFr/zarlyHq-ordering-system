@@ -387,9 +387,13 @@
                 </a>
 
                 <div class="sidebar-section-title">Management</div>
-                <a href="{% url 'inventory_list' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'inventory_list' %}active{% endif %}">
+                <a href="{% url 'inventory_list' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'inventory_list' or request.resolver_match.url_name == 'edit_product' %}active{% endif %}">
                     <span class="sidebar-menu-item-icon">📦</span>
-                    <span class="sidebar-menu-item-text">Inventory</span>
+                    <span class="sidebar-menu-item-text">Inventory & Products</span>
+                </a>
+                <a href="{% url 'manage_categories' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'manage_categories' %}active{% endif %}">
+                    <span class="sidebar-menu-item-icon">🗂</span>
+                    <span class="sidebar-menu-item-text">Categories</span>
                 </a>
                 <a href="{% url 'admin_complaints_list' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'admin_complaints_list' %}active{% endif %}">
                     <span class="sidebar-menu-item-icon">🚨</span>
@@ -409,6 +413,10 @@
                 </a>
 
                 <div class="sidebar-section-title">Order Operations</div>
+                <a href="{% url 'admin_create_order' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'admin_create_order' %}active{% endif %}">
+                    <span class="sidebar-menu-item-icon">✏️</span>
+                    <span class="sidebar-menu-item-text">Create Order</span>
+                </a>
                 <a href="{% url 'sales_admin_dashboard' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'sales_admin_dashboard' %}active{% endif %}">
                     <span class="sidebar-menu-item-icon">📋</span>
                     <span class="sidebar-menu-item-text">Sales Dashboard</span>
@@ -433,6 +441,10 @@
                 </a>
 
                 <div class="sidebar-section-title">Orders</div>
+                <a href="{% url 'admin_create_order' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'admin_create_order' %}active{% endif %}">
+                    <span class="sidebar-menu-item-icon">✏️</span>
+                    <span class="sidebar-menu-item-text">Create Order</span>
+                </a>
                 <a href="{% url 'approved_orders_list' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'approved_orders_list' %}active{% endif %}">
                     <span class="sidebar-menu-item-icon">✅</span>
                     <span class="sidebar-menu-item-text">Approved Orders</span>

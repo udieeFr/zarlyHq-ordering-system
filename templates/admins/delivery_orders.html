@@ -99,7 +99,7 @@
                 {% for order in in_delivery_orders %}
                 <tr>
                     <td data-sort="{{ order.id }}"><a href="{% url 'admin_order_detail' order.id %}">#{{ order.id }}</a></td>
-                    <td>{{ order.customer.username }}<br>{{ order.full_name }}</td>
+                    <td>{{ order.customer_label }}<br>{{ order.full_name }}</td>
                     <td>{{ order.phone_number }}</td>
                     <td>
                         <form method="post" action="{% url 'update_order_tracking' order.id %}" class="d-inline-block w-100">
@@ -160,7 +160,7 @@
                 {% for order in delivered_orders %}
                 <tr>
                     <td data-sort="{{ order.id }}"><a href="{% url 'admin_order_detail' order.id %}">#{{ order.id }}</a></td>
-                    <td>{{ order.customer.username }}<br>{{ order.full_name }}</td>
+                    <td>{{ order.customer_label }}<br>{{ order.full_name }}</td>
                     <td>{{ order.phone_number }}</td>
                     <td>
                         {% if order.courier_name %}<strong>{{ order.courier_name }}</strong><br>{% endif %}

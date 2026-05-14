@@ -107,7 +107,7 @@
                                     <div class="fw-bold">Order #{{ order.id }}</div>
                                     <small class="text-muted">Placed {{ order.created_at|date:"d M Y H:i" }}</small>
                                 </td>
-                                <td>{{ order.customer.username }}</td>
+                                <td>{{ order.customer_label }}</td>
                                 <td>RM {{ order.total_amount }}</td>
                                 <td>
                                     {% if order.id in urgent_pending_ids %}
@@ -224,7 +224,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <span class="small fw-bold d-block">Order #{{ order.id }}</span>
-                        <span class="text-muted" style="font-size: 0.75rem;">RM {{ order.total_amount }} • {{ order.customer.username }}</span>
+                        <span class="text-muted" style="font-size: 0.75rem;">RM {{ order.total_amount }} • {{ order.customer_label }}</span>
                     </div>
                     
                     <div class="d-flex gap-2">

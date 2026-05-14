@@ -11,6 +11,7 @@ class Order(models.Model):
         ('out_for_delivery', 'Out for Delivery'),
         ('delivered', 'Delivered'),
         ('rejected', 'Rejected'),
+        ('cancelled', 'Cancelled by Customer'),
         ('pending_payment', 'Approved but pending payment'),
     )
     
@@ -28,7 +29,6 @@ class Order(models.Model):
     order_notes = models.TextField(null=True, blank=True)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='pending')
-    payment_proof = models.ImageField(upload_to='payment_proofs/', null=True, blank=True)
     otp_code = models.CharField(max_length=6, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     approved_at = models.DateTimeField(null=True, blank=True)
@@ -47,11 +47,30 @@ class Order(models.Model):
                                              related_name='delivery_assigned_orders', limit_choices_to={'role__in': ['sales_admin', 'manager']})
     delivered_at = models.DateTimeField(null=True, blank=True)
 
+    # Walk-in / manually-created orders
+    is_walk_in = models.BooleanField(default=False)
+
     # Remake / priority fields
     is_remake = models.BooleanField(default=False)
     remake_of = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True,
                                   related_name='remakes')
     is_priority = models.BooleanField(default=False)
+
+    @property
+    def customer_label(self):
+        """Display name for this order's customer — handles walk-in orders gracefully."""
+        if self.is_walk_in:
+            return f"Walk-in: {self.full_name or '—'}"
+        return self.customer.username if self.customer_id else '—'
+
+    @property
+    def payment_proof(self):
+        """Backwards-compat property — reads from the manual Payment record's proof_image."""
+        payment = self.payments.filter(
+            payment_method='manual',
+            proof_image__isnull=False,
+        ).exclude(proof_image='').order_by('-created_at').first()
+        return payment.proof_image if payment else None
 
     @property
     def address_summary(self):
@@ -169,16 +188,34 @@ class PrepGroup(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
                                    related_name='created_prep_groups', limit_choices_to={'role__in': ['sales_admin', 'manager']})
-    total_orders = models.PositiveIntegerField(default=0)
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def save(self, *args, **kwargs):
         if not self.group_id:
-            self.group_id = f"GRP{timezone.now().strftime('%Y%m%d%H%M%S')}"
+            today = timezone.now().strftime('%y%m%d')
+            prefix = f'OP-{today}-'
+            last = (PrepGroup.objects
+                    .filter(group_id__startswith=prefix)
+                    .order_by('-group_id')
+                    .first())
+            seq = int(last.group_id.split('-')[-1]) + 1 if last else 1
+            self.group_id = f'{prefix}{seq:02d}'
         super().save(*args, **kwargs)
 
+    @property
+    def total_orders(self):
+        return getattr(self, '_total_orders', None) or self.orders.count()
+
+    @property
+    def total_amount(self):
+        from django.db.models import Sum
+        val = getattr(self, '_total_amount', None)
+        if val is not None:
+            return val
+        result = self.orders.aggregate(s=Sum('total_amount'))['s']
+        return result or 0
+
     def __str__(self):
-        return f"Prep Group {self.group_id} - {self.total_orders} orders"
+        return f"Order Preparation {self.group_id} — {self.total_orders} orders"
 
     @property
     def item_summary(self):
@@ -198,6 +235,33 @@ class PrepGroup(models.Model):
                         'orders': [order.id]
                     }
         return sorted(item_counts.items(), key=lambda x: x[1]['quantity'], reverse=True)
+
+
+class OrderEvent(models.Model):
+    """
+    Immutable log of every status transition on an order.
+    Replaces the 9 nullable timestamp/actor columns on Order with a proper
+    history table — one row per state change, queryable by date range or actor.
+    """
+    STATUS_CHOICES = Order.STATUS_CHOICES
+
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='events')
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES)
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                              related_name='order_events')
+    note = models.TextField(blank=True)
+    timestamp = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        ordering = ['timestamp']
+        indexes = [
+            models.Index(fields=['order', 'status']),
+            models.Index(fields=['order', '-timestamp']),
+        ]
+
+    def __str__(self):
+        who = self.actor.username if self.actor else 'system'
+        return f"Order #{self.order_id} → {self.status} by {who} at {self.timestamp:%Y-%m-%d %H:%M}"
 
 
 class RejectionReason(models.Model):
@@ -234,7 +298,7 @@ class RejectedOrder(models.Model):
     Stores order snapshot, rejection reason, admin info, and timestamps.
     """
     # Core rejection data
-    order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='rejection_record')
+    order = models.OneToOneField(Order, on_delete=models.PROTECT, related_name='rejection_record')
     rejection_reason = models.ForeignKey(RejectionReason, on_delete=models.SET_NULL, null=True, blank=True)
     custom_reason = models.TextField(blank=True, help_text="Custom rejection reason if admin typed instead of selecting predefined")
     
@@ -315,6 +379,7 @@ class AuditLog(models.Model):
         ('refund_failed', 'Refund Failed'),
         ('refund_manual', 'Manual Refund Flagged'),
         ('refund_processed', 'Manual Refund Processed'),
+        ('order_cancelled', 'Order Cancelled by Customer'),
     )
 
     actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
@@ -391,8 +456,10 @@ class Refund(models.Model):
         ('manual',     'Manual Refund Required'),
     )
     SOURCE_CHOICES = (
-        ('order_rejection', 'Order Rejection'),
-        ('complaint',       'Customer Complaint'),
+        ('order_rejection',      'Order Rejection'),
+        ('complaint',            'Customer Complaint'),
+        ('customer_cancellation','Customer Cancellation'),
+        ('webhook',              'Stripe Webhook'),
     )
 
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='refunds')

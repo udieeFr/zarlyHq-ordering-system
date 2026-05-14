@@ -184,29 +184,73 @@ def handle_payment_intent_failed(payment_intent_id, event):
 def handle_charge_refunded(charge_id, event):
     """
     Handles charge.refunded webhook event.
-    Called when a charge is refunded.
-    
+    Called when a charge is refunded in Stripe.
+
     Args:
         charge_id: Stripe Charge ID
         event: Full webhook event dictionary
-    
+
     Returns:
         tuple: (success: bool, message: str)
     """
     try:
-        payment = Payment.objects.get(stripe_charge_id=charge_id)
+        # stripe_charge_id is rarely populated — fall back to looking up by payment_intent
+        try:
+            payment = Payment.objects.get(stripe_charge_id=charge_id)
+        except Payment.DoesNotExist:
+            charge = stripe.Charge.retrieve(charge_id)
+            payment_intent_id = charge.payment_intent
+            if not payment_intent_id:
+                error_msg = f'Charge {charge_id} has no payment_intent, cannot find Payment record'
+                logger.warning(error_msg)
+                return False, error_msg
+            payment = Payment.objects.get(stripe_payment_intent_id=payment_intent_id)
+
+        if payment.status == 'refunded':
+            logger.info(f'Charge {charge_id} already marked as refunded, skipping')
+            return True, 'Already refunded'
+
         payment.status = 'refunded'
         payment.last_webhook_event = 'charge.refunded'
         payment.webhook_event_timestamp = timezone.now()
         payment.save()
-        
+
         order = payment.order
-        # You might want to create a refund record or trigger special handling here
+
+        # Create a Refund record so it appears in the manager dashboard
+        from admins.models import Refund
+        if not Refund.objects.filter(order=order, stripe_refund_id__isnull=False).exclude(stripe_refund_id='').exists():
+            charge_data = event.get('data', {}).get('object', {})
+            refunds_list = charge_data.get('refunds', {}).get('data', [])
+            stripe_refund_id = refunds_list[0].get('id', '') if refunds_list else ''
+
+            Refund.objects.create(
+                order=order,
+                payment=payment,
+                amount=order.total_amount,
+                source='order_rejection',
+                status='succeeded',
+                stripe_refund_id=stripe_refund_id,
+                reason=f'Stripe webhook confirmed refund (charge {charge_id})',
+            )
+
+        from admins.notifications import notify
+        notify(order.customer,
+               title='Refund confirmed 💰',
+               message=f'Your refund of RM {order.total_amount} for Order #{order.id} has been '
+                       f'confirmed by Stripe. It may take 3–5 business days to appear on your card.',
+               link=f'/order-details/{order.id}/',
+               notification_type='payment')
+
         logger.info(f'Charge refunded for order {order.id}, charge {charge_id}')
         return True, f'Refund processed for order {order.id}'
-        
+
     except Payment.DoesNotExist:
         error_msg = f'No payment found for charge {charge_id}'
+        logger.error(error_msg)
+        return False, error_msg
+    except stripe.error.StripeError as e:
+        error_msg = f'Stripe error retrieving charge {charge_id}: {str(e)}'
         logger.error(error_msg)
         return False, error_msg
     except Exception as e:

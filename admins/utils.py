@@ -11,7 +11,7 @@ from pyhanko.sign import signers, fields
 from pyhanko.pdf_utils.incremental_writer import IncrementalPdfFileWriter
 from pyhanko.pdf_utils.reader import PdfFileReader
 
-def generate_invoice_pdf(order):
+def generate_invoice_pdf(order, approver=None):
     """Generates a PDF receipt using ReportLab"""
     filename = f"order_{order.id}_receipt.pdf"
     file_path = os.path.join(settings.MEDIA_ROOT, 'temp_pdfs', filename)
@@ -21,16 +21,22 @@ def generate_invoice_pdf(order):
     c = canvas.Canvas(file_path, pagesize=A4)
     c.setFont("Helvetica-Bold", 24)
     c.drawString(50, 800, "ZARLY BIGFOOD SDN BHD")
-    
+
     c.setFont("Helvetica", 12)
     c.drawString(50, 770, f"Order Receipt #{order.id}")
     c.drawString(50, 755, f"Date: {order.created_at.strftime('%Y-%m-%d %H:%M')}")
-    c.drawString(50, 740, f"Customer: {order.customer.username}")
+    c.drawString(50, 740, f"Customer: {order.customer_label}")
+    y_base = 725
+    if order.is_walk_in and approver:
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(50, y_base, f"Walk-in order — authorized by: {approver.get_full_name() or approver.username} ({approver.role})")
+        c.setFont("Helvetica", 12)
+        y_base -= 15
     if order.street_address or order.city or order.state or order.postcode:
-        c.drawString(50, 725, f"Address: {order.address_summary}")
-        y = 705
+        c.drawString(50, y_base, f"Address: {order.address_summary}")
+        y = y_base - 20
     else:
-        y = 725
+        y = y_base
     if order.latitude and order.longitude:
         c.drawString(50, y - 15, f"Coordinates: {order.latitude}, {order.longitude}")
         y -= 25

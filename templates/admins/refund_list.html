@@ -159,7 +159,7 @@
           <td>
             <a href="{% url 'admin_order_detail' r.order.id %}" style="color:#ff9933;font-weight:600;text-decoration:none;">#{{ r.order.id }}</a>
           </td>
-          <td>{{ r.order.customer.username }}</td>
+          <td>{{ r.order.customer_label }}</td>
           <td style="font-weight:800;color:#0f172a;">RM {{ r.amount|floatformat:2 }}</td>
           <td><span class="source-badge">{{ r.get_source_display }}</span></td>
           <td>
@@ -180,7 +180,7 @@
           <td>
             {% if r.status == 'manual' or r.status == 'failed' or r.status == 'pending' %}
             <button class="action-btn btn-process"
-                    onclick="openModal({{ r.id }}, '{{ r.order.id }}', '{{ r.amount }}', '{{ r.order.customer.username }}')">
+                    onclick="openModal({{ r.id }}, '{{ r.order.id }}', '{{ r.amount }}', '{{ r.order.customer_label }}')">
               ✅ Process
             </button>
             {% else %}

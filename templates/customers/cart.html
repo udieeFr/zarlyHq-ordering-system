@@ -1,109 +1,187 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<style>
+  :root { --orange: #ff9933; --navy: #0f172a; }
 
-<div class="menu-header">
-    <h1>My Cart 🛒</h1>
-</div>
+  .cart-wrap { max-width: 900px; margin: 0 auto; padding: 2rem 1rem 4rem; }
+  .cart-title { font-size: 1.5rem; font-weight: 900; color: var(--navy); margin-bottom: 1.5rem; }
 
-{% if cart_items %}
-<div class="checkout-container">
-    <div class="checkout-main">
-        <h2 style="color: var(--zarly-orange); margin-bottom: 25px;">Your Order</h2>
-        
+  .cart-grid { display: grid; grid-template-columns: 1fr 300px; gap: 1.5rem; align-items: start; }
+  @media(max-width:700px){ .cart-grid { grid-template-columns: 1fr; } }
+
+  /* Item card */
+  .cart-item-card {
+    background: #fff; border-radius: 14px; padding: 1.1rem 1.3rem;
+    box-shadow: 0 2px 12px rgba(15,23,42,.07); margin-bottom: .85rem;
+    display: flex; align-items: center; gap: 1rem;
+  }
+  .cart-item-info { flex: 1; min-width: 0; }
+  .cart-item-name { font-weight: 700; color: var(--navy); font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cart-item-unit { font-size: .78rem; color: #9ca3af; margin-top: .15rem; }
+
+  /* Qty stepper */
+  .qty-stepper { display: flex; align-items: center; gap: .35rem; }
+  .qty-btn {
+    width: 30px; height: 30px; border-radius: 8px; border: 1.5px solid #e5e7eb;
+    background: #f9fafb; color: var(--navy); font-size: 1rem; font-weight: 700;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background .12s, border .12s;
+  }
+  .qty-btn:hover { background: var(--orange); border-color: var(--orange); color: #fff; }
+  .qty-num { font-weight: 800; font-size: .9rem; min-width: 24px; text-align: center; color: var(--navy); }
+
+  .cart-item-subtotal { font-weight: 800; font-size: 1rem; color: var(--orange); min-width: 80px; text-align: right; }
+
+  .btn-remove {
+    background: none; border: none; color: #d1d5db; cursor: pointer; padding: .25rem;
+    font-size: 1rem; line-height: 1; transition: color .12s;
+  }
+  .btn-remove:hover { color: #ef4444; }
+
+  /* Summary */
+  .cart-summary-card {
+    background: #fff; border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(15,23,42,.07); padding: 1.4rem;
+    position: sticky; top: 80px;
+  }
+  .summary-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #9ca3af; margin-bottom: .9rem; }
+  .summary-line { display: flex; justify-content: space-between; font-size: .85rem; padding: .3rem 0; color: #374151; }
+  .summary-total-line { display: flex; justify-content: space-between; font-size: 1.1rem; font-weight: 900; color: var(--navy); padding: .75rem 0 0; border-top: 1px solid #f3f4f6; margin-top: .5rem; }
+  .summary-total-line span:last-child { color: var(--orange); }
+
+  .btn-checkout {
+    display: block; width: 100%; padding: .85rem; border: none; border-radius: 12px;
+    background: linear-gradient(135deg, #ff9933, #f97316);
+    color: #fff; font-size: .95rem; font-weight: 800; text-align: center;
+    text-decoration: none; margin-top: 1rem; cursor: pointer; transition: opacity .15s;
+  }
+  .btn-checkout:hover { opacity: .9; color: #fff; }
+
+  .btn-clear-cart {
+    display: block; width: 100%; padding: .5rem; border: 1.5px solid #e5e7eb;
+    border-radius: 10px; background: #fff; color: #6b7280; font-size: .8rem;
+    font-weight: 600; text-align: center; cursor: pointer; margin-top: .6rem;
+    transition: border .15s, color .15s;
+  }
+  .btn-clear-cart:hover { border-color: #ef4444; color: #ef4444; }
+
+  /* Empty state */
+  .empty-cart { text-align: center; padding: 5rem 1rem; background: #fff; border-radius: 16px; box-shadow: 0 2px 12px rgba(15,23,42,.07); }
+  .empty-icon { font-size: 4rem; margin-bottom: 1rem; }
+</style>
+
+<div class="cart-wrap">
+  <div class="cart-title">My Cart 🛒</div>
+
+  {% if messages %}
+    {% for msg in messages %}
+    <div class="alert alert-{{ msg.tags }} alert-dismissible fade show mb-3" role="alert" style="border-radius:12px;">
+      {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  {% endif %}
+
+  {% if cart_items %}
+  <div class="cart-grid">
+
+    <!-- Items -->
+    <div>
+      {% for item in cart_items %}
+      <div class="cart-item-card">
+        <div class="cart-item-info">
+          <div class="cart-item-name">{{ item.product.name }}</div>
+          <div class="cart-item-unit">RM {{ item.product.price }} each · {{ item.product.stock }} left in stock</div>
+        </div>
+
+        <!-- Quantity stepper — auto-submits -->
+        <form method="post" action="{% url 'update_cart' %}" id="form-{{ item.product.id }}">
+          {% csrf_token %}
+          <input type="hidden" name="product_id" value="{{ item.product.id }}">
+          <input type="hidden" name="quantity" id="qty-{{ item.product.id }}" value="{{ item.quantity }}">
+          <div class="qty-stepper">
+            <button type="button" class="qty-btn"
+                    onclick="changeQty('{{ item.product.id }}', -1, {{ item.product.stock }})">−</button>
+            <span class="qty-num" id="display-{{ item.product.id }}">{{ item.quantity }}</span>
+            <button type="button" class="qty-btn"
+                    onclick="changeQty('{{ item.product.id }}', +1, {{ item.product.stock }})">+</button>
+          </div>
+        </form>
+
+        <div class="cart-item-subtotal">RM {{ item.subtotal }}</div>
+
+        <!-- Remove -->
+        <form method="post" action="{% url 'remove_from_cart' %}">
+          {% csrf_token %}
+          <input type="hidden" name="product_id" value="{{ item.product.id }}">
+          <button type="submit" class="btn-remove" title="Remove">✕</button>
+        </form>
+      </div>
+      {% endfor %}
+
+      <a href="{% url 'product_list' %}" style="font-size:.82rem;color:#9ca3af;text-decoration:none;">← Continue shopping</a>
+    </div>
+
+    <!-- Summary -->
+    <div>
+      <div class="cart-summary-card">
+        <div class="summary-label">Order Summary</div>
         {% for item in cart_items %}
-        <div class="order-card" style="background: white; padding: 20px; margin-bottom: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="flex: 1;">
-                    <h4 style="margin: 0 0 10px 0; color: var(--zarly-dark);">{{ item.product.name }}</h4>
-                    <p style="color: #7f8c8d; margin: 0;">RM {{ item.product.price }} x {{ item.quantity }}</p>
-                </div>
-                <div style="display: flex; align-items: center; gap: 20px;">
-                    <form method="post" action="{% url 'update_cart' %}" style="display: flex; align-items: center; gap: 10px;">
-                        {% csrf_token %}
-                        <input type="hidden" name="product_id" value="{{ item.product.id }}">
-                        <div class="quantity-control">
-                            <button type="button" class="qty-minus" onclick="decreaseQty(this)">-</button>
-                            <input type="number" name="quantity" value="{{ item.quantity }}" min="0" max="{{ item.product.stock }}" class="qty-input">
-                            <button 
-                                type="button" 
-                                class="qty-plus" 
-                                data-stock="{{ item.product.stock }}" 
-                                onclick="increaseQty(this, this.getAttribute('data-stock'))">
-                                +
-                            </button>
-                        </div>
-                        <button type="submit" class="btn btn-sm" style="background: var(--zarly-orange); color: white; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer;">Update</button>
-                    </form>
-                    <div style="font-size: 24px; font-weight: bold; color: var(--zarly-orange); min-width: 100px; text-align: right;">
-                        RM {{ item.subtotal }}
-                    </div>
-                    <form method="post" action="{% url 'remove_from_cart' %}" style="display: inline;">
-                        {% csrf_token %}
-                        <input type="hidden" name="product_id" value="{{ item.product.id }}">
-                        <button type="submit" class="btn" style="background: var(--zarly-red); color: white; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer;">🗑️</button>
-                    </form>
-                </div>
-            </div>
+        <div class="summary-line">
+          <span>{{ item.product.name }} ×{{ item.quantity }}</span>
+          <span>RM {{ item.subtotal }}</span>
         </div>
         {% endfor %}
-        
-        <div style="margin-top: 30px; text-align: center;">
-            <a href="{% url 'product_list' %}" class="btn" style="background: #95a5a6; color: white; padding: 15px 40px; border-radius: 8px; text-decoration: none; display: inline-block; margin-right: 15px;">
-                ← Continue Shopping
-            </a>
-            <a href="{% url 'checkout' %}" class="btn-submit-order" style="padding: 15px 40px; border-radius: 8px; text-decoration: none; display: inline-block;">
-                Proceed to Checkout →
-            </a>
+        <div class="summary-total-line">
+          <span>Total</span>
+          <span>RM {{ total_price }}</span>
         </div>
+        <a href="{% url 'checkout' %}" class="btn-checkout">Checkout →</a>
+        <button class="btn-clear-cart" onclick="clearCart()">Clear cart</button>
+      </div>
     </div>
-    
-    <!-- Cart Summary -->
-    <div class="cart-summary">
-        <h2>Order Summary</h2>
-        
-        {% for item in cart_items %}
-        <div class="cart-item">
-            <div class="cart-item-info">
-                <h5>{{ item.product.name }}</h5>
-                <p class="quantity">{{ item.quantity }}x RM {{ item.product.price }}</p>
-            </div>
-            <div class="cart-item-price">RM {{ item.subtotal }}</div>
-        </div>
-        {% endfor %}
-        
-        <div class="cart-total">
-            <h3>
-                <span>Subtotal:</span>
-                <span class="amount">RM {{ total_price }}</span>
-            </h3>
-        </div>
-    </div>
+
+  </div>
+  {% else %}
+  <div class="empty-cart">
+    <div class="empty-icon">🛒</div>
+    <h3 style="color:#374151;font-weight:800;margin-bottom:.5rem;">Your cart is empty</h3>
+    <p style="color:#9ca3af;margin-bottom:1.5rem;">Browse our menu and add something delicious.</p>
+    <a href="{% url 'product_list' %}" class="btn-checkout" style="display:inline-block;width:auto;padding:.75rem 2rem;">Browse Menu</a>
+  </div>
+  {% endif %}
 </div>
 
-{% else %}
-<div style="text-align: center; padding: 80px 20px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-    <div style="font-size: 80px; margin-bottom: 20px;">🛒</div>
-    <h2 style="color: #7f8c8d; margin-bottom: 20px;">Your cart is empty</h2>
-    <p style="color: #95a5a6; margin-bottom: 30px;">Browse our delicious menu and add items to your cart!</p>
-    <a href="{% url 'product_list' %}" class="hero-btn">Browse Menu</a>
-</div>
-{% endif %}
+<!-- Clear cart form -->
+<form id="clearForm" method="post" action="{% url 'update_cart' %}" style="display:none;">
+  {% csrf_token %}
+  <input type="hidden" name="clear_cart" value="1">
+</form>
 
 <script>
-function decreaseQty(btn) {
-    const input = btn.parentElement.querySelector('.qty-input');
-    if (input.value > 0) {
-        input.value = parseInt(input.value) - 1;
-    }
-}
+  function changeQty(productId, delta, maxStock) {
+    const hidden  = document.getElementById('qty-' + productId);
+    const display = document.getElementById('display-' + productId);
+    let current   = parseInt(hidden.value);
+    let next      = current + delta;
 
-function increaseQty(btn, max) {
-    const input = btn.parentElement.querySelector('.qty-input');
-    if (input.value < max) {
-        input.value = parseInt(input.value) + 1;
+    if (next < 0) next = 0;
+    if (next > maxStock) next = maxStock;
+
+    hidden.value   = next;
+    display.textContent = next;
+
+    // Auto-submit after a short debounce
+    clearTimeout(window['_qt_' + productId]);
+    window['_qt_' + productId] = setTimeout(() => {
+      document.getElementById('form-' + productId).submit();
+    }, 600);
+  }
+
+  function clearCart() {
+    if (confirm('Remove all items from your cart?')) {
+      document.getElementById('clearForm').submit();
     }
-}
+  }
 </script>
-
 {% endblock %}

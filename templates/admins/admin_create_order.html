@@ -1,0 +1,265 @@
+{% extends 'admin_base.html' %}
+
+{% block page_title %}Create Order{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Create Order</h1>
+  <p>Manually enter an order on behalf of a customer.</p>
+</div>
+
+<div class="mb-3">
+  <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
+</div>
+
+<form method="post" id="orderForm">
+  {% csrf_token %}
+  <div class="row g-4">
+
+    <!-- Left column: customer + items -->
+    <div class="col-lg-7">
+
+      <!-- Customer -->
+      <div class="content-card mb-4">
+        <h6 class="fw-bold mb-3">Customer</h6>
+
+        <!-- Walk-in toggle -->
+        <div class="btn-group w-100 mb-3" role="group">
+          <input type="radio" class="btn-check" name="is_walk_in" id="modeRegistered" value="0" checked autocomplete="off">
+          <label class="btn btn-outline-primary" for="modeRegistered">Registered Customer</label>
+
+          <input type="radio" class="btn-check" name="is_walk_in" id="modeWalkin" value="1" autocomplete="off">
+          <label class="btn btn-outline-secondary" for="modeWalkin">Walk-in (No Account)</label>
+        </div>
+
+        <!-- Registered customer dropdown -->
+        <div id="registeredSection">
+          <select name="customer_id" class="form-select" id="customerSelect">
+            <option value="">— Select a customer —</option>
+            {% for c in customers %}
+            <option value="{{ c.id }}">{{ c.username }}{% if c.get_full_name %} ({{ c.get_full_name }}){% endif %} — {{ c.email }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Walk-in fields -->
+        <div id="walkinSection" style="display:none;">
+          <div class="mb-2">
+            <label class="form-label small fw-bold">Walk-in Name <span class="text-danger">*</span></label>
+            <input type="text" name="walkin_name" id="walkinName" class="form-control" placeholder="Customer name">
+          </div>
+          <div class="mb-0">
+            <label class="form-label small fw-bold">Walk-in Phone</label>
+            <input type="text" name="walkin_phone" class="form-control" placeholder="e.g. 0123456789">
+          </div>
+        </div>
+      </div>
+
+      <!-- Order Items -->
+      <div class="content-card mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="fw-bold mb-0">Items</h6>
+          <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRow()">+ Add Item</button>
+        </div>
+        <table class="table table-sm align-middle" id="itemsTable">
+          <thead class="table-light">
+            <tr>
+              <th>Product</th>
+              <th class="text-center" style="width:120px;">Qty</th>
+              <th class="text-end" style="width:110px;">Subtotal</th>
+              <th style="width:40px;"></th>
+            </tr>
+          </thead>
+          <tbody id="itemsBody">
+            <!-- rows added by JS -->
+          </tbody>
+        </table>
+        <div class="text-end mt-2">
+          <span class="text-muted small">Total: </span>
+          <strong class="fs-5" id="grandTotal">RM 0.00</strong>
+        </div>
+      </div>
+
+      <!-- Order Notes -->
+      <div class="content-card mb-4">
+        <h6 class="fw-bold mb-3">Order Notes</h6>
+        <textarea name="order_notes" class="form-control" rows="2" placeholder="Special instructions, dietary notes…"></textarea>
+      </div>
+    </div>
+
+    <!-- Right column: delivery + status -->
+    <div class="col-lg-5">
+      <div class="content-card mb-4">
+        <h6 class="fw-bold mb-3">Delivery Details</h6>
+        <div class="mb-2">
+          <label class="form-label small fw-bold">Receiver Name</label>
+          <input type="text" name="full_name" class="form-control" placeholder="Leave blank to use account name">
+        </div>
+        <div class="mb-2">
+          <label class="form-label small fw-bold">Phone</label>
+          <input type="text" name="phone_number" class="form-control" placeholder="e.g. 0123456789">
+        </div>
+        <div class="mb-2">
+          <label class="form-label small fw-bold">Street Address</label>
+          <input type="text" name="street_address" class="form-control" placeholder="No. 10, Jalan…">
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-6">
+            <label class="form-label small fw-bold">City</label>
+            <input type="text" name="city" class="form-control">
+          </div>
+          <div class="col-6">
+            <label class="form-label small fw-bold">State</label>
+            <input type="text" name="state" class="form-control">
+          </div>
+        </div>
+        <div class="mb-0">
+          <label class="form-label small fw-bold">Postcode</label>
+          <input type="text" name="postcode" class="form-control" style="max-width:120px;">
+        </div>
+      </div>
+
+      <div class="content-card mb-4">
+        <h6 class="fw-bold mb-3">Initial Status</h6>
+        <div class="d-grid gap-2">
+          <label class="d-flex align-items-start gap-2 p-3 border rounded-3 cursor-pointer" style="cursor:pointer;">
+            <input type="radio" name="initial_status" value="pending" checked class="mt-1">
+            <div>
+              <div class="fw-bold">Pending Review</div>
+              <div class="text-muted small">Saved as a new order — admin team reviews next.</div>
+            </div>
+          </label>
+          <label class="d-flex align-items-start gap-2 p-3 border rounded-3" style="cursor:pointer;">
+            <input type="radio" name="initial_status" value="pending_payment" class="mt-1">
+            <div>
+              <div class="fw-bold">Awaiting Payment</div>
+              <div class="text-muted small">Skip review — customer still needs to pay.</div>
+            </div>
+          </label>
+          <label class="d-flex align-items-start gap-2 p-3 border rounded-3" style="cursor:pointer;">
+            <input type="radio" name="initial_status" value="approved" class="mt-1">
+            <div>
+              <div class="fw-bold">Approved Immediately</div>
+              <div class="text-muted small">Mark as approved right away — skips the review queue.</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary fw-bold w-100 py-3"
+              onclick="return validateForm()">
+        Create Order
+      </button>
+    </div>
+  </div>
+</form>
+
+<script>
+const PRODUCTS = [
+  {% for p in products %}
+  { id: {{ p.id }}, name: "{{ p.name|escapejs }}", price: {{ p.price }}, stock: {{ p.stock }}, category: "{{ p.category.name|escapejs }}" }{% if not forloop.last %},{% endif %}
+  {% endfor %}
+];
+
+let rowCount = 0;
+
+function buildProductOptions(selectedId) {
+  let html = '<option value="">— choose product —</option>';
+  let lastCat = '';
+  PRODUCTS.forEach(p => {
+    if (p.category !== lastCat) {
+      if (lastCat) html += '</optgroup>';
+      html += `<optgroup label="${p.category}">`;
+      lastCat = p.category;
+    }
+    html += `<option value="${p.id}" data-price="${p.price}" data-stock="${p.stock}"
+      ${p.id == selectedId ? 'selected' : ''}>${p.name} — RM ${parseFloat(p.price).toFixed(2)} (${p.stock} left)</option>`;
+  });
+  if (lastCat) html += '</optgroup>';
+  return html;
+}
+
+function addRow(productId, qty) {
+  rowCount++;
+  const tbody = document.getElementById('itemsBody');
+  const tr = document.createElement('tr');
+  tr.id = `row-${rowCount}`;
+  tr.innerHTML = `
+    <td>
+      <select name="product_id[]" class="form-select form-select-sm product-sel" onchange="onProductChange(this, ${rowCount})" required>
+        ${buildProductOptions(productId || '')}
+      </select>
+    </td>
+    <td>
+      <input type="number" name="quantity[]" id="qty-${rowCount}" value="${qty || 1}" min="1"
+             class="form-control form-control-sm text-center" onchange="recalcTotal()">
+    </td>
+    <td class="text-end fw-bold" id="sub-${rowCount}">RM 0.00</td>
+    <td><button type="button" class="btn btn-sm text-danger p-0" onclick="removeRow(${rowCount})">✕</button></td>`;
+  tbody.appendChild(tr);
+  if (productId) onProductChange(tr.querySelector('.product-sel'), rowCount);
+  recalcTotal();
+}
+
+function onProductChange(sel, id) {
+  const opt = sel.options[sel.selectedIndex];
+  const price = parseFloat(opt.dataset.price) || 0;
+  const qty = parseInt(document.getElementById(`qty-${id}`).value) || 1;
+  const max = parseInt(opt.dataset.stock) || 999;
+  document.getElementById(`qty-${id}`).max = max;
+  document.getElementById(`sub-${id}`).textContent = `RM ${(price * qty).toFixed(2)}`;
+  recalcTotal();
+}
+
+function recalcTotal() {
+  let total = 0;
+  document.querySelectorAll('#itemsBody tr').forEach(tr => {
+    const id = tr.id.split('-')[1];
+    const sel = tr.querySelector('.product-sel');
+    const qty = parseInt(document.getElementById(`qty-${id}`)?.value) || 0;
+    const price = parseFloat(sel?.options[sel.selectedIndex]?.dataset.price) || 0;
+    const sub = price * qty;
+    document.getElementById(`sub-${id}`).textContent = `RM ${sub.toFixed(2)}`;
+    total += sub;
+  });
+  document.getElementById('grandTotal').textContent = `RM ${total.toFixed(2)}`;
+}
+
+function removeRow(id) {
+  document.getElementById(`row-${id}`).remove();
+  recalcTotal();
+}
+
+function validateForm() {
+  const isWalkin = document.getElementById('modeWalkin').checked;
+  if (isWalkin) {
+    if (!document.getElementById('walkinName').value.trim()) {
+      alert('Please enter a name for the walk-in customer.');
+      return false;
+    }
+  } else {
+    if (!document.getElementById('customerSelect').value) {
+      alert('Please select a customer.');
+      return false;
+    }
+  }
+  if (document.querySelectorAll('#itemsBody tr').length === 0) {
+    alert('Please add at least one item.');
+    return false;
+  }
+  return true;
+}
+
+// Toggle walk-in / registered sections
+document.querySelectorAll('input[name="is_walk_in"]').forEach(radio => {
+  radio.addEventListener('change', function () {
+    const walkin = this.value === '1';
+    document.getElementById('walkinSection').style.display = walkin ? '' : 'none';
+    document.getElementById('registeredSection').style.display = walkin ? 'none' : '';
+  });
+});
+
+// Start with one empty row
+addRow();
+</script>
+{% endblock %}

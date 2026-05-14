@@ -242,11 +242,23 @@
     <div class="container mt-4 main-content">
         {% if messages %}
             {% for message in messages %}
-                <div class="alert {% if 'error' in message.tags %}alert-danger{% elif 'success' in message.tags %}alert-success{% else %}alert-info{% endif %}">
-                    {{ message }}
+                <div class="alert {% if 'error' in message.tags %}alert-danger{% elif 'success' in message.tags %}alert-success{% else %}alert-info{% endif %} auto-dismiss"
+                     style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;">
+                    <span>{{ message }}</span>
+                    <button type="button" onclick="this.parentElement.remove()"
+                            style="background:none;border:none;font-size:1rem;opacity:.6;cursor:pointer;padding:0 .25rem;line-height:1;">✕</button>
                 </div>
             {% endfor %}
         {% endif %}
+        <script>
+          document.querySelectorAll('.auto-dismiss').forEach(function(el) {
+            setTimeout(function() {
+              el.style.transition = 'opacity .5s';
+              el.style.opacity = '0';
+              setTimeout(function() { el.remove(); }, 500);
+            }, 3500);
+          });
+        </script>
         {% block content %}{% endblock %}
     </div>
 

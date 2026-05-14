@@ -63,6 +63,14 @@
           {% else %}
             <a href="{% url 'order_success' o.id %}" class="upcoming-track-btn">TRACK</a>
           {% endif %}
+          {% if o.status == 'pending' %}
+            <button type="button"
+                    onclick="openCancelModal('{{ o.id }}')"
+                    class="upcoming-track-btn"
+                    style="background:#fff;color:#ef4444;border:1.5px solid #ef4444;margin-left:.35rem;">
+              CANCEL
+            </button>
+          {% endif %}
         </div>
       </div>
 
@@ -154,6 +162,7 @@
       <!-- Actions -->
       <div class="prev-card-actions">
         <a href="{% url 'order_success' o.id %}" class="btn-prev-details">DETAILS</a>
+        <a href="{% url 'reorder' o.id %}" class="btn-prev-details" style="background:#ff9933;color:#fff;border-color:#ff9933;" title="Add all items from this order back to your cart">REORDER</a>
         {% if o.status == 'approved' or o.status == 'delivered' %}
           <button type="button" class="btn-prev-complaint"
                   onclick="openComplaint('{{ o.id }}')">COMPLAINT</button>
@@ -216,19 +225,43 @@
   </div>
 </div>
 
+<!-- Cancel order modal -->
+<div id="cancelOrderModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:16px;padding:2rem;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);">
+    <h5 style="font-weight:800;color:#0f172a;margin-bottom:.5rem;">Cancel Order <span id="cancelOrderNum"></span>?</h5>
+    <p style="color:#6b7280;font-size:.88rem;margin-bottom:1.25rem;">This cannot be undone. Stock will be restored automatically.</p>
+    <form method="POST" id="cancelOrderForm">
+      {% csrf_token %}
+      <div style="margin-bottom:1rem;">
+        <label style="font-size:.8rem;font-weight:700;color:#374151;display:block;margin-bottom:.3rem;">
+          Reason <span style="color:#9ca3af;font-weight:500;">(optional)</span>
+        </label>
+        <input type="text" name="cancel_reason" class="form-control" placeholder="e.g. Changed my mind…">
+      </div>
+      <div style="display:flex;gap:.75rem;">
+        <button type="button" class="btn btn-outline-secondary flex-fill"
+                onclick="document.getElementById('cancelOrderModal').style.display='none'">Keep Order</button>
+        <button type="submit" class="btn btn-danger flex-fill fw-bold">Yes, Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 function openComplaint(orderId) {
   const sel = document.getElementById('complaintOrderSelect');
   if (sel) {
     for (let i = 0; i < sel.options.length; i++) {
-      if (sel.options[i].value === String(orderId)) {
-        sel.selectedIndex = i;
-        break;
-      }
+      if (sel.options[i].value === String(orderId)) { sel.selectedIndex = i; break; }
     }
   }
-  const modal = new bootstrap.Modal(document.getElementById('compModal'));
-  modal.show();
+  new bootstrap.Modal(document.getElementById('compModal')).show();
+}
+
+function openCancelModal(orderId) {
+  document.getElementById('cancelOrderNum').textContent = '#' + orderId;
+  document.getElementById('cancelOrderForm').action = '/menu/order/' + orderId + '/cancel/';
+  document.getElementById('cancelOrderModal').style.display = 'flex';
 }
 </script>
 {% endblock %}

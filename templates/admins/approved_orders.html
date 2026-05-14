@@ -79,7 +79,7 @@
                         </a>
                     </td>
                     <td>
-                        <div>{{ order.customer.username }}</div>
+                        <div>{{ order.customer_label }}</div>
                         <small class="text-muted">{{ order.full_name }}</small>
                     </td>
                     <td class="fw-bold">RM {{ order.total_amount }}</td>
@@ -128,8 +128,8 @@
     <div class="row">
         <div class="col-md-3">
             <div class="text-center">
-                <div class="fs-4 fw-bold text-primary" id="group-id">GRP000</div>
-                <small class="text-muted">Group ID</small>
+                <div class="fs-4 fw-bold text-primary" id="group-id">OP-???-01</div>
+                <small class="text-muted">Preparation ID (auto-assigned)</small>
             </div>
         </div>
         <div class="col-md-3">
@@ -210,7 +210,8 @@ function updateSummary() {
     });
 
     // Update display
-    document.getElementById('group-id').textContent = `GRP${new Date().toISOString().slice(0,15).replace(/[-:]/g,'')}`;
+    const now = new Date(); const yy=String(now.getFullYear()).slice(2), mm=String(now.getMonth()+1).padStart(2,'0'), dd=String(now.getDate()).padStart(2,'0');
+    document.getElementById('group-id').textContent = `OP-${yy}${mm}${dd}-??`;
     document.getElementById('selected-count').textContent = selectedCount;
     document.getElementById('total-amount').textContent = `RM ${totalAmount.toFixed(2)}`;
 

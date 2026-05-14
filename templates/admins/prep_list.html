@@ -1,11 +1,11 @@
 {% extends 'admin_base.html' %}
 
-{% block page_title %}Prep List - Group {{ group_id }}{% endblock %}
+{% block page_title %}Preparation List — {{ group_id }}{% endblock %}
 
 {% block content %}
 <!-- Page Header -->
 <div class="page-header">
-    <h1>Prep List - Group {{ group_id }}</h1>
+    <h1>Preparation List — {{ group_id }}</h1>
     <p>Items needed for {{ order_count }} selected order{{ order_count|pluralize }}</p>
 </div>
 
@@ -26,7 +26,7 @@
 <div class="content-card mb-4 print-hide">
     <div class="row">
         <div class="col-md-4">
-            <h6 class="fw-bold">Group ID</h6>
+            <h6 class="fw-bold">Preparation ID</h6>
             <p class="mb-0">{{ group_id }}</p>
         </div>
         <div class="col-md-4">
@@ -86,7 +86,7 @@
             <div class="card h-100">
                 <div class="card-body">
                     <h6 class="card-title">Order #{{ order.id }}</h6>
-                    <p class="card-text mb-1"><strong>Customer:</strong> {{ order.customer.username }}</p>
+                    <p class="card-text mb-1"><strong>Customer:</strong> {{ order.customer_label }}</p>
                     <p class="card-text mb-1"><strong>Name:</strong> {{ order.full_name }}</p>
                     <p class="card-text mb-1"><strong>Phone:</strong> {{ order.phone_number }}</p>
                     <p class="card-text mb-1"><strong>Amount:</strong> RM {{ order.total_amount }}</p>

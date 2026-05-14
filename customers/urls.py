@@ -39,4 +39,10 @@ urlpatterns = [
     path('notifications/', views.notifications_list, name='notifications_list'),
     path('notifications/<int:notification_id>/open/', views.notification_open, name='notification_open'),
     path('notifications/mark-all-read/', views.notifications_mark_all_read, name='notifications_mark_all_read'),
+
+    # Reorder
+    path('order/<int:order_id>/reorder/', views.reorder, name='reorder'),
+
+    # Cancel order
+    path('order/<int:order_id>/cancel/', views.cancel_order, name='cancel_order'),
 ]

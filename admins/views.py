@@ -5,9 +5,9 @@ from django.contrib.auth import login, logout
 from django.utils import timezone
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Count
 from datetime import timedelta
-from .models import Order, OrderItem, DigitalSignature, Complaint, PrepGroup, Payment, AuditLog, Notification
+from .models import Order, OrderItem, DigitalSignature, Complaint, PrepGroup, Payment, AuditLog, Notification, OrderEvent
 from .utils import generate_invoice_pdf, sign_pdf_digitally
 from .notifications import log_audit, notify, notify_admins
 from customers.auth_utils import (
@@ -36,12 +36,21 @@ def order_has_confirmed_payment(order):
         status='succeeded',
         stripe_payment_intent_id__isnull=False  # Webhook has processed this payment
     ).exists()
-    return bool(order.payment_proof) or has_stripe_payment
+    has_manual_proof = order.payments.filter(
+        payment_method='manual',
+        proof_image__isnull=False,
+    ).exclude(proof_image='').exists()
+    return has_manual_proof or has_stripe_payment
+
+
+def log_order_event(order, status, actor=None, note=''):
+    """Record a single order state transition to the OrderEvent history table."""
+    OrderEvent.objects.create(order=order, status=status, actor=actor, note=note)
 
 
 def finalize_order_approval(order, user, request=None):
     """Signs the invoice and marks the order as approved."""
-    raw_pdf = generate_invoice_pdf(order)
+    raw_pdf = generate_invoice_pdf(order, approver=user)
     signed_path, doc_hash, sig_value = sign_pdf_digitally(raw_pdf, order.id)
     sig_record = DigitalSignature.objects.create(
         order=order,
@@ -53,6 +62,7 @@ def finalize_order_approval(order, user, request=None):
     order.approved_at = timezone.now()
     order.approved_by = user
     order.save()
+    log_order_event(order, 'approved', actor=user)
 
     # Audit + notification + CRM update
     log_audit(request, 'signature_created', target=sig_record,
@@ -60,11 +70,12 @@ def finalize_order_approval(order, user, request=None):
               metadata={'order_id': order.id, 'sha256': doc_hash}, actor=user)
     log_audit(request, 'order_approved', target=order,
               description=f"Order #{order.id} approved", actor=user)
-    notify(order.customer,
-           title="Your order has been approved ✅",
-           message=f"Order #{order.id} is now approved and signed. You can download your signed receipt.",
-           link=f"/order-details/{order.id}/",
-           notification_type='order_update')
+    if not order.is_walk_in:
+        notify(order.customer,
+               title="Your order has been approved ✅",
+               message=f"Order #{order.id} is now approved and signed. You can download your signed receipt.",
+               link=f"/order-details/{order.id}/",
+               notification_type='order_update')
     # Update CRM profile
     try:
         from customers.models import CustomerProfile
@@ -353,6 +364,201 @@ def add_product(request):
         'allergies': Allergy.objects.all()
     })
 
+@manager_required
+def edit_product(request, product_id):
+    """Edit an existing product — price, name, stock, category, allergies. Manager-only."""
+    product = get_object_or_404(Product, id=product_id)
+
+    if request.method == 'POST':
+        product.name = request.POST.get('name', product.name).strip()
+        product.price = request.POST.get('price', product.price)
+        product.stock = request.POST.get('stock', product.stock)
+        product.weight_grams = request.POST.get('weight_grams', product.weight_grams)
+        category_id = request.POST.get('category')
+        if category_id:
+            product.category_id = category_id
+        product.save()
+        product.allergies.set(request.POST.getlist('allergies'))
+        log_audit(request, 'inventory_updated', target=product,
+                  description=f"Product '{product.name}' updated by {request.user.username}",
+                  metadata={'price': str(product.price), 'stock': product.stock})
+        messages.success(request, f"'{product.name}' updated.")
+        return redirect('inventory_list')
+
+    return render(request, 'admins/edit_product.html', {
+        'product': product,
+        'categories': Category.objects.all(),
+        'allergies': Allergy.objects.all(),
+        'selected_allergies': list(product.allergies.values_list('id', flat=True)),
+    })
+
+
+@manager_required
+def delete_product(request, product_id):
+    """Delete a product. POST only, manager-only."""
+    product = get_object_or_404(Product, id=product_id)
+    if request.method == 'POST':
+        name = product.name
+        product.delete()
+        log_audit(request, 'inventory_updated', target=None,
+                  description=f"Product '{name}' deleted by {request.user.username}")
+        messages.success(request, f"'{name}' deleted from the menu.")
+    return redirect('inventory_list')
+
+
+@manager_required
+def manage_categories(request):
+    """Add, rename, or delete product categories. Manager-only."""
+    from customers.models import Category as Cat
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'add':
+            name = request.POST.get('name', '').strip()
+            if name:
+                Cat.objects.get_or_create(name=name)
+                messages.success(request, f"Category '{name}' added.")
+        elif action == 'rename':
+            cat_id = request.POST.get('category_id')
+            new_name = request.POST.get('name', '').strip()
+            if cat_id and new_name:
+                Cat.objects.filter(id=cat_id).update(name=new_name)
+                messages.success(request, f"Category renamed to '{new_name}'.")
+        elif action == 'delete':
+            cat_id = request.POST.get('category_id')
+            if cat_id:
+                cat = get_object_or_404(Cat, id=cat_id)
+                if cat.products.exists():
+                    messages.error(request, f"Cannot delete '{cat.name}' — it still has products assigned to it.")
+                else:
+                    cat.delete()
+                    messages.success(request, "Category deleted.")
+        return redirect('manage_categories')
+
+    categories = Cat.objects.annotate(product_count=Count('products')).order_by('name')
+    return render(request, 'admins/manage_categories.html', {'categories': categories})
+
+
+def _get_walkin_user():
+    """Return (or lazily create) the shared system user for walk-in orders."""
+    from customers.models import User as U
+    user, _ = U.objects.get_or_create(
+        username='__walkin__',
+        defaults={
+            'email': 'walkin@internal.zarly',
+            'role': 'customer',
+            'is_active': False,
+        },
+    )
+    return user
+
+
+@sales_admin_required
+def admin_create_order(request):
+    """Manually enter an order — for a registered customer or a walk-in."""
+    from customers.models import User as CustomerUser
+
+    if request.method == 'POST':
+        is_walk_in = request.POST.get('is_walk_in') == '1'
+
+        if is_walk_in:
+            customer = _get_walkin_user()
+            customer_label = request.POST.get('walkin_name', '').strip() or 'Walk-in Customer'
+        else:
+            customer_id = request.POST.get('customer_id')
+            if not customer_id:
+                messages.error(request, 'Please select a customer or choose Walk-in.')
+                return redirect('admin_create_order')
+            customer = get_object_or_404(CustomerUser, id=customer_id, role='customer')
+            customer_label = customer.username
+
+        # Build items list
+        product_ids = request.POST.getlist('product_id[]')
+        quantities  = request.POST.getlist('quantity[]')
+        items, total, errors = [], 0, []
+        for pid, qty_str in zip(product_ids, quantities):
+            try:
+                qty = int(qty_str)
+                if qty < 1:
+                    continue
+                product = Product.objects.get(id=pid)
+                if product.stock < qty:
+                    errors.append(f"'{product.name}' only has {product.stock} in stock.")
+                    continue
+                subtotal = product.price * qty
+                items.append({'product': product, 'quantity': qty, 'subtotal': subtotal})
+                total += subtotal
+            except (Product.DoesNotExist, ValueError):
+                continue
+
+        for e in errors:
+            messages.error(request, e)
+
+        if not items:
+            messages.error(request, 'No valid items — order not created.')
+            return redirect('admin_create_order')
+
+        initial_status = request.POST.get('initial_status', 'pending')
+        if initial_status not in ('pending', 'approved', 'pending_payment'):
+            initial_status = 'pending'
+
+        full_name = request.POST.get('full_name', '').strip()
+        if not full_name:
+            full_name = (customer_label if is_walk_in else
+                         customer.get_full_name() or customer.username)
+
+        order = Order.objects.create(
+            customer=customer,
+            is_walk_in=is_walk_in,
+            full_name=full_name,
+            phone_number=request.POST.get('phone_number', '').strip(),
+            street_address=request.POST.get('street_address', '').strip(),
+            city=request.POST.get('city', '').strip(),
+            state=request.POST.get('state', '').strip(),
+            postcode=request.POST.get('postcode', '').strip(),
+            order_notes=request.POST.get('order_notes', '').strip(),
+            total_amount=total,
+            status=initial_status,
+        )
+        if initial_status == 'approved':
+            order.approved_at = timezone.now()
+            order.approved_by = request.user
+            order.save(update_fields=['approved_at', 'approved_by'])
+
+        for item in items:
+            OrderItem.objects.create(
+                order=order,
+                product=item['product'],
+                quantity=item['quantity'],
+                subtotal=item['subtotal'],
+            )
+            item['product'].stock -= item['quantity']
+            item['product'].save(update_fields=['stock'])
+
+        log_order_event(order, initial_status, actor=request.user,
+                        note=f'Manually created by admin — {"walk-in" if is_walk_in else customer_label}')
+        log_audit(request, 'order_created', target=order,
+                  description=f"Admin {request.user.username} manually created Order #{order.id} for {customer_label}",
+                  metadata={'total': str(total), 'items': len(items),
+                            'status': initial_status, 'walk_in': is_walk_in})
+
+        if not is_walk_in:
+            notify(customer,
+                   title='Your order has been approved ✅' if initial_status == 'approved' else 'New order created for you',
+                   message=f'Admin created Order #{order.id} (RM {total}) on your behalf.',
+                   link=f'/order-details/{order.id}/',
+                   notification_type='order_update')
+
+        messages.success(request, f"Order #{order.id} created for {customer_label} (RM {total}).")
+        return redirect('admin_order_detail', order_id=order.id)
+
+    customers = CustomerUser.objects.filter(role='customer').exclude(username='__walkin__').order_by('username')
+    products = Product.objects.filter(stock__gt=0).select_related('category').order_by('category__name', 'name')
+    return render(request, 'admins/admin_create_order.html', {
+        'customers': customers,
+        'products': products,
+    })
+
+
 # --- DASHBOARD AND ORDERS ---
 
 @sales_admin_required
@@ -593,47 +799,50 @@ def reject_pending_payment(request, order_id):
     
     # Move back to pending
     order.status = 'pending'
-    order.payment_proof = None  # Clear the rejected proof
     order.save()
-    
-    # Update Payment record status
-    Payment.objects.filter(order=order, payment_method='manual').update(status='rejected')
+
+    # Clear proof from Payment record and mark rejected
+    for p in order.payments.filter(payment_method='manual'):
+        p.proof_image = None
+        p.status = 'rejected'
+        p.save(update_fields=['proof_image', 'status'])
 
     log_audit(request, 'payment_rejected', target=order,
               description=f"Manual payment proof rejected for Order #{order.id}",
               metadata={'reason': rejection_reason})
-    notify(order.customer,
-           title="Payment proof rejected ⚠️",
-           message=f"Your payment proof for Order #{order.id} was rejected. Reason: {rejection_reason}. "
-                   f"Please upload a new proof.",
-           link=f"/order-details/{order.id}/",
-           notification_type='payment')
-    
-    # Send notification email to customer
-    try:
-        from django.core.mail import send_mail
-        from django.template.loader import render_to_string
-        from django.urls import reverse
-        
-        dashboard_url = request.build_absolute_uri(reverse('order_success', kwargs={'order_id': order.id}))
-        
-        email_body = render_to_string('emails/payment_proof_rejected.html', {
-            'customer_name': order.customer.first_name or order.customer.username,
-            'order_id': order.id,
-            'reason': rejection_reason,
-            'dashboard_url': dashboard_url,
-        })
-        
-        send_mail(
-            subject=f'Payment Proof Rejected - Order #{order.id}',
-            message='',
-            from_email=None,  # Uses DEFAULT_FROM_EMAIL
-            recipient_list=[order.customer.email],
-            html_message=email_body,
-            fail_silently=True,
-        )
-    except Exception as e:
-        print(f"Error sending rejection email: {e}")
+    if not order.is_walk_in:
+        notify(order.customer,
+               title="Payment proof rejected ⚠️",
+               message=f"Your payment proof for Order #{order.id} was rejected. Reason: {rejection_reason}. "
+                       f"Please upload a new proof.",
+               link=f"/order-details/{order.id}/",
+               notification_type='payment')
+
+        # Send notification email to customer
+        try:
+            from django.core.mail import send_mail
+            from django.template.loader import render_to_string
+            from django.urls import reverse
+
+            dashboard_url = request.build_absolute_uri(reverse('order_success', kwargs={'order_id': order.id}))
+
+            email_body = render_to_string('emails/payment_proof_rejected.html', {
+                'customer_name': order.customer.first_name or order.customer.username,
+                'order_id': order.id,
+                'reason': rejection_reason,
+                'dashboard_url': dashboard_url,
+            })
+
+            send_mail(
+                subject=f'Payment Proof Rejected - Order #{order.id}',
+                message='',
+                from_email=None,
+                recipient_list=[order.customer.email],
+                html_message=email_body,
+                fail_silently=True,
+            )
+        except Exception as e:
+            print(f"Error sending rejection email: {e}")
     
     messages.success(request, f"Order #{order.id} payment proof rejected. Customer notified.")
     return redirect('pending_payment_orders_list')
@@ -702,17 +911,18 @@ def print_prep_list(request):
 @sales_admin_required
 def prepared_orders_list(request):
     """List all prep groups with prepared orders."""
-    # Show only active prep groups that still have at least one order in prepared state.
-    # Once a group is marked ready_for_delivery, it drops out of this list.
     prep_groups = (
         PrepGroup.objects
         .filter(orders__status='prepared')
         .select_related('created_by')
+        .annotate(
+            _total_orders=Count('orders', distinct=True),
+            _total_amount=Sum('orders__total_amount'),
+        )
         .distinct()
         .order_by('-created_at')
     )
 
-    # Search
     search_query = request.GET.get('q', '').strip()
     if search_query:
         prep_groups = prep_groups.filter(
@@ -720,7 +930,6 @@ def prepared_orders_list(request):
             Q(created_by__username__icontains=search_query)
         )
 
-    # Filters
     days_filter = request.GET.get('days', '')
     if days_filter:
         try:
@@ -738,10 +947,14 @@ def prepared_orders_list(request):
         except ValueError:
             pass
 
-    # Ordering
     order_by = request.GET.get('order_by', '-created_at')
-    if order_by in ['created_at', '-created_at', 'total_orders', '-total_orders', 'total_amount', '-total_amount']:
-        prep_groups = prep_groups.order_by(order_by)
+    sort_map = {
+        'total_orders': '_total_orders', '-total_orders': '-_total_orders',
+        'total_amount': '_total_amount', '-total_amount': '-_total_amount',
+    }
+    db_order = sort_map.get(order_by, order_by)
+    if db_order in ['created_at', '-created_at', '_total_orders', '-_total_orders', '_total_amount', '-_total_amount']:
+        prep_groups = prep_groups.order_by(db_order)
 
     return render(request, 'admins/prepared_orders.html', {
         'prep_groups': prep_groups,
@@ -772,7 +985,7 @@ def mark_prep_group_ready(request, group_id):
         orders = prep_group.orders.filter(status='prepared')
 
         if not orders.exists():
-            messages.error(request, 'No prepared orders are available in this prep group.')
+            messages.error(request, 'No prepared orders are available in this order preparation group.')
             return redirect('prep_group_detail', group_id=prep_group.group_id)
 
         order_list = list(orders)
@@ -787,19 +1000,23 @@ def mark_prep_group_ready(request, group_id):
             delivery_assigned_by=request.user
         )
 
+        for o in order_list:
+            log_order_event(o, 'ready_for_delivery', actor=request.user,
+                            note=f'courier={courier_name or ""} tracking={tracking_number or ""}')
         log_audit(request, 'order_ready_for_delivery', target=prep_group,
-                  description=f"Prep group {prep_group.group_id} marked ready for delivery",
+                  description=f"Order Preparation {prep_group.group_id} marked ready for delivery",
                   metadata={'courier': courier_name or '', 'tracking': tracking_number or '',
                             'order_ids': [o.id for o in order_list]})
         for o in order_list:
-            notify(o.customer,
-                   title="Your order is ready for delivery 📦",
-                   message=f"Order #{o.id} has been packed and assigned to "
-                           f"{courier_name or 'a courier'}.",
-                   link=f"/order-details/{o.id}/",
-                   notification_type='delivery')
+            if not o.is_walk_in:
+                notify(o.customer,
+                       title="Your order is ready for delivery 📦",
+                       message=f"Order #{o.id} has been packed and assigned to "
+                               f"{courier_name or 'a courier'}.",
+                       link=f"/order-details/{o.id}/",
+                       notification_type='delivery')
 
-        messages.success(request, f'Prep group {prep_group.group_id} marked as ready for delivery.')
+        messages.success(request, f'Order Preparation {prep_group.group_id} marked as ready for delivery.')
         return redirect('delivery_orders_list')
 
     return redirect('prep_group_detail', group_id=prep_group.group_id)
@@ -810,14 +1027,16 @@ def mark_order_out_for_delivery(request, order_id):
     order = get_object_or_404(Order, id=order_id, status='ready_for_delivery')
     order.status = 'out_for_delivery'
     order.save()
+    log_order_event(order, 'out_for_delivery', actor=request.user)
     log_audit(request, 'order_out_for_delivery', target=order,
               description=f"Order #{order.id} out for delivery")
-    notify(order.customer,
-           title="Your order is on the way 🛵",
-           message=f"Order #{order.id} has been dispatched. "
-                   f"{'Track it with Citylink: ' + order.tracking_number if order.tracking_number else ''}",
-           link=f"/order-details/{order.id}/",
-           notification_type='delivery')
+    if not order.is_walk_in:
+        notify(order.customer,
+               title="Your order is on the way 🛵",
+               message=f"Order #{order.id} has been dispatched. "
+                       f"{'Track it with Citylink: ' + order.tracking_number if order.tracking_number else ''}",
+               link=f"/order-details/{order.id}/",
+               notification_type='delivery')
     messages.success(request, f"Order #{order.id} marked as Out for Delivery.")
     return redirect('delivery_orders_list')
 
@@ -828,13 +1047,15 @@ def mark_order_delivered(request, order_id):
     order.status = 'delivered'
     order.delivered_at = timezone.now()
     order.save()
+    log_order_event(order, 'delivered', actor=request.user)
     log_audit(request, 'order_delivered', target=order,
               description=f"Order #{order.id} delivered")
-    notify(order.customer,
-           title="Order delivered ✅",
-           message=f"Order #{order.id} has been delivered. We hope you enjoyed it!",
-           link=f"/order-details/{order.id}/",
-           notification_type='delivery')
+    if not order.is_walk_in:
+        notify(order.customer,
+               title="Order delivered ✅",
+               message=f"Order #{order.id} has been delivered. We hope you enjoyed it!",
+               link=f"/order-details/{order.id}/",
+               notification_type='delivery')
     # Recalculate CRM stats
     try:
         from customers.models import CustomerProfile
@@ -937,8 +1158,6 @@ def mark_orders_prepared(request):
         # Create prep group
         prep_group = PrepGroup.objects.create(
             created_by=request.user,
-            total_orders=orders.count(),
-            total_amount=sum(order.total_amount for order in orders)
         )
         prep_group.orders.set(orders)
 
@@ -952,17 +1171,20 @@ def mark_orders_prepared(request):
             prepared_by=request.user
         )
 
+        for o in order_list:
+            log_order_event(o, 'prepared', actor=request.user)
         log_audit(request, 'order_prepared', target=prep_group,
-                  description=f"Created {prep_group.group_id} with {len(order_list)} orders",
+                  description=f"Created Order Preparation {prep_group.group_id} with {len(order_list)} orders",
                   metadata={'order_ids': [o.id for o in order_list]})
         for o in order_list:
-            notify(o.customer,
-                   title="Your order is being prepared 👨‍🍳",
-                   message=f"Order #{o.id} is now being prepared in the kitchen.",
-                   link=f"/orders/",
-                   notification_type='order_update')
+            if not o.is_walk_in:
+                notify(o.customer,
+                       title="Your order is being prepared 👨‍🍳",
+                       message=f"Order #{o.id} is now being prepared in the kitchen.",
+                       link=f"/orders/",
+                       notification_type='order_update')
 
-        messages.success(request, f"Created prep group {prep_group.group_id} with {prep_group.total_orders} orders.")
+        messages.success(request, f"Created Order Preparation {prep_group.group_id} with {len(order_list)} orders.")
         return redirect('prep_group_detail', group_id=prep_group.group_id)
 
     return redirect('approved_orders_list')
@@ -977,6 +1199,7 @@ def set_pending_payment(request, order_id):
     else:
         order.status = 'pending_payment'
         order.save()
+        log_order_event(order, 'pending_payment', actor=request.user)
         messages.success(request, f"Order #{order.id} marked as Accepted and Waiting for Payment.")
     return redirect('sales_admin_dashboard')
 
@@ -1037,7 +1260,8 @@ def bulk_reject_orders(request):
             # Update order status
             order.status = 'rejected'
             order.save()
-            
+            log_order_event(order, 'rejected', actor=request.user)
+
             # Create rejection record for analytics
             rejected_order_record = RejectedOrder.objects.create(
                 order=order,
@@ -1046,16 +1270,15 @@ def bulk_reject_orders(request):
                 rejected_by=request.user,
                 order_total_amount=order.total_amount,
                 order_item_count=order.items.count(),
-                customer_name=order.customer.first_name or order.customer.username,
-                customer_email=order.customer.email,
+                customer_name=order.customer_label,
+                customer_email='' if order.is_walk_in else order.customer.email,
             )
-            
-            # Send rejection email to customer
-            try:
-                notify_rejection_to_customer(rejected_order_record, send_email=True)
-            except Exception as e:
-                # Log error but don't block rejection
-                print(f"Error notifying customer for order {order.id}: {str(e)}")
+
+            if not order.is_walk_in:
+                try:
+                    notify_rejection_to_customer(rejected_order_record, send_email=True)
+                except Exception as e:
+                    print(f"Error notifying customer for order {order.id}: {str(e)}")
             
             rejected_count += 1
 
@@ -1084,6 +1307,7 @@ def approve_order(request, order_id):
         # Payment not yet received - move to awaiting payment list
         order.status = 'pending_payment'
         order.save()
+        log_order_event(order, 'pending_payment', actor=request.user)
         messages.success(request, f"Order #{order.id} Approved. Customer will see it in their Awaiting Payment list.")
     
     return redirect('sales_admin_dashboard')
@@ -1113,7 +1337,8 @@ def reject_order(request, order_id):
     # Update order status
     order.status = 'rejected'
     order.save()
-    
+    log_order_event(order, 'rejected', actor=request.user)
+
     # Create rejection record for analytics
     rejected_order_record = RejectedOrder.objects.create(
         order=order,
@@ -1122,26 +1347,29 @@ def reject_order(request, order_id):
         rejected_by=request.user,
         order_total_amount=order.total_amount,
         order_item_count=order.items.count(),
-        customer_name=order.customer.first_name or order.customer.username,
-        customer_email=order.customer.email,
+        customer_name=order.customer_label,
+        customer_email='' if order.is_walk_in else order.customer.email,
     )
-    
-    # Send rejection email to customer
-    try:
-        notify_rejection_to_customer(rejected_order_record, send_email=True)
-        messages.warning(request, f"Order #{order.id} Rejected and customer notified via email.")
-    except Exception as e:
-        messages.warning(request, f"Order #{order.id} Rejected but failed to send email: {str(e)}")
+
+    if order.is_walk_in:
+        messages.warning(request, f"Order #{order.id} Rejected. (Walk-in order — no email sent.)")
+    else:
+        try:
+            notify_rejection_to_customer(rejected_order_record, send_email=True)
+            messages.warning(request, f"Order #{order.id} Rejected and customer notified via email.")
+        except Exception as e:
+            messages.warning(request, f"Order #{order.id} Rejected but failed to send email: {str(e)}")
 
     log_audit(request, 'order_rejected', target=order,
               description=f"Order #{order.id} rejected",
               metadata={'reason': custom_reason or (rejection_reason.reason_text if rejection_reason else '')})
-    notify(order.customer,
-           title="Order rejected ❌",
-           message=f"Order #{order.id} has been rejected. Reason: "
-                   f"{custom_reason or (rejection_reason.customer_message if rejection_reason else 'Please contact support.')}",
-           link=f"/rejected-orders/",
-           notification_type='order_update')
+    if not order.is_walk_in:
+        notify(order.customer,
+               title="Order rejected ❌",
+               message=f"Order #{order.id} has been rejected. Reason: "
+                       f"{custom_reason or (rejection_reason.customer_message if rejection_reason else 'Please contact support.')}",
+               link=f"/rejected-orders/",
+               notification_type='order_update')
 
     # Auto-refund if the customer had already paid via Stripe
     from admins.refund_utils import process_refund
@@ -1315,12 +1543,13 @@ def mark_refund_processed(request, refund_id):
               description=f'Manual refund #{refund.id} processed for Order #{refund.order.id} — RM {refund.amount}',
               metadata={'bank_reference': bank_reference, 'notes': notes, 'amount': str(refund.amount)})
 
-    notify(refund.order.customer,
-           title='Refund completed',
-           message=f'Your refund of RM {refund.amount} for Order #{refund.order.id} '
-                   f'has been transferred to your account. Please allow 1–3 business days.',
-           link=f'/order-details/{refund.order.id}/',
-           notification_type='payment')
+    if not refund.order.is_walk_in:
+        notify(refund.order.customer,
+               title='Refund completed',
+               message=f'Your refund of RM {refund.amount} for Order #{refund.order.id} '
+                       f'has been transferred to your account. Please allow 1–3 business days.',
+               link=f'/order-details/{refund.order.id}/',
+               notification_type='payment')
 
     messages.success(request, f"Refund #{refund.id} marked as processed (RM {refund.amount}).")
     return redirect('refund_list')

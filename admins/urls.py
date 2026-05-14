@@ -28,9 +28,15 @@ urlpatterns = [
     # Inventory and Product Management
     path('inventory/', views.inventory_list, name='inventory_list'),
     path('inventory/add/', views.add_product, name='add_product'),
+    path('inventory/<int:product_id>/edit/', views.edit_product, name='edit_product'),
+    path('inventory/<int:product_id>/delete/', views.delete_product, name='delete_product'),
+    path('inventory/categories/', views.manage_categories, name='manage_categories'),
     path('inventory/stage/<int:product_id>/', views.stage_stock_update, name='stage_stock_update'),
     path('inventory/confirm/', views.confirm_stock_changes, name='confirm_stock_changes'),
     path('inventory/clear/', views.clear_stock_staging, name='clear_stock_staging'),
+
+    # Manual order creation (admin-side)
+    path('orders/create/', views.admin_create_order, name='admin_create_order'),
     
     # Complaints Management
     path('complaints/', views.admin_complaints_list, name='admin_complaints_list'),
