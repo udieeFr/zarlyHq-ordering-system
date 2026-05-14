@@ -1,0 +1,60 @@
+{% extends 'admin_base.html' %}
+
+{% block page_title %}Confirm Your Identity{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+  <div class="col-sm-10 col-md-7 col-lg-5">
+
+    <div class="content-card">
+      <!-- Lock icon header -->
+      <div class="text-center mb-4">
+        <div style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,#0f172a,#1e293b);display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="white" viewBox="0 0 16 16">
+            <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
+          </svg>
+        </div>
+        <h5 class="fw-bold mb-1">Confirm your identity</h5>
+        <p class="text-muted small mb-0">
+          This page contains sensitive information.<br>
+          Re-enter your password to continue. Access is granted for <strong>{{ sudo_duration_minutes }} minutes</strong>.
+        </p>
+      </div>
+
+      {% if messages %}
+        {% for msg in messages %}
+        <div class="alert alert-danger py-2 small">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+
+      <form method="post" autocomplete="off">
+        {% csrf_token %}
+
+        <div class="mb-3">
+          <label class="form-label fw-bold small">Logged in as</label>
+          <div class="form-control bg-light text-muted" style="cursor:default;">
+            {{ request.user.username }}
+            <span class="badge bg-secondary ms-1">{{ request.user.role }}</span>
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label for="password" class="form-label fw-bold small">Password</label>
+          <input type="password" name="password" id="password"
+                 class="form-control" placeholder="Enter your password"
+                 autofocus autocomplete="current-password" required>
+        </div>
+
+        <div class="d-grid gap-2">
+          <button type="submit" class="btn btn-dark fw-bold py-2">Confirm and Continue</button>
+          <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+
+    <p class="text-center text-muted small mt-3">
+      This re-authentication attempt is recorded in the security audit log.
+    </p>
+  </div>
+</div>
+{% endblock %}

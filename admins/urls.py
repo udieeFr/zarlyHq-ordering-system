@@ -43,6 +43,9 @@ urlpatterns = [
     path('complaints/<int:complaint_id>/', views.admin_complaint_detail, name='admin_complaint_detail'),
     path('complaints/<int:complaint_id>/resolve/', views.resolve_complaint, name='resolve_complaint'),
 
+    # Step-up authentication
+    path('sudo/', views.sudo_confirm, name='sudo_confirm'),
+
     # Audit Log (security trail)
     path('audit-log/', views.audit_log_list, name='audit_log_list'),
 

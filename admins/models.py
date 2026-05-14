@@ -347,11 +347,18 @@ class RejectedOrder(models.Model):
         return self.rejection_reason.customer_message if self.rejection_reason else "Your order was rejected."
 
 
+AUDIT_CHAIN_GENESIS = 'ZARLY_AUDIT_CHAIN_V1'
+
+
 class AuditLog(models.Model):
     """
     Immutable audit trail of every security-relevant action in the system.
     Supports the non-repudiation theme: every action is attributable to an actor,
     timestamped, and traceable to a source IP.
+
+    Hash chaining: each row stores a SHA-256 of its own content plus the
+    previous row's chain_hash. Deleting or altering any row breaks every
+    subsequent hash, making tampering detectable via verify_chain().
     """
     ACTION_CHOICES = (
         ('order_created', 'Order Created'),
@@ -393,6 +400,8 @@ class AuditLog(models.Model):
     user_agent = models.TextField(blank=True)
     metadata = models.JSONField(default=dict, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    chain_hash = models.CharField(max_length=64, blank=True, db_index=True,
+                                  help_text="SHA-256 of this entry's content chained with the previous entry's hash.")
 
     class Meta:
         ordering = ['-timestamp']
@@ -401,6 +410,64 @@ class AuditLog(models.Model):
             models.Index(fields=['action_type', '-timestamp']),
             models.Index(fields=['target_model', 'target_id']),
         ]
+
+    def _compute_hash(self, prev_hash):
+        import hashlib, json
+        content = '|'.join([
+            prev_hash,
+            str(self.actor_id or ''),
+            self.action_type,
+            self.description,
+            self.target_model,
+            str(self.target_id or ''),
+            json.dumps(self.metadata, sort_keys=True),
+            self.ip_address or '',
+        ])
+        return hashlib.sha256(content.encode('utf-8')).hexdigest()
+
+    def save(self, *args, **kwargs):
+        import hashlib
+        from django.db import transaction
+        if not self.pk:
+            with transaction.atomic():
+                last = (AuditLog.objects
+                        .select_for_update()
+                        .only('chain_hash')
+                        .order_by('id')
+                        .last())
+                if last and last.chain_hash:
+                    prev_hash = last.chain_hash
+                else:
+                    prev_hash = hashlib.sha256(AUDIT_CHAIN_GENESIS.encode()).hexdigest()
+                self.chain_hash = self._compute_hash(prev_hash)
+                super().save(*args, **kwargs)
+        else:
+            super().save(*args, **kwargs)
+
+    @classmethod
+    def verify_chain(cls):
+        """
+        Walk every entry in insertion order and recompute each chain_hash.
+        Returns (is_valid: bool, broken_at_id: int|None).
+        A broken chain means at least one entry was altered or deleted.
+        """
+        import hashlib
+        genesis = hashlib.sha256(AUDIT_CHAIN_GENESIS.encode()).hexdigest()
+        prev_hash = genesis
+        first_unchained = None
+
+        for entry in cls.objects.order_by('id').iterator(chunk_size=500):
+            if not entry.chain_hash:
+                # Pre-chain entry (created before this feature was added) — skip
+                # but mark so callers know the chain only covers a subset.
+                first_unchained = entry.id
+                continue
+            expected = entry._compute_hash(prev_hash)
+            if entry.chain_hash != expected:
+                return False, entry.id
+            prev_hash = entry.chain_hash
+
+        return True, first_unchained  # True = valid; first_unchained = oldest pre-chain id or None
 
     def __str__(self):
         who = self.actor.username if self.actor else 'system'

@@ -10,6 +10,7 @@ from datetime import timedelta
 from .models import Order, OrderItem, DigitalSignature, Complaint, PrepGroup, Payment, AuditLog, Notification, OrderEvent
 from .utils import generate_invoice_pdf, sign_pdf_digitally
 from .notifications import log_audit, notify, notify_admins
+from .sudo import sudo_required, grant_sudo, SUDO_NEXT_KEY, SUDO_DURATION
 from customers.auth_utils import (
     sales_admin_required, 
     manager_required, 
@@ -46,6 +47,25 @@ def order_has_confirmed_payment(order):
 def log_order_event(order, status, actor=None, note=''):
     """Record a single order state transition to the OrderEvent history table."""
     OrderEvent.objects.create(order=order, status=status, actor=actor, note=note)
+
+
+@sales_admin_required
+def sudo_confirm(request):
+    """Step-up authentication — re-enter password to access sensitive pages."""
+    if request.method == 'POST':
+        password = request.POST.get('password', '')
+        if request.user.check_password(password):
+            grant_sudo(request)
+            log_audit(request, 'login_success',
+                      description=f"{request.user.username} passed step-up authentication")
+            next_url = request.session.pop(SUDO_NEXT_KEY, None) or 'sales_admin_dashboard'
+            return redirect(next_url)
+        log_audit(request, 'login_failed',
+                  description=f"{request.user.username} failed step-up authentication")
+        messages.error(request, 'Incorrect password. Please try again.')
+    return render(request, 'admins/sudo_confirm.html', {
+        'sudo_duration_minutes': SUDO_DURATION // 60,
+    })
 
 
 def finalize_order_approval(order, user, request=None):
@@ -408,6 +428,7 @@ def edit_product(request, product_id):
 
 
 @manager_required
+@sudo_required
 def delete_product(request, product_id):
     """Delete a product. POST only, manager-only."""
     product = get_object_or_404(Product, id=product_id)
@@ -1452,6 +1473,7 @@ def resolve_complaint(request, complaint_id):
 # --- AUDIT LOG ---
 
 @manager_required
+@sudo_required
 def audit_log_list(request):
     """Filterable view of the security audit trail."""
     logs = AuditLog.objects.select_related('actor').all()
@@ -1492,6 +1514,8 @@ def audit_log_list(request):
         limit = 200
     logs = logs[:limit]
 
+    chain_valid, chain_broken_at = AuditLog.verify_chain()
+
     return render(request, 'admins/audit_log.html', {
         'logs': logs,
         'action_choices': AuditLog.ACTION_CHOICES,
@@ -1502,12 +1526,15 @@ def audit_log_list(request):
         'search_query': search_query,
         'count_limit': limit,
         'total_count': AuditLog.objects.count(),
+        'chain_valid': chain_valid,
+        'chain_broken_at': chain_broken_at,
     })
 
 
 # --- REFUND MANAGEMENT ---
 
 @manager_required
+@sudo_required
 def refund_list(request):
     """Manager view — lists all refund records filterable by status."""
     from admins.models import Refund
@@ -1529,6 +1556,7 @@ def refund_list(request):
 
 
 @manager_required
+@sudo_required
 def mark_refund_processed(request, refund_id):
     """Mark a manual/failed refund as completed after the manager does the bank transfer."""
     from admins.models import Refund
