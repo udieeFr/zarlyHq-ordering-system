@@ -4,161 +4,219 @@
 
 {% block content %}
 <style>
-    .tier-pill {
-        display: inline-block;
-        padding: 0.18rem 0.6rem;
-        border-radius: 999px;
-        font-size: 0.72rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-    }
-    .tier-bronze   { background:#fef3c7; color:#92400e; }
-    .tier-silver   { background:#e2e8f0; color:#475569; }
-    .tier-gold     { background:#fef9c3; color:#854d0e; }
-    .tier-platinum { background:#dbeafe; color:#1e40af; }
+  /* Tier pills */
+  .tier-pill {
+    display: inline-block;
+    padding: 0.18rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .tier-bronze { background:#fef3c7; color:#92400e; }
+  .tier-silver { background:#e2e8f0; color:#475569; }
+  .tier-gold   { background:#fef9c3; color:#854d0e; }
+  .tier-vip    { background:#dbeafe; color:#1e40af; }
 
-    .campaign-bar {
-        display: none;
-        position: sticky; bottom: 1.25rem; z-index: 100;
-        background: #0f172a; color: #fff;
-        border-radius: 14px; padding: 0.9rem 1.4rem;
-        box-shadow: 0 8px 32px rgba(15,23,42,.3);
-        align-items: center; gap: 1rem; flex-wrap: wrap;
-        animation: slideUp .2s ease;
-    }
-    .campaign-bar.visible { display: flex; }
-    @keyframes slideUp { from { transform:translateY(20px); opacity:0; } to { transform:translateY(0); opacity:1; } }
-    .campaign-count { font-size: .88rem; font-weight: 700; }
-    .campaign-count span { color: #ff9933; }
-    .btn-campaign {
-        background: linear-gradient(135deg, #ff9933, #f97316);
-        color: #fff; border: none; padding: .5rem 1.2rem;
-        border-radius: 10px; font-weight: 700; font-size: .85rem;
-        cursor: pointer; transition: opacity .15s;
-    }
-    .btn-campaign:hover { opacity: .88; }
-    .btn-clear { background: transparent; color: rgba(255,255,255,.6); border: none; font-size: .8rem; cursor: pointer; }
+  /* Soft panels */
+  .crm-panel {
+    background: #fff;
+    border-radius: 1rem;
+    border: 1px solid oklch(93% 0.006 60);
+    box-shadow: 0 4px 24px rgba(15,23,42,.08), 0 1.5px 6px rgba(15,23,42,.04);
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+  }
+  .crm-panel-header {
+    padding: 0.9rem 1.4rem;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;
+  }
+  .crm-panel-title { font-size: 0.88rem; font-weight: 800; color: #0f172a; letter-spacing: -.01em; margin: 0; }
+  .crm-panel-body { padding: 1.2rem 1.4rem; }
+
+  /* Soft table */
+  .soft-table { width: 100%; font-size: 0.82rem; border-collapse: collapse; }
+  .soft-table th {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .06em; color: #64748b;
+    padding: 0.65rem 1rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+  }
+  .soft-table td { padding: 0.72rem 1rem; border-bottom: 1px solid #f1f5f9; color: #1e293b; vertical-align: middle; }
+  .soft-table tr:last-child td { border-bottom: none; }
+  .soft-table tr:hover td { background: oklch(98.5% 0.004 60); }
+  .soft-table tr.opted-out td { background: oklch(98% 0.002 250); }
+  .soft-table tr.opted-out:hover td { background: oklch(96.5% 0.003 250); }
+
+  /* VIP star button */
+  .vip-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; border-radius: 8px; border: 1px solid #e2e8f0;
+    background: #f8fafc; color: #94a3b8; cursor: pointer;
+    font-size: 0.9rem; line-height: 1; transition: all .15s;
+    vertical-align: middle;
+  }
+  .vip-btn.is-vip { background: #fef3c7; border-color: #f59e0b; color: #b45309; }
+  .vip-btn:hover { border-color: #f59e0b; color: #b45309; background: #fef3c7; }
+
+  /* Text link style */
+  .view-link { font-size: 0.78rem; font-weight: 600; color: #ff9933; text-decoration: none; }
+  .view-link:hover { color: #e07e1e; text-decoration: underline; }
+
+  /* Campaign bar */
+  .campaign-bar {
+    display: none;
+    position: sticky; bottom: 1.25rem; z-index: 100;
+    background: #0f172a; color: #fff;
+    border-radius: 14px; padding: 0.9rem 1.4rem;
+    box-shadow: 0 8px 32px rgba(15,23,42,.3);
+    align-items: center; gap: 1rem; flex-wrap: wrap;
+    animation: slideUp .2s ease;
+  }
+  .campaign-bar.visible { display: flex; }
+  @keyframes slideUp { from { transform:translateY(20px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+  .campaign-count { font-size: .88rem; font-weight: 700; }
+  .campaign-count span { color: #ff9933; }
+  .btn-campaign {
+    background: linear-gradient(135deg, #ff9933, #f97316);
+    color: #fff; border: none; padding: .5rem 1.2rem;
+    border-radius: 10px; font-weight: 700; font-size: .85rem;
+    cursor: pointer; transition: opacity .15s;
+    display: inline-flex; align-items: center; gap: 0.4rem;
+  }
+  .btn-campaign:hover { opacity: .88; }
+  .btn-clear { background: transparent; color: rgba(255,255,255,.6); border: none; font-size: .8rem; cursor: pointer; }
 </style>
 
 <div class="page-header">
-    <h1>Customers</h1>
-    <p>Customer relationship overview — lifetime value, loyalty tier, last activity. Select customers to send a campaign email.</p>
+  <h1>Customers</h1>
+  <p>Lifetime value, loyalty tier, and last activity. Select customers to send a campaign email.</p>
 </div>
 
-<div class="mb-4">
-    <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
-</div>
-
-<div class="content-card mb-4">
-    <form method="get" class="row g-3">
-        <div class="col-md-4">
-            <label class="form-label">Search</label>
-            <input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="Username, email, name">
-        </div>
-        <div class="col-md-3">
-            <label class="form-label">Loyalty tier</label>
-            <select name="tier" class="form-select">
-                <option value="">All tiers</option>
-                {% for code, label in tier_choices %}
-                <option value="{{ code }}" {% if tier_filter == code %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-3">
-            <label class="form-label">Sort by</label>
-            <select name="order_by" class="form-select">
-                <option value="-total_spent" {% if order_by == '-total_spent' %}selected{% endif %}>Highest spend</option>
-                <option value="total_spent" {% if order_by == 'total_spent' %}selected{% endif %}>Lowest spend</option>
-                <option value="-total_orders" {% if order_by == '-total_orders' %}selected{% endif %}>Most orders</option>
-                <option value="-last_order_at" {% if order_by == '-last_order_at' %}selected{% endif %}>Most recent activity</option>
-                <option value="user__username" {% if order_by == 'user__username' %}selected{% endif %}>Username (A-Z)</option>
-                <option value="-created_at" {% if order_by == '-created_at' %}selected{% endif %}>Newest customer</option>
-            </select>
-        </div>
-        <div class="col-md-2 d-flex align-items-end">
-            <button type="submit" class="btn btn-primary w-100">Apply</button>
-        </div>
+<!-- Filters -->
+<div class="crm-panel">
+  <div class="crm-panel-header">
+    <span class="crm-panel-title">Filter &amp; Sort</span>
+  </div>
+  <div class="crm-panel-body">
+    <form method="get" class="row g-3 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label" style="font-size:0.8rem;font-weight:600;color:#64748b;">Search</label>
+        <input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="Username, email, name">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" style="font-size:0.8rem;font-weight:600;color:#64748b;">Loyalty tier</label>
+        <select name="tier" class="form-select">
+          <option value="">All tiers</option>
+          {% for code, label in tier_choices %}
+          <option value="{{ code }}" {% if tier_filter == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" style="font-size:0.8rem;font-weight:600;color:#64748b;">Sort by</label>
+        <select name="order_by" class="form-select">
+          <option value="-total_spent"   {% if order_by == '-total_spent'   %}selected{% endif %}>Highest spend</option>
+          <option value="total_spent"    {% if order_by == 'total_spent'    %}selected{% endif %}>Lowest spend</option>
+          <option value="-total_orders"  {% if order_by == '-total_orders'  %}selected{% endif %}>Most orders</option>
+          <option value="-last_order_at" {% if order_by == '-last_order_at' %}selected{% endif %}>Most recent activity</option>
+          <option value="user__username" {% if order_by == 'user__username' %}selected{% endif %}>Username (A-Z)</option>
+          <option value="-created_at"    {% if order_by == '-created_at'    %}selected{% endif %}>Newest customer</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary w-100">Apply</button>
+      </div>
     </form>
+  </div>
 </div>
 
-<div class="content-card">
-    <div class="d-flex align-items-center justify-content-between mb-3" style="flex-wrap:wrap;gap:.5rem;">
-        <h5 class="fw-bold mb-0">All Customers ({{ profiles|length }})</h5>
-        <div style="display:flex;gap:.5rem;">
-            <button class="btn btn-sm btn-outline-secondary" onclick="selectAll()">Select All</button>
-            <button class="btn btn-sm btn-outline-secondary" onclick="clearAll()">Clear</button>
-        </div>
+<!-- Table -->
+<div class="crm-panel">
+  <div class="crm-panel-header">
+    <span class="crm-panel-title">All Customers <span style="font-weight:500;color:#64748b;">({{ profiles|length }})</span></span>
+    <div style="display:flex;gap:.5rem;">
+      <button class="btn btn-sm btn-outline-secondary" onclick="selectAll()">Select All</button>
+      <button class="btn btn-sm btn-outline-secondary" onclick="clearAll()">Clear</button>
     </div>
-    <div class="table-responsive">
-        <table class="table table-hover align-middle">
-            <thead class="table-light">
-                <tr>
-                    <th style="width:36px;"></th>
-                    <th>Customer</th>
-                    <th>Email</th>
-                    <th>Phone</th>
-                    <th>Tier</th>
-                    <th>Orders</th>
-                    <th>Lifetime Spend</th>
-                    <th>Last Order</th>
-                    <th>Opt-in</th>
-                    <th class="text-end">Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for p in profiles %}
-                <tr class="{% if not p.marketing_opt_in %}table-secondary{% endif %}">
-                    <td>
-                        {% if p.marketing_opt_in %}
-                        <input type="checkbox" class="customer-check form-check-input" value="{{ p.user.id }}" onchange="updateBar()">
-                        {% else %}
-                        <span title="Opted out" style="color:#94a3b8;font-size:.8rem;">—</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <strong>{{ p.user.username }}</strong>
-                        {% if p.is_vip %}<span style="background:#f59e0b;color:#000;font-size:.6rem;font-weight:700;padding:1px 6px;border-radius:10px;vertical-align:middle;margin-left:4px;">VIP</span>{% endif %}
-                        <br><small class="text-muted">{{ p.user.first_name }} {{ p.user.last_name }}</small>
-                    </td>
-                    <td>{{ p.user.email }}</td>
-                    <td style="font-size:.82rem;color:#475569;">{{ p.default_phone|default:"—" }}</td>
-                    <td><span class="tier-pill tier-{{ p.loyalty_tier }}">{{ p.get_loyalty_tier_display }}</span></td>
-                    <td class="fw-bold">{{ p.total_orders }}</td>
-                    <td class="fw-bold">RM {{ p.total_spent|floatformat:2 }}</td>
-                    <td>{% if p.last_order_at %}{{ p.last_order_at|date:"d M Y" }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
-                    <td>
-                        {% if p.marketing_opt_in %}
-                        <span style="color:#10b981;font-weight:700;font-size:.78rem;">Yes</span>
-                        {% else %}
-                        <span style="color:#94a3b8;font-size:.78rem;">No</span>
-                        {% endif %}
-                    </td>
-                    <td class="text-end">
-                        <button class="btn btn-sm {% if p.is_vip %}btn-warning{% else %}btn-outline-secondary{% endif %} me-1 vip-toggle"
-                                data-url="{% url 'toggle_customer_vip' p.user.id %}"
-                                data-id="{{ p.user.id }}"
-                                title="{% if p.is_vip %}Remove VIP{% else %}Mark as VIP{% endif %}">
-                            ★
-                        </button>
-                        <a href="{% url 'customer_crm_detail' p.user.id %}" class="btn btn-sm btn-outline-primary">View</a>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="10" class="text-center text-muted py-4">No customers match your filters.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="soft-table">
+      <thead>
+        <tr>
+          <th style="width:40px;"></th>
+          <th>Customer</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Tier</th>
+          <th>Orders</th>
+          <th>Lifetime Spend</th>
+          <th>Last Order</th>
+          <th>Opt-in</th>
+          <th style="text-align:right;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in profiles %}
+        <tr class="{% if not p.marketing_opt_in %}opted-out{% endif %}">
+          <td style="padding-left:1.1rem;">
+            {% if p.marketing_opt_in %}
+            <input type="checkbox" class="customer-check form-check-input" value="{{ p.user.id }}" onchange="updateBar()">
+            {% else %}
+            <span title="Opted out" style="color:#64748b;font-size:.8rem;">—</span>
+            {% endif %}
+          </td>
+          <td>
+            <span style="font-weight:700;color:#0f172a;">{{ p.user.username }}</span>
+            {% if p.is_vip %}<span style="background:#f59e0b;color:oklch(22% 0.06 60);font-size:.72rem;font-weight:700;padding:1px 6px;border-radius:10px;vertical-align:middle;margin-left:4px;">VIP</span>{% endif %}
+            {% if p.user.first_name or p.user.last_name %}
+            <br><span style="font-size:.78rem;color:#64748b;">{{ p.user.first_name }} {{ p.user.last_name }}</span>
+            {% endif %}
+          </td>
+          <td style="color:#475569;font-size:.8rem;">{{ p.user.email }}</td>
+          <td style="color:#475569;font-size:.8rem;">{{ p.default_phone|default:"—" }}</td>
+          <td><span class="tier-pill tier-{{ p.loyalty_tier }}">{{ p.get_loyalty_tier_display }}</span></td>
+          <td style="font-weight:700;">{{ p.total_orders }}</td>
+          <td style="font-weight:700;color:#10b981;">RM {{ p.total_spent|floatformat:2 }}</td>
+          <td style="color:#64748b;font-size:.8rem;">
+            {% if p.last_order_at %}{{ p.last_order_at|date:"d M Y" }}{% else %}—{% endif %}
+          </td>
+          <td>
+            {% if p.marketing_opt_in %}
+            <span style="color:#10b981;font-weight:700;font-size:.78rem;">Yes</span>
+            {% else %}
+            <span style="color:#64748b;font-size:.78rem;">No</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right;white-space:nowrap;">
+            <button class="vip-btn {% if p.is_vip %}is-vip{% endif %} vip-toggle me-1"
+                    data-url="{% url 'toggle_customer_vip' p.user.id %}"
+                    data-id="{{ p.user.id }}"
+                    title="{% if p.is_vip %}Remove VIP{% else %}Mark as VIP{% endif %}">★</button>
+            <a href="{% url 'customer_crm_detail' p.user.id %}" class="view-link">View →</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="10" style="text-align:center;color:#64748b;padding:2.5rem 1rem;">
+            No customers match your filters.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <!-- Sticky campaign bar -->
 <div class="campaign-bar" id="campaignBar">
-    <div class="campaign-count">
-        <span id="selectedCount">0</span> customer(s) selected
-    </div>
-    <button class="btn-campaign" onclick="sendCampaign()">📧 Send Campaign Email</button>
-    <button class="btn-clear" onclick="clearAll()">Clear selection</button>
+  <div class="campaign-count"><span id="selectedCount">0</span> customer(s) selected</div>
+  <button class="btn-campaign" onclick="sendCampaign()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+    Send Campaign Email
+  </button>
+  <button class="btn-clear" onclick="clearAll()">Clear selection</button>
 </div>
 {% csrf_token %}
 
@@ -189,13 +247,14 @@
     window.location.href = "{% url 'campaign_compose' %}?" + params;
   }
 
-  // VIP toggle
   document.querySelectorAll('.vip-toggle').forEach(btn => {
     btn.addEventListener('click', function() {
       const url = this.dataset.url;
       const csrf = document.querySelector('[name=csrfmiddlewaretoken]') || { value: '' };
       fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrf.value, 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(r => r.json()).then(() => location.reload());
+        .then(r => r.json())
+        .then(() => location.reload())
+        .catch(() => alert('Failed to update VIP status. Please try again.'));
     });
   });
 </script>

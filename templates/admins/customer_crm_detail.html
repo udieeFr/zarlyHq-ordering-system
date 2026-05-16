@@ -4,90 +4,142 @@
 
 {% block content %}
 <style>
-    .crm-stat-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1rem 1.25rem; }
-    .crm-stat-card .label { font-size:0.75rem; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; }
-    .crm-stat-card .value { font-size:1.5rem; font-weight:800; color:#0f172a; }
-    .tier-pill { display:inline-block; padding:0.18rem 0.6rem; border-radius:999px; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; }
-    .tier-bronze { background:#fef3c7; color:#92400e; }
-    .tier-silver { background:#e2e8f0; color:#475569; }
-    .tier-gold { background:#fef9c3; color:#854d0e; }
-    .tier-platinum { background:#dbeafe; color:#1e40af; }
+  .kpi-card {
+    background: #fff;
+    border-radius: 1rem;
+    padding: 1.25rem 1.4rem;
+    border: 1px solid oklch(93% 0.006 60);
+    box-shadow: 0 4px 24px rgba(15,23,42,.08), 0 1.5px 6px rgba(15,23,42,.04);
+    height: 100%;
+  }
+  .kpi-icon-wrap {
+    width: 44px; height: 44px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 4px 14px rgba(0,0,0,.15);
+    color: #fff;
+  }
+  .kpi-icon-orange { background: linear-gradient(135deg, #ff9933, #f97316); }
+  .kpi-icon-green  { background: linear-gradient(135deg, #10b981, #059669); }
+  .kpi-icon-blue   { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+  .kpi-icon-purple { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+  .kpi-label { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #64748b; margin-bottom: 0.2rem; }
+  .kpi-value { font-size: 1.6rem; font-weight: 900; color: #0f172a; line-height: 1.1; }
+  .kpi-sub   { font-size: 0.75rem; color: #64748b; margin-top: 0.2rem; }
+
+  .tier-pill { display:inline-block; padding:0.18rem 0.6rem; border-radius:999px; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; }
+  .tier-bronze { background:#fef3c7; color:#92400e; }
+  .tier-silver { background:#e2e8f0; color:#475569; }
+  .tier-gold   { background:#fef9c3; color:#854d0e; }
+  .tier-vip    { background:#dbeafe; color:#1e40af; }
 </style>
 
 <div class="page-header">
-    <h1>{{ customer.username }}</h1>
-    <p>{{ customer.email }} · <span class="tier-pill tier-{{ profile.loyalty_tier }}">{{ profile.get_loyalty_tier_display }}</span></p>
+  <h1>{{ customer.username }}</h1>
+  <p>{{ customer.email }} · <span class="tier-pill tier-{{ profile.loyalty_tier }}">{{ profile.get_loyalty_tier_display }}</span>{% if profile.is_vip %} · <span style="background:#f59e0b;color:oklch(22% 0.06 60);font-size:.72rem;font-weight:700;padding:1px 6px;border-radius:10px;">VIP</span>{% endif %}</p>
 </div>
 
 <div class="mb-4">
-    <a href="{% url 'customers_crm_list' %}" class="btn btn-outline-secondary">← Back to Customers</a>
+  <a href="{% url 'customers_crm_list' %}" class="btn btn-outline-secondary">← Back to Customers</a>
 </div>
 
 <!-- Stats -->
 <div class="row g-3 mb-4">
-    <div class="col-md-3"><div class="crm-stat-card"><div class="label">Total Orders</div><div class="value">{{ profile.total_orders }}</div></div></div>
-    <div class="col-md-3"><div class="crm-stat-card"><div class="label">Lifetime Spend</div><div class="value">RM {{ profile.total_spent|floatformat:2 }}</div></div></div>
-    <div class="col-md-3"><div class="crm-stat-card"><div class="label">Last Order</div><div class="value">{% if profile.last_order_at %}{{ profile.last_order_at|date:"d M Y" }}{% else %}—{% endif %}</div></div></div>
-    <div class="col-md-3"><div class="crm-stat-card"><div class="label">Customer Since</div><div class="value">{{ customer.date_joined|date:"M Y" }}</div></div></div>
+  <div class="col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon-wrap kpi-icon-orange">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      </div>
+      <div class="kpi-label">Total Orders</div>
+      <div class="kpi-value">{{ profile.total_orders }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon-wrap kpi-icon-green">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </div>
+      <div class="kpi-label">Lifetime Spend</div>
+      <div class="kpi-value">RM {{ profile.total_spent|floatformat:2 }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon-wrap kpi-icon-blue">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      </div>
+      <div class="kpi-label">Last Order</div>
+      <div class="kpi-value" style="font-size:1.25rem;">{% if profile.last_order_at %}{{ profile.last_order_at|date:"d M Y" }}{% else %}—{% endif %}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon-wrap kpi-icon-purple">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+      </div>
+      <div class="kpi-label">Customer Since</div>
+      <div class="kpi-value" style="font-size:1.25rem;">{{ customer.date_joined|date:"M Y" }}</div>
+    </div>
+  </div>
 </div>
 
 <!-- Admin notes -->
 <div class="content-card mb-4">
-    <h5 class="fw-bold mb-3">Internal Notes <small class="text-muted">(only visible to staff)</small></h5>
-    <form method="post">
-        {% csrf_token %}
-        <textarea name="admin_notes" rows="4" class="form-control mb-3" placeholder="Notes about this customer — allergies they've mentioned, VIP status, complaints history...">{{ profile.admin_notes }}</textarea>
-        <button type="submit" class="btn btn-primary">Save Notes</button>
-    </form>
+  <h5 class="fw-bold mb-3">Internal Notes <small class="text-muted" style="font-weight:400;">(only visible to staff)</small></h5>
+  <form method="post">
+    {% csrf_token %}
+    <textarea name="admin_notes" rows="4" class="form-control mb-3" placeholder="Notes about this customer — allergies they've mentioned, VIP status, complaints history...">{{ profile.admin_notes }}</textarea>
+    <button type="submit" class="btn btn-primary">Save Notes</button>
+  </form>
 </div>
 
 <!-- Recent orders -->
 <div class="content-card mb-4">
-    <h5 class="fw-bold mb-3">Recent Orders ({{ orders|length }})</h5>
-    <div class="table-responsive">
-        <table class="table table-sm align-middle">
-            <thead class="table-light">
-                <tr><th>Order #</th><th>Date</th><th>Status</th><th>Total</th><th>Action</th></tr>
-            </thead>
-            <tbody>
-                {% for o in orders %}
-                <tr>
-                    <td><strong>#{{ o.id }}</strong></td>
-                    <td>{{ o.created_at|date:"d M Y H:i" }}</td>
-                    <td>{{ o.get_status_display }}</td>
-                    <td>RM {{ o.total_amount|floatformat:2 }}</td>
-                    <td><a href="{% url 'admin_order_detail' o.id %}" class="btn btn-sm btn-outline-primary">View</a></td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="5" class="text-center text-muted py-4">No orders yet.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+  <h5 class="fw-bold mb-3">Recent Orders ({{ orders|length }})</h5>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead class="table-light">
+        <tr><th>Order #</th><th>Date</th><th>Status</th><th>Total</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        {% for o in orders %}
+        <tr>
+          <td><strong>#{{ o.id }}</strong></td>
+          <td>{{ o.created_at|date:"d M Y H:i" }}</td>
+          <td>{{ o.get_status_display }}</td>
+          <td>RM {{ o.total_amount|floatformat:2 }}</td>
+          <td><a href="{% url 'admin_order_detail' o.id %}" class="btn btn-sm btn-outline-primary">View</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center text-muted py-4">No orders yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <!-- Complaints -->
 <div class="content-card">
-    <h5 class="fw-bold mb-3">Complaints ({{ complaints|length }})</h5>
-    <div class="table-responsive">
-        <table class="table table-sm align-middle">
-            <thead class="table-light">
-                <tr><th>Date</th><th>Order</th><th>Subject</th><th>Status</th><th>Action Taken</th></tr>
-            </thead>
-            <tbody>
-                {% for c in complaints %}
-                <tr>
-                    <td>{{ c.created_at|date:"d M Y" }}</td>
-                    <td>#{{ c.order.id }}</td>
-                    <td>{{ c.subject }}</td>
-                    <td>{{ c.get_status_display }}</td>
-                    <td>{% if c.action_taken %}{{ c.get_action_taken_display }}{% else %}—{% endif %}</td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="5" class="text-center text-muted py-4">No complaints filed.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+  <h5 class="fw-bold mb-3">Complaints ({{ complaints|length }})</h5>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead class="table-light">
+        <tr><th>Date</th><th>Order</th><th>Subject</th><th>Status</th><th>Action Taken</th></tr>
+      </thead>
+      <tbody>
+        {% for c in complaints %}
+        <tr>
+          <td>{{ c.created_at|date:"d M Y" }}</td>
+          <td>#{{ c.order.id }}</td>
+          <td>{{ c.subject }}</td>
+          <td>{{ c.get_status_display }}</td>
+          <td>{% if c.action_taken %}{{ c.get_action_taken_display }}{% else %}—{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center text-muted py-4">No complaints filed.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}

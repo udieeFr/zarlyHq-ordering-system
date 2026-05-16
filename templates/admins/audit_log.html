@@ -4,171 +4,207 @@
 
 {% block content %}
 <style>
-    .audit-table { font-size: 0.85rem; }
-    .audit-table td { vertical-align: top; padding: 0.55rem 0.6rem; }
-    .audit-action-pill {
-        display: inline-block;
-        padding: 0.15rem 0.55rem;
-        border-radius: 999px;
-        font-size: 0.72rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        background: #f1f5f9;
-        color: #334155;
-    }
-    .audit-action-pill.act-order_approved,
-    .audit-action-pill.act-signature_created,
-    .audit-action-pill.act-payment_verified,
-    .audit-action-pill.act-receipt_verified { background:#ecfdf5; color:#065f46; }
-    .audit-action-pill.act-order_rejected,
-    .audit-action-pill.act-payment_rejected,
-    .audit-action-pill.act-login_failed { background:#fef2f2; color:#991b1b; }
-    .audit-action-pill.act-login_success { background:#eff6ff; color:#1e40af; }
-    .audit-action-pill.act-complaint_submitted,
-    .audit-action-pill.act-complaint_resolved { background:#fffbeb; color:#92400e; }
-    .audit-action-pill.act-refund_issued,
-    .audit-action-pill.act-refund_processed  { background:#ecfdf5; color:#065f46; }
-    .audit-action-pill.act-refund_failed     { background:#fef2f2; color:#991b1b; }
-    .audit-action-pill.act-refund_manual     { background:#fef9c3; color:#854d0e; }
-    .audit-meta {
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        font-size: 0.72rem;
-        color: #64748b;
-        white-space: pre-wrap;
-        word-break: break-all;
-        margin: 0;
-    }
-    .audit-ip { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; }
+  /* Panels */
+  .log-panel {
+    background: #fff;
+    border-radius: 1rem;
+    border: 1px solid oklch(93% 0.006 60);
+    box-shadow: 0 4px 24px rgba(15,23,42,.08), 0 1.5px 6px rgba(15,23,42,.04);
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+  }
+  .log-panel-header {
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;
+  }
+  .log-panel-title { font-size: 0.88rem; font-weight: 800; color: #0f172a; letter-spacing: -.01em; margin: 0; }
+  .log-panel-body { padding: 1.1rem 1.25rem; }
+
+  /* Integrity banner */
+  .integrity-banner {
+    display: flex; align-items: flex-start; gap: 0.75rem;
+    border-radius: 0.875rem; padding: 0.875rem 1.1rem;
+    margin-bottom: 1.25rem; font-size: 0.85rem;
+  }
+  .integrity-ok  { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+  .integrity-err { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
+  .integrity-icon { flex-shrink: 0; margin-top: 1px; }
+  .integrity-banner strong { display: block; margin-bottom: 0.15rem; }
+  .integrity-banner span { font-size: 0.8rem; opacity: 0.85; }
+
+  /* Log table — optimized for dense scanning */
+  .log-table { width: 100%; font-size: 0.78rem; border-collapse: collapse; }
+  .log-table th {
+    font-size: 0.63rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #64748b;
+    padding: 0.5rem 0.875rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; white-space: nowrap;
+  }
+  .log-table td { padding: 0.35rem 0.875rem; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; }
+  .log-table tr:last-child td { border-bottom: none; }
+  .log-table tr:hover td { background: oklch(98.5% 0.004 60); }
+
+  /* Monospace cells */
+  .lc-mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 0.72rem; color: #475569; white-space: nowrap; }
+
+  /* Truncated cells */
+  .lc-clip     { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lc-clip-sm  { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Action pills */
+  .audit-action-pill {
+    display: inline-block; padding: 0.12rem 0.5rem; border-radius: 999px;
+    font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    background: #f1f5f9; color: #334155; white-space: nowrap;
+  }
+  .audit-action-pill.act-order_approved,
+  .audit-action-pill.act-signature_created,
+  .audit-action-pill.act-payment_verified,
+  .audit-action-pill.act-receipt_verified { background:#ecfdf5; color:#065f46; }
+  .audit-action-pill.act-order_rejected,
+  .audit-action-pill.act-payment_rejected,
+  .audit-action-pill.act-login_failed     { background:#fef2f2; color:#991b1b; }
+  .audit-action-pill.act-login_success    { background:#eff6ff; color:#1e40af; }
+  .audit-action-pill.act-complaint_submitted,
+  .audit-action-pill.act-complaint_resolved { background:#fffbeb; color:#92400e; }
+  .audit-action-pill.act-refund_issued,
+  .audit-action-pill.act-refund_processed   { background:#ecfdf5; color:#065f46; }
+  .audit-action-pill.act-refund_failed      { background:#fef2f2; color:#991b1b; }
+  .audit-action-pill.act-refund_manual      { background:#fef9c3; color:#854d0e; }
 </style>
 
 <div class="page-header">
-    <h1>Security Audit Log</h1>
-    <p>Immutable record of every security-relevant action — non-repudiation at the system level.</p>
+  <h1>Security Audit Log</h1>
+  <p>Immutable, cryptographically chained record of every security-relevant action.</p>
 </div>
 
-<div class="mb-4">
-    <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
-    <span class="text-muted ms-3">Total entries on record: <strong>{{ total_count }}</strong></span>
+<div class="mb-3" style="font-size:0.85rem;color:#64748b;">
+  <strong style="color:#0f172a;">{{ total_count }}</strong> total entries on record
 </div>
 
+<!-- Integrity status -->
 {% if chain_valid %}
-<div class="alert d-flex align-items-center gap-2 mb-4" style="background:#f0fdf4;border:1px solid #86efac;color:#166534;">
-    <span style="font-size:1.2rem;">&#10003;</span>
-    <div>
-        <strong>Audit chain intact.</strong>
-        Every log entry is cryptographically linked — no tampering detected.
-        {% if chain_broken_at %}
-        <span class="text-muted ms-2" style="font-size:0.8rem;">(Entries before ID #{{ chain_broken_at }} pre-date hash chaining.)</span>
-        {% endif %}
-    </div>
+<div class="integrity-banner integrity-ok">
+  <div class="integrity-icon">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+  </div>
+  <div>
+    <strong>Audit chain intact</strong>
+    <span>Every log entry is cryptographically linked — no tampering detected.{% if chain_broken_at %} Entries before ID #{{ chain_broken_at }} pre-date hash chaining.{% endif %}</span>
+  </div>
 </div>
 {% else %}
-<div class="alert d-flex align-items-center gap-2 mb-4" style="background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;">
-    <span style="font-size:1.2rem;">&#9888;</span>
-    <div>
-        <strong>Chain integrity failure at entry #{{ chain_broken_at }}.</strong>
-        One or more audit log entries may have been altered or deleted directly in the database.
-        This requires immediate investigation.
-    </div>
+<div class="integrity-banner integrity-err">
+  <div class="integrity-icon">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  </div>
+  <div>
+    <strong>Chain integrity failure at entry #{{ chain_broken_at }}</strong>
+    <span>One or more audit entries may have been altered or deleted directly in the database. This requires immediate investigation.</span>
+  </div>
 </div>
 {% endif %}
 
 <!-- Filters -->
-<div class="content-card mb-4">
-    <form method="get" class="row g-3">
-        <div class="col-md-3">
-            <label class="form-label">Search description / IP / actor</label>
-            <input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="e.g. Order #14, 192.168...">
-        </div>
-        <div class="col-md-2">
-            <label class="form-label">Action</label>
-            <select name="action" class="form-select">
-                <option value="">All actions</option>
-                {% for code, label in action_choices %}
-                <option value="{{ code }}" {% if action_filter == code %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label">Actor (username)</label>
-            <input type="text" name="actor" value="{{ actor_filter }}" class="form-control" placeholder="username">
-        </div>
-        <div class="col-md-2">
-            <label class="form-label">Target type</label>
-            <input type="text" name="target_model" value="{{ target_filter }}" class="form-control" placeholder="Order, Payment...">
-        </div>
-        <div class="col-md-1">
-            <label class="form-label">Days</label>
-            <input type="number" name="days" value="{{ days_filter }}" class="form-control" placeholder="7">
-        </div>
-        <div class="col-md-1">
-            <label class="form-label">Limit</label>
-            <input type="number" name="count" value="{{ count_limit }}" class="form-control" min="1" max="1000">
-        </div>
-        <div class="col-md-1 d-flex align-items-end">
-            <button type="submit" class="btn btn-primary w-100">Filter</button>
-        </div>
+<div class="log-panel">
+  <div class="log-panel-header">
+    <span class="log-panel-title">Filter</span>
+  </div>
+  <div class="log-panel-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label" style="font-size:0.78rem;font-weight:600;color:#64748b;margin-bottom:0.3rem;">Search</label>
+        <input type="text" name="q" value="{{ search_query }}" class="form-control form-control-sm" placeholder="Description, IP, actor">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" style="font-size:0.78rem;font-weight:600;color:#64748b;margin-bottom:0.3rem;">Action</label>
+        <select name="action" class="form-select form-select-sm">
+          <option value="">All actions</option>
+          {% for code, label in action_choices %}
+          <option value="{{ code }}" {% if action_filter == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" style="font-size:0.78rem;font-weight:600;color:#64748b;margin-bottom:0.3rem;">Actor</label>
+        <input type="text" name="actor" value="{{ actor_filter }}" class="form-control form-control-sm" placeholder="username">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" style="font-size:0.78rem;font-weight:600;color:#64748b;margin-bottom:0.3rem;">Target type</label>
+        <input type="text" name="target_model" value="{{ target_filter }}" class="form-control form-control-sm" placeholder="Order, Payment...">
+      </div>
+      <div class="col-md-1">
+        <label class="form-label" style="font-size:0.78rem;font-weight:600;color:#64748b;margin-bottom:0.3rem;">Days</label>
+        <input type="number" name="days" value="{{ days_filter }}" class="form-control form-control-sm" placeholder="7">
+      </div>
+      <div class="col-md-1">
+        <label class="form-label" style="font-size:0.78rem;font-weight:600;color:#64748b;margin-bottom:0.3rem;">Limit</label>
+        <input type="number" name="count" value="{{ count_limit }}" class="form-control form-control-sm" min="1" max="1000">
+      </div>
+      <div class="col-md-1">
+        <button type="submit" class="btn btn-primary btn-sm w-100">Filter</button>
+      </div>
     </form>
+  </div>
 </div>
 
-<!-- Audit Log Table -->
-<div class="content-card">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="fw-bold mb-0">Audit Entries ({{ logs|length }})</h5>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-hover align-middle audit-table">
-            <thead class="table-light">
-                <tr>
-                    <th style="width:160px;">Timestamp</th>
-                    <th style="width:130px;">Actor</th>
-                    <th style="width:170px;">Action</th>
-                    <th>Description</th>
-                    <th style="width:120px;">Target</th>
-                    <th style="width:130px;">IP</th>
-                    <th>Metadata</th>
-                    <th style="width:90px;" title="SHA-256 chain hash for tamper detection">Chain</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for log in logs %}
-                <tr>
-                    <td>{{ log.timestamp|date:"d M Y H:i:s" }}</td>
-                    <td>
-                        {% if log.actor %}<strong>{{ log.actor.username }}</strong><br>
-                            <small class="text-muted">{{ log.actor.role|default:'—' }}</small>
-                        {% else %}<span class="text-muted">system</span>{% endif %}
-                    </td>
-                    <td>
-                        <span class="audit-action-pill act-{{ log.action_type }}">
-                            {{ log.get_action_type_display }}
-                        </span>
-                    </td>
-                    <td>{{ log.description|default:'—' }}</td>
-                    <td>
-                        {% if log.target_model %}{{ log.target_model }} #{{ log.target_id }}
-                        {% else %}<span class="text-muted">—</span>{% endif %}
-                    </td>
-                    <td class="audit-ip">{{ log.ip_address|default:'—' }}</td>
-                    <td>
-                        {% if log.metadata %}<pre class="audit-meta">{{ log.metadata }}</pre>
-                        {% else %}<span class="text-muted">—</span>{% endif %}
-                    </td>
-                    <td>
-                        {% if log.chain_hash %}
-                        <span class="font-monospace" style="font-size:0.65rem;color:#64748b;"
-                              title="{{ log.chain_hash }}">{{ log.chain_hash|slice:":8" }}…</span>
-                        {% else %}
-                        <span class="text-muted" title="Pre-dates hash chaining">—</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="8" class="text-center text-muted py-4">No audit entries match your filters.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+<!-- Log table -->
+<div class="log-panel">
+  <div class="log-panel-header">
+    <span class="log-panel-title">Audit Entries <span style="font-weight:500;color:#64748b;">({{ logs|length }})</span></span>
+  </div>
+  <div class="table-responsive">
+    <table class="log-table">
+      <thead>
+        <tr>
+          <th style="width:148px;">Timestamp</th>
+          <th style="width:110px;">Actor</th>
+          <th style="width:155px;">Action</th>
+          <th>Description</th>
+          <th style="width:110px;">Target</th>
+          <th style="width:120px;">IP</th>
+          <th style="width:180px;">Metadata</th>
+          <th style="width:80px;" title="First 8 chars of SHA-256 chain hash">Chain</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td class="lc-mono">{{ log.timestamp|date:"d M Y H:i:s" }}</td>
+          <td>
+            {% if log.actor %}
+              <span style="font-weight:600;color:#0f172a;">{{ log.actor.username }}</span>
+            {% else %}
+              <span style="color:#94a3b8;font-size:0.72rem;">system</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="audit-action-pill act-{{ log.action_type }}">{{ log.get_action_type_display }}</span>
+          </td>
+          <td class="lc-clip" title="{{ log.description }}">{{ log.description|default:"—" }}</td>
+          <td class="lc-clip-sm" style="font-size:0.75rem;color:#64748b;">
+            {% if log.target_model %}{{ log.target_model }} #{{ log.target_id }}{% else %}—{% endif %}
+          </td>
+          <td class="lc-mono">{{ log.ip_address|default:"—" }}</td>
+          <td class="lc-clip-sm lc-mono" style="font-size:0.68rem;" title="{{ log.metadata }}">
+            {% if log.metadata %}{{ log.metadata }}{% else %}<span style="color:#94a3b8;">—</span>{% endif %}
+          </td>
+          <td>
+            {% if log.chain_hash %}
+            <span class="lc-mono" style="font-size:0.65rem;color:#94a3b8;" title="{{ log.chain_hash }}">{{ log.chain_hash|slice:":8" }}…</span>
+            {% else %}
+            <span style="color:#94a3b8;">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" style="text-align:center;color:#64748b;padding:2.5rem 1rem;">
+            No audit entries match your filters.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}

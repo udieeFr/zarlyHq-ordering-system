@@ -4,7 +4,11 @@
       "Bash(grep -E \"\\\\.py$\")",
       "Bash(python manage.py check --deploy)",
       "Bash(python manage.py check)",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(npx --yes impeccable detect --json \"templates/admins/manager_dashboard.html\")",
+      "Bash(npx impeccable *)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(not exist *)"
     ]
   },
   "enabledPlugins": {

@@ -520,6 +520,56 @@
             </nav>
 
             <div class="admin-content">
+
+                {% if messages %}
+                <div id="adminToastStack" style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1.25rem;">
+                  {% for message in messages %}
+                  <div class="admin-toast admin-toast--{{ message.tags }}" role="alert" aria-live="assertive" style="
+                    display:flex;align-items:flex-start;gap:0.75rem;
+                    padding:0.875rem 1.1rem;border-radius:0.875rem;
+                    font-size:0.85rem;line-height:1.45;
+                    animation:toastIn .2s ease;
+                    {% if 'error' in message.tags or 'danger' in message.tags %}
+                      background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;
+                    {% elif 'warning' in message.tags %}
+                      background:#fffbeb;border:1px solid #fcd34d;color:#92400e;
+                    {% elif 'success' in message.tags %}
+                      background:#f0fdf4;border:1px solid #86efac;color:#166534;
+                    {% else %}
+                      background:#eff6ff;border:1px solid #93c5fd;color:#1e40af;
+                    {% endif %}
+                  ">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;">
+                      {% if 'error' in message.tags or 'danger' in message.tags %}
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                      {% elif 'warning' in message.tags %}
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                      {% elif 'success' in message.tags %}
+                        <polyline points="20 6 9 17 4 12"/>
+                      {% else %}
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                      {% endif %}
+                    </svg>
+                    <span style="flex:1;">{{ message }}</span>
+                    <button onclick="this.closest('.admin-toast').remove()" style="background:none;border:none;cursor:pointer;padding:0;opacity:0.55;line-height:1;flex-shrink:0;margin-top:1px;" aria-label="Dismiss">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  </div>
+                  {% endfor %}
+                </div>
+                <style>
+                  @keyframes toastIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+                </style>
+                <script>
+                  (function(){
+                    var toasts = document.querySelectorAll('.admin-toast');
+                    toasts.forEach(function(t){
+                      setTimeout(function(){ t.style.transition='opacity .4s,transform .4s'; t.style.opacity='0'; t.style.transform='translateY(-4px)'; setTimeout(function(){ t.remove(); },420); }, 5000);
+                    });
+                  })();
+                </script>
+                {% endif %}
+
                 {% block content %}{% endblock %}
             </div>
         </div>

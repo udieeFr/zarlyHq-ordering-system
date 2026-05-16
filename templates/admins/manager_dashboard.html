@@ -5,67 +5,46 @@
 
 {% block content %}
 <style>
-  /* ── Soft UI overrides for ZarlyHQ brand ── */
   :root {
     --soft-radius: 1rem;
     --soft-shadow: 0 4px 24px rgba(15,23,42,.08), 0 1.5px 6px rgba(15,23,42,.04);
     --soft-shadow-lg: 0 20px 60px rgba(15,23,42,.12);
     --zarly-orange: #ff9933;
-    --zarly-orange-light: #fff7ed;
-    --zarly-navy: #0f172a;
   }
 
-  /* Hero banner */
+  /* Hero */
   .dash-hero {
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #1f2937 100%);
+    background: linear-gradient(145deg, oklch(95% 0.06 58) 0%, oklch(98% 0.03 62) 100%);
     border-radius: var(--soft-radius);
     padding: 1.75rem 2rem;
     margin-bottom: 1.75rem;
-    position: relative;
-    overflow: hidden;
-    box-shadow: var(--soft-shadow-lg);
-  }
-  .dash-hero::before {
-    content: '';
-    position: absolute;
-    top: -60px; right: -60px;
-    width: 220px; height: 220px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(255,153,51,.22) 0%, transparent 70%);
-    pointer-events: none;
-  }
-  .dash-hero::after {
-    content: '';
-    position: absolute;
-    bottom: -80px; left: 30%;
-    width: 300px; height: 180px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(255,153,51,.10) 0%, transparent 70%);
-    pointer-events: none;
+    border: 1px solid oklch(91% 0.06 58);
+    box-shadow: 0 2px 8px oklch(85% 0.08 58 / 0.28), 0 1px 3px rgba(0,0,0,0.04);
   }
   .dash-hero-title {
     font-size: 1.75rem;
     font-weight: 900;
     letter-spacing: -0.04em;
-    color: #fff;
+    color: oklch(22% 0.04 50);
     margin-bottom: 0.25rem;
-    position: relative;
   }
-  .dash-hero-title span { color: var(--zarly-orange); }
-  .dash-hero-sub { color: rgba(255,255,255,.65); font-size: 0.9rem; position: relative; margin-bottom: 1.1rem; }
-  .dash-hero-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; position: relative; }
+  .dash-hero-title span { color: oklch(58% 0.18 47); }
+  .dash-hero-sub { color: oklch(42% 0.04 50); font-size: 0.9rem; margin-bottom: 1.1rem; }
+  .dash-hero-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
   .dash-chip {
     display: inline-flex; align-items: center; gap: 0.35rem;
-    padding: 0.35rem 0.8rem; border-radius: 999px;
+    padding: 0.35rem 0.85rem; border-radius: 999px;
     font-size: 0.78rem; font-weight: 600;
     text-decoration: none; transition: all .2s;
   }
   .dash-chip-orange { background: var(--zarly-orange); color: #fff; }
   .dash-chip-orange:hover { background: #e07e1e; color: #fff; }
-  .dash-chip-ghost { background: rgba(255,255,255,.12); color: rgba(255,255,255,.9); border: 1px solid rgba(255,255,255,.2); }
-  .dash-chip-ghost:hover { background: rgba(255,255,255,.2); color: #fff; }
+  .dash-chip-ghost { background: rgba(0,0,0,0.06); color: oklch(32% 0.04 50); border: 1px solid rgba(0,0,0,0.10); }
+  .dash-chip-ghost:hover { background: rgba(0,0,0,0.11); color: oklch(22% 0.04 50); }
+  .dash-chip-alert { background: oklch(94% 0.04 25); color: oklch(38% 0.14 30); border: 1px solid oklch(87% 0.06 25); }
+  .dash-chip-alert:hover { background: oklch(90% 0.06 25); }
 
-  /* ── Soft KPI Cards ── */
+  /* KPI Cards */
   .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
   @media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
   @media (max-width: 700px)  { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -75,39 +54,35 @@
     background: #fff;
     border-radius: var(--soft-radius);
     padding: 1.25rem 1.4rem;
+    border: 1px solid oklch(93% 0.006 60);
     box-shadow: var(--soft-shadow);
-    position: relative;
-    overflow: hidden;
     transition: transform .2s, box-shadow .2s;
+    display: block;
+    text-decoration: none;
+    color: inherit;
   }
-  .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--soft-shadow-lg); }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--soft-shadow-lg); color: inherit; }
   .kpi-icon-wrap {
     width: 44px; height: 44px; border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 1.3rem; margin-bottom: 0.75rem;
+    margin-bottom: 0.75rem;
     box-shadow: 0 4px 14px rgba(0,0,0,.15);
+    color: #fff;
   }
   .kpi-icon-orange { background: linear-gradient(135deg, #ff9933, #f97316); }
   .kpi-icon-green  { background: linear-gradient(135deg, #10b981, #059669); }
   .kpi-icon-blue   { background: linear-gradient(135deg, #3b82f6, #2563eb); }
   .kpi-icon-purple { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
   .kpi-icon-red    { background: linear-gradient(135deg, #ef4444, #dc2626); }
-  .kpi-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #64748b; margin-bottom: 0.2rem; }
+  .kpi-label { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #64748b; margin-bottom: 0.2rem; }
   .kpi-value { font-size: 1.7rem; font-weight: 900; color: #0f172a; line-height: 1.1; }
-  .kpi-sub { font-size: 0.75rem; color: #94a3b8; margin-top: 0.2rem; }
-  .kpi-accent-bar {
-    position: absolute; left: 0; top: 0; bottom: 0; width: 4px; border-radius: var(--soft-radius) 0 0 var(--soft-radius);
-  }
-  .bar-orange { background: linear-gradient(180deg, #ff9933, #f97316); }
-  .bar-green  { background: linear-gradient(180deg, #10b981, #059669); }
-  .bar-blue   { background: linear-gradient(180deg, #3b82f6, #2563eb); }
-  .bar-purple { background: linear-gradient(180deg, #8b5cf6, #7c3aed); }
-  .bar-red    { background: linear-gradient(180deg, #ef4444, #dc2626); }
+  .kpi-sub { font-size: 0.75rem; color: #64748b; margin-top: 0.2rem; }
 
-  /* ── Soft content panels ── */
+  /* Soft content panels */
   .soft-card {
     background: #fff;
     border-radius: var(--soft-radius);
+    border: 1px solid oklch(93% 0.006 60);
     box-shadow: var(--soft-shadow);
     margin-bottom: 1.5rem;
     overflow: hidden;
@@ -121,58 +96,54 @@
   .soft-card-body { padding: 1.2rem 1.4rem; }
   .soft-card-body.p0 { padding: 0; }
 
-  /* ── Chart containers ── */
+  /* Chart containers */
   .chart-wrap { position: relative; height: 220px; }
 
-  /* ── Two-column layout ── */
+  /* Layout */
   .dash-row { display: grid; gap: 1rem; margin-bottom: 0; }
   .dash-row-2 { grid-template-columns: 1fr 1fr; }
   .dash-row-3 { grid-template-columns: 2fr 1fr; }
   @media (max-width: 960px) { .dash-row-2, .dash-row-3 { grid-template-columns: 1fr; } }
 
-  /* ── Status chips ── */
+  /* Status chips */
   .status-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
   @media (max-width: 700px) { .status-grid { grid-template-columns: repeat(2, 1fr); } }
   .status-chip {
     background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
-    padding: 0.6rem 0.75rem; font-size: 0.8rem;
+    padding: 0.6rem 0.75rem;
   }
   .status-chip .sc-count { font-size: 1.3rem; font-weight: 900; color: #0f172a; line-height: 1; }
-  .status-chip .sc-label { font-size: 0.7rem; color: #64748b; margin-top: 0.15rem; }
+  .status-chip .sc-label { font-size: 0.72rem; color: #64748b; margin-top: 0.15rem; }
 
-  /* ── Table overrides ── */
+  /* Table */
   .soft-table { width: 100%; font-size: 0.82rem; border-collapse: collapse; }
   .soft-table th { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #64748b; padding: 0.65rem 1rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
   .soft-table td { padding: 0.7rem 1rem; border-bottom: 1px solid #f1f5f9; color: #1e293b; vertical-align: middle; }
   .soft-table tr:last-child td { border-bottom: none; }
   .soft-table tr:hover td { background: #fafbfc; }
 
-  /* ── Tier pills ── */
+  /* Tier pills */
   .tier-pill { display:inline-block; padding:.15rem .55rem; border-radius:999px; font-size:.68rem; font-weight:700; text-transform:uppercase; }
-  .tier-bronze   { background:#fef3c7; color:#92400e; }
-  .tier-silver   { background:#e2e8f0; color:#475569; }
-  .tier-gold     { background:#fef9c3; color:#854d0e; }
-  .tier-platinum { background:#dbeafe; color:#1e40af; }
+  .tier-bronze { background:#fef3c7; color:#92400e; }
+  .tier-silver { background:#e2e8f0; color:#475569; }
+  .tier-gold   { background:#fef9c3; color:#854d0e; }
+  .tier-vip    { background:#dbeafe; color:#1e40af; }
 
-  /* ── Audit pill ── */
-  .audit-pill {
-    font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
-    padding: 0.1rem 0.45rem; border-radius: 999px; background:#f1f5f9; color:#334155;
-  }
+  /* Audit pill */
+  .audit-pill { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; padding: 0.1rem 0.45rem; border-radius: 999px; background:#f1f5f9; color:#334155; }
   .audit-pill.act-order_approved, .audit-pill.act-signature_created, .audit-pill.act-payment_verified { background:#ecfdf5; color:#065f46; }
   .audit-pill.act-order_rejected, .audit-pill.act-login_failed, .audit-pill.act-payment_rejected { background:#fef2f2; color:#991b1b; }
   .audit-pill.act-login_success { background:#eff6ff; color:#1e40af; }
   .audit-pill.act-complaint_submitted { background:#fffbeb; color:#92400e; }
-  .audit-pill.act-refund_issued    { background:#ecfdf5; color:#065f46; }
-  .audit-pill.act-refund_processed { background:#ecfdf5; color:#065f46; }
-  .audit-pill.act-refund_failed    { background:#fef2f2; color:#991b1b; }
-  .audit-pill.act-refund_manual    { background:#fef9c3; color:#854d0e; }
+  .audit-pill.act-refund_issued, .audit-pill.act-refund_processed { background:#ecfdf5; color:#065f46; }
+  .audit-pill.act-refund_failed { background:#fef2f2; color:#991b1b; }
+  .audit-pill.act-refund_manual { background:#fef9c3; color:#854d0e; }
 
-  /* ── View-all link ── */
+  /* View-all */
   .view-all { font-size: 0.78rem; font-weight: 600; color: var(--zarly-orange); text-decoration: none; white-space: nowrap; }
   .view-all:hover { color: #e07e1e; text-decoration: underline; }
 
-  /* ── Top products bar ── */
+  /* Top products bar */
   .prod-bar-wrap { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.85rem; }
   .prod-bar-wrap:last-child { margin-bottom: 0; }
   .prod-bar-label { font-size: 0.8rem; font-weight: 600; color: #1e293b; min-width: 120px; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -182,68 +153,78 @@
 
   /* Revenue range pills */
   .range-pills { display: flex; gap: 0.4rem; }
-  .range-pill { font-size: 0.72rem; font-weight: 600; padding: 0.2rem 0.55rem; border-radius: 999px; background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; cursor: pointer; transition: all .15s; }
+  .range-pill { font-size: 0.8rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 999px; background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; cursor: pointer; transition: all .15s; }
   .range-pill.active, .range-pill:hover { background: var(--zarly-orange); color: #fff; border-color: var(--zarly-orange); }
+
+  /* Complaint inline stats */
+  .complaint-stats { display: flex; gap: 2rem; padding: 0.875rem 1.4rem 0; }
+  .complaint-stat-num { font-size: 1.5rem; font-weight: 900; line-height: 1; }
+  .complaint-stat-lbl { font-size: 0.72rem; color: #64748b; margin-top: 0.15rem; }
 </style>
 
-<!-- ── Hero ──────────────────────────────────────────────── -->
+<!-- Hero -->
 <div class="dash-hero">
   <div class="dash-hero-title">Zarly <span>BigFood</span> Dashboard</div>
-  <div class="dash-hero-sub">Executive summary — revenue, operations, customers & security · {{ request.user.first_name|default:request.user.username }}</div>
+  <div class="dash-hero-sub">Executive summary · {{ request.user.first_name|default:request.user.username }}</div>
   <div class="dash-hero-chips">
-    <a href="{% url 'customers_crm_list' %}" class="dash-chip dash-chip-orange">👥 Customer CRM</a>
-    <a href="{% url 'audit_log_list' %}" class="dash-chip dash-chip-ghost">🛡️ Audit Log</a>
-    <a href="{% url 'admin_complaints_list' %}" class="dash-chip dash-chip-ghost">🚨 Complaints</a>
-    <a href="{% url 'sales_admin_dashboard' %}" class="dash-chip dash-chip-ghost">📋 Order Ops</a>
-    <a href="{% url 'refund_list' %}" class="dash-chip dash-chip-ghost {% if pending_refunds_count %}dash-chip-orange{% endif %}">💸 Refunds{% if pending_refunds_count %} ({{ pending_refunds_count }}){% endif %}</a>
+    <a href="{% url 'customers_crm_list' %}" class="dash-chip dash-chip-orange">Customer CRM</a>
+    <a href="{% url 'audit_log_list' %}" class="dash-chip dash-chip-ghost">Audit Log</a>
+    <a href="{% url 'admin_complaints_list' %}" class="dash-chip dash-chip-ghost">Complaints</a>
+    <a href="{% url 'sales_admin_dashboard' %}" class="dash-chip dash-chip-ghost">Order Ops</a>
+    <a href="{% url 'refund_list' %}" class="dash-chip {% if pending_refunds_count %}dash-chip-alert{% else %}dash-chip-ghost{% endif %}">Refunds{% if pending_refunds_count %} ({{ pending_refunds_count }}){% endif %}</a>
   </div>
 </div>
 
-<!-- ── KPI Grid ───────────────────────────────────────────── -->
+<!-- KPI Grid -->
 <div class="kpi-grid">
-  <div class="kpi-card">
-    <div class="kpi-accent-bar bar-green"></div>
-    <div class="kpi-icon-wrap kpi-icon-green">💰</div>
+  <a href="{% url 'sales_report' %}" class="kpi-card">
+    <div class="kpi-icon-wrap kpi-icon-green">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    </div>
     <div class="kpi-label">Today's Revenue</div>
     <div class="kpi-value">RM {{ revenue_today|floatformat:2 }}</div>
     <div class="kpi-sub">Approved + Delivered</div>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-accent-bar bar-orange"></div>
-    <div class="kpi-icon-wrap kpi-icon-orange">📦</div>
+  </a>
+  <a href="{% url 'sales_admin_dashboard' %}" class="kpi-card">
+    <div class="kpi-icon-wrap kpi-icon-orange">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+    </div>
     <div class="kpi-label">Orders Today</div>
     <div class="kpi-value">{{ orders_today }}</div>
     <div class="kpi-sub">{{ orders_week }} this week</div>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-accent-bar bar-blue"></div>
-    <div class="kpi-icon-wrap kpi-icon-blue">🏠</div>
+  </a>
+  <a href="{% url 'delivery_orders_list' %}" class="kpi-card">
+    <div class="kpi-icon-wrap kpi-icon-blue">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+    </div>
     <div class="kpi-label">Delivery Rate</div>
     <div class="kpi-value">{{ delivery_rate }}%</div>
-    <div class="kpi-sub">{{ status_breakdown.delivered }} delivered of {{ total_orders }}</div>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-accent-bar bar-red"></div>
-    <div class="kpi-icon-wrap kpi-icon-red">🚨</div>
+    <div class="kpi-sub">{{ status_breakdown.delivered }} of {{ total_orders }} delivered</div>
+  </a>
+  <a href="{% url 'admin_complaints_list' %}" class="kpi-card">
+    <div class="kpi-icon-wrap kpi-icon-red">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </div>
     <div class="kpi-label">Open Complaints</div>
     <div class="kpi-value">{{ pending_complaints }}</div>
     <div class="kpi-sub">{{ resolved_complaints }} resolved</div>
-  </div>
-  <div class="kpi-card" style="cursor:pointer;" onclick="window.location='{% url 'refund_list' %}?status=manual'">
-    <div class="kpi-accent-bar bar-purple"></div>
-    <div class="kpi-icon-wrap kpi-icon-purple">💸</div>
+  </a>
+  <a href="{% url 'refund_list' %}?status=manual" class="kpi-card">
+    <div class="kpi-icon-wrap kpi-icon-purple">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+    </div>
     <div class="kpi-label">Pending Refunds</div>
     <div class="kpi-value {% if pending_refunds_count %}text-danger{% endif %}">{{ pending_refunds_count }}</div>
     <div class="kpi-sub">manual + failed — action required</div>
-  </div>
+  </a>
 </div>
 
-<!-- ── Revenue chart + Donut ─────────────────────────────── -->
+<!-- Revenue chart + Donut -->
 <div class="dash-row dash-row-3" style="margin-bottom:1rem;">
 
   <div class="soft-card">
     <div class="soft-card-header">
-      <span class="soft-card-title">📈 Revenue — Last 30 Days</span>
+      <span class="soft-card-title">Revenue Trend</span>
       <div class="range-pills">
         <span class="range-pill active" onclick="setRange(30,this)">30d</span>
         <span class="range-pill" onclick="setRange(14,this)">14d</span>
@@ -251,9 +232,10 @@
       </div>
     </div>
     <div class="soft-card-body">
-      <div style="font-size:0.78rem;color:#64748b;margin-bottom:0.75rem;">
-        Month total: <strong style="color:#0f172a;">RM {{ revenue_month|floatformat:2 }}</strong>
-        &nbsp;·&nbsp; All time: <strong style="color:#0f172a;">RM {{ revenue_all_time|floatformat:2 }}</strong>
+      <div style="font-size:0.78rem;color:#64748b;margin-bottom:0.75rem;display:flex;gap:1.5rem;flex-wrap:wrap;">
+        <span>Week: <strong style="color:#0f172a;">RM {{ revenue_week|floatformat:2 }}</strong></span>
+        <span>Month: <strong style="color:#0f172a;">RM {{ revenue_month|floatformat:2 }}</strong></span>
+        <span>All time: <strong style="color:#0f172a;">RM {{ revenue_all_time|floatformat:2 }}</strong></span>
       </div>
       <div class="chart-wrap">
         <canvas id="revenueChart"></canvas>
@@ -263,7 +245,7 @@
 
   <div class="soft-card">
     <div class="soft-card-header">
-      <span class="soft-card-title">🍩 Order Status</span>
+      <span class="soft-card-title">Order Status</span>
     </div>
     <div class="soft-card-body">
       <div class="chart-wrap" style="height:180px;">
@@ -277,30 +259,30 @@
 
 </div>
 
-<!-- ── Operations + Top Products ─────────────────────────── -->
+<!-- Operations + Top Products -->
 <div class="dash-row dash-row-2" style="margin-bottom:1rem;">
 
   <div class="soft-card">
     <div class="soft-card-header">
-      <span class="soft-card-title">⚡ Operations Snapshot</span>
+      <span class="soft-card-title">Operations Snapshot</span>
     </div>
     <div class="soft-card-body">
       <div class="status-grid">
-        <div class="status-chip"><div class="sc-count">{{ status_breakdown.pending }}</div><div class="sc-label">⏳ Pending</div></div>
-        <div class="status-chip"><div class="sc-count">{{ status_breakdown.pending_payment }}</div><div class="sc-label">💳 Awaiting Payment</div></div>
-        <div class="status-chip"><div class="sc-count">{{ status_breakdown.approved }}</div><div class="sc-label">✅ Approved</div></div>
-        <div class="status-chip"><div class="sc-count">{{ status_breakdown.prepared }}</div><div class="sc-label">👨‍🍳 Preparing</div></div>
-        <div class="status-chip"><div class="sc-count">{{ status_breakdown.ready_for_delivery }}</div><div class="sc-label">📦 Ready</div></div>
-        <div class="status-chip"><div class="sc-count">{{ status_breakdown.out_for_delivery }}</div><div class="sc-label">🛵 Out for Delivery</div></div>
-        <div class="status-chip"><div class="sc-count">{{ status_breakdown.delivered }}</div><div class="sc-label">🏠 Delivered</div></div>
-        <div class="status-chip"><div class="sc-count">{{ status_breakdown.rejected }}</div><div class="sc-label">❌ Rejected</div></div>
+        <div class="status-chip"><div class="sc-count">{{ status_breakdown.pending }}</div><div class="sc-label">Pending</div></div>
+        <div class="status-chip"><div class="sc-count">{{ status_breakdown.pending_payment }}</div><div class="sc-label">Awaiting Payment</div></div>
+        <div class="status-chip"><div class="sc-count">{{ status_breakdown.approved }}</div><div class="sc-label">Approved</div></div>
+        <div class="status-chip"><div class="sc-count">{{ status_breakdown.prepared }}</div><div class="sc-label">Preparing</div></div>
+        <div class="status-chip"><div class="sc-count">{{ status_breakdown.ready_for_delivery }}</div><div class="sc-label">Ready</div></div>
+        <div class="status-chip"><div class="sc-count">{{ status_breakdown.out_for_delivery }}</div><div class="sc-label">Out for Delivery</div></div>
+        <div class="status-chip"><div class="sc-count">{{ status_breakdown.delivered }}</div><div class="sc-label">Delivered</div></div>
+        <div class="status-chip"><div class="sc-count">{{ status_breakdown.rejected }}</div><div class="sc-label">Rejected</div></div>
       </div>
     </div>
   </div>
 
   <div class="soft-card">
     <div class="soft-card-header">
-      <span class="soft-card-title">🏆 Top Products</span>
+      <span class="soft-card-title">Top Products</span>
     </div>
     <div class="soft-card-body">
       {% if top_products %}
@@ -323,38 +305,14 @@
 
 </div>
 
-<!-- ── Revenue KPIs Row ───────────────────────────────────── -->
-<div class="kpi-grid" style="grid-template-columns: repeat(4,1fr); margin-bottom:1.5rem;">
-  <div class="kpi-card">
-    <div class="kpi-accent-bar bar-green"></div>
-    <div class="kpi-label">Today</div>
-    <div class="kpi-value" style="font-size:1.25rem;">RM {{ revenue_today|floatformat:2 }}</div>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-accent-bar bar-green"></div>
-    <div class="kpi-label">Last 7 Days</div>
-    <div class="kpi-value" style="font-size:1.25rem;">RM {{ revenue_week|floatformat:2 }}</div>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-accent-bar bar-green"></div>
-    <div class="kpi-label">Last 30 Days</div>
-    <div class="kpi-value" style="font-size:1.25rem;">RM {{ revenue_month|floatformat:2 }}</div>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-accent-bar bar-orange"></div>
-    <div class="kpi-label">All Time</div>
-    <div class="kpi-value" style="font-size:1.25rem;">RM {{ revenue_all_time|floatformat:2 }}</div>
-  </div>
-</div>
-
-<!-- ── CRM + Complaints ───────────────────────────────────── -->
+<!-- CRM + Complaints -->
 <div class="dash-row dash-row-2" style="margin-bottom:1rem;">
 
   <div class="soft-card">
     <div class="soft-card-header">
-      <span class="soft-card-title">👥 Top Customers</span>
+      <span class="soft-card-title">Top Customers</span>
       <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-        <span class="tier-pill tier-platinum">Platinum {{ tier_map.platinum|default:0 }}</span>
+        <span class="tier-pill tier-vip">VIP {{ tier_map.vip|default:0 }}</span>
         <span class="tier-pill tier-gold">Gold {{ tier_map.gold|default:0 }}</span>
         <span class="tier-pill tier-silver">Silver {{ tier_map.silver|default:0 }}</span>
         <span class="tier-pill tier-bronze">Bronze {{ tier_map.bronze|default:0 }}</span>
@@ -384,24 +342,20 @@
 
   <div class="soft-card">
     <div class="soft-card-header">
-      <span class="soft-card-title">🚨 Recent Complaints</span>
+      <span class="soft-card-title">Recent Complaints</span>
       <a href="{% url 'admin_complaints_list' %}" class="view-all">View all →</a>
     </div>
-    <div class="soft-card-body" style="padding-bottom:.75rem;">
-      <div style="display:flex;gap:.75rem;margin-bottom:1rem;">
-        <div class="kpi-card" style="flex:1;padding:.85rem 1rem;margin-bottom:0;">
-          <div class="kpi-accent-bar bar-orange"></div>
-          <div class="kpi-label">Pending</div>
-          <div class="kpi-value" style="font-size:1.4rem;">{{ pending_complaints }}</div>
-        </div>
-        <div class="kpi-card" style="flex:1;padding:.85rem 1rem;margin-bottom:0;">
-          <div class="kpi-accent-bar bar-green"></div>
-          <div class="kpi-label">Resolved</div>
-          <div class="kpi-value" style="font-size:1.4rem;">{{ resolved_complaints }}</div>
-        </div>
+    <div class="complaint-stats">
+      <div>
+        <div class="complaint-stat-num" style="color:#ef4444;">{{ pending_complaints }}</div>
+        <div class="complaint-stat-lbl">pending</div>
+      </div>
+      <div>
+        <div class="complaint-stat-num" style="color:#10b981;">{{ resolved_complaints }}</div>
+        <div class="complaint-stat-lbl">resolved</div>
       </div>
     </div>
-    <div class="soft-card-body p0">
+    <div class="soft-card-body p0" style="margin-top:0.875rem;">
       <table class="soft-table">
         <thead><tr><th>Order</th><th>Customer</th><th>Subject</th><th>Status</th></tr></thead>
         <tbody>
@@ -428,11 +382,11 @@
 
 </div>
 
-<!-- ── Refunds ────────────────────────────────────────────── -->
+<!-- Refunds -->
 {% if recent_refunds %}
 <div class="soft-card" style="margin-bottom:1rem;">
   <div class="soft-card-header">
-    <span class="soft-card-title">💸 Recent Refunds</span>
+    <span class="soft-card-title">Recent Refunds</span>
     <a href="{% url 'refund_list' %}" class="view-all">View all →</a>
   </div>
   <div class="soft-card-body p0">
@@ -458,7 +412,7 @@
               <span style="background:#f1f5f9;color:#475569;font-size:.68rem;font-weight:700;padding:.15rem .45rem;border-radius:999px;">{{ r.get_status_display }}</span>
             {% endif %}
           </td>
-          <td style="color:#94a3b8;font-size:.75rem;white-space:nowrap;">{{ r.created_at|date:"d M H:i" }}</td>
+          <td style="color:#64748b;font-size:.75rem;white-space:nowrap;">{{ r.created_at|date:"d M H:i" }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -467,10 +421,10 @@
 </div>
 {% endif %}
 
-<!-- ── Audit Log ──────────────────────────────────────────── -->
+<!-- Audit Log -->
 <div class="soft-card">
   <div class="soft-card-header">
-    <span class="soft-card-title">🛡️ Recent Security Events</span>
+    <span class="soft-card-title">Recent Security Events</span>
     <a href="{% url 'audit_log_list' %}" class="view-all">Full log →</a>
   </div>
   <div class="soft-card-body p0">
@@ -481,11 +435,11 @@
       <tbody>
         {% for log in recent_audit %}
         <tr>
-          <td style="white-space:nowrap;color:#94a3b8;font-size:.75rem;">{{ log.timestamp|date:"d M H:i:s" }}</td>
-          <td>{% if log.actor %}<span style="font-weight:600;">{{ log.actor.username }}</span>{% else %}<span style="color:#94a3b8;">system</span>{% endif %}</td>
+          <td style="white-space:nowrap;color:#64748b;font-size:.75rem;">{{ log.timestamp|date:"d M H:i:s" }}</td>
+          <td>{% if log.actor %}<span style="font-weight:600;">{{ log.actor.username }}</span>{% else %}<span style="color:#64748b;">system</span>{% endif %}</td>
           <td><span class="audit-pill act-{{ log.action_type }}">{{ log.get_action_type_display }}</span></td>
           <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#64748b;">{{ log.description|default:'—' }}</td>
-          <td style="font-family:monospace;font-size:.72rem;color:#94a3b8;">{{ log.ip_address|default:'—' }}</td>
+          <td style="font-family:monospace;font-size:.72rem;color:#64748b;">{{ log.ip_address|default:'—' }}</td>
         </tr>
         {% empty %}
         <tr><td colspan="5" class="text-center text-muted py-3">No audit entries yet.</td></tr>
@@ -500,15 +454,14 @@
 {% block extra_scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-  const allLabels   = {{ chart_labels|safe }};
-  const allRevenue  = {{ chart_revenue|safe }};
+  const allLabels  = {{ chart_labels|safe }};
+  const allRevenue = {{ chart_revenue|safe }};
 
-  // ── Revenue Line Chart ──────────────────────────────────
+  // Revenue Line Chart
   const revenueCtx = document.getElementById('revenueChart').getContext('2d');
-
   const gradientFill = revenueCtx.createLinearGradient(0, 0, 0, 220);
-  gradientFill.addColorStop(0,   'rgba(255,153,51,.28)');
-  gradientFill.addColorStop(1,   'rgba(255,153,51,0)');
+  gradientFill.addColorStop(0, 'rgba(255,153,51,.28)');
+  gradientFill.addColorStop(1, 'rgba(255,153,51,0)');
 
   let revenueChart = new Chart(revenueCtx, {
     type: 'line',
@@ -537,9 +490,7 @@
           titleColor: '#94a3b8',
           bodyColor: '#fff',
           padding: 10,
-          callbacks: {
-            label: ctx => ' RM ' + ctx.parsed.y.toFixed(2)
-          }
+          callbacks: { label: ctx => ' RM ' + ctx.parsed.y.toFixed(2) }
         }
       },
       scales: {
@@ -561,14 +512,12 @@
   function setRange(days, el) {
     document.querySelectorAll('.range-pill').forEach(p => p.classList.remove('active'));
     el.classList.add('active');
-    const sliced = allLabels.slice(-days);
-    const data   = allRevenue.slice(-days);
-    revenueChart.data.labels   = sliced;
-    revenueChart.data.datasets[0].data = data;
+    revenueChart.data.labels = allLabels.slice(-days);
+    revenueChart.data.datasets[0].data = allRevenue.slice(-days);
     revenueChart.update();
   }
 
-  // ── Status Donut Chart ──────────────────────────────────
+  // Status Donut Chart
   const statusCtx = document.getElementById('statusChart').getContext('2d');
   new Chart(statusCtx, {
     type: 'doughnut',
