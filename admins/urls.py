@@ -68,6 +68,10 @@ urlpatterns = [
     path('order/<int:order_id>/toggle-priority/', views.toggle_order_priority, name='toggle_order_priority'),
     path('customers/<int:user_id>/toggle-vip/', views.toggle_customer_vip, name='toggle_customer_vip'),
 
+    # Admin / Manager Profile
+    path('profile/', views.admin_profile, name='admin_profile'),
+    path('manager/profile/', views.manager_profile, name='manager_profile'),
+
     # Email Campaigns
     path('email-templates/', views.email_template_list, name='email_template_list'),
     path('email-templates/create/', views.email_template_create, name='email_template_create'),

@@ -18,7 +18,7 @@
               color:{% if tier == 'bronze' %}#cd7f32{% elif tier == 'silver' %}#cbd5e1{% elif tier == 'gold' %}#fbbf24{% else %}#a78bfa{% endif %};">
               {{ tier|capfirst }}
             </span>
-            {% if profile.is_vip %}<span style="background:#f59e0b;color:#000;font-size:.65rem;font-weight:700;padding:2px 8px;border-radius:20px;">VIP</span>{% endif %}
+            {% if profile.is_vip %}<span style="background:#f59e0b;color:#000;font-size:.75rem;font-weight:700;padding:2px 8px;border-radius:20px;">VIP</span>{% endif %}
           </div>
           {% if next_tier %}
           <div class="mt-2" style="font-size:.78rem;color:#94a3b8;">
@@ -34,20 +34,20 @@
         <div class="d-flex gap-4 text-center">
           <div>
             <div style="font-size:1.6rem;font-weight:800;">{{ total_orders }}</div>
-            <div style="font-size:.72rem;color:#94a3b8;">Orders</div>
+            <div style="font-size:.75rem;color:#94a3b8;">Orders</div>
           </div>
           <div>
             <div style="font-size:1.6rem;font-weight:800;">RM {{ total_spent|floatformat:2 }}</div>
-            <div style="font-size:.72rem;color:#94a3b8;">Total Spent</div>
+            <div style="font-size:.75rem;color:#94a3b8;">Total Spent</div>
           </div>
           <div>
             <div style="font-size:1.6rem;font-weight:800;">RM {{ avg_order|floatformat:2 }}</div>
-            <div style="font-size:.72rem;color:#94a3b8;">Avg Order</div>
+            <div style="font-size:.75rem;color:#94a3b8;">Avg Order</div>
           </div>
           {% if top_item %}
           <div>
             <div style="font-size:1rem;font-weight:700;max-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ top_item.product__name }}</div>
-            <div style="font-size:.72rem;color:#94a3b8;">Favourite (×{{ top_item.qty }})</div>
+            <div style="font-size:.75rem;color:#94a3b8;">Favourite (×{{ top_item.qty }})</div>
           </div>
           {% endif %}
         </div>
@@ -74,8 +74,6 @@
 
     {% for o in unpaid_orders %}
     <div class="upcoming-card unpaid-card">
-      <div class="unpaid-card-stripe"></div>
-
       <div class="upcoming-card-header">
         <div>
           <a href="{% url 'order_success' o.id %}" class="upcoming-order-id" style="text-decoration:none;color:inherit;">Order #{{ o.id }}</a>

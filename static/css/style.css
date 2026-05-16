@@ -48,7 +48,13 @@
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: radial-gradient(
+    ellipse 110% 55% at 100% 0%,
+    oklch(92% 0.06 68 / 0.45),
+    transparent 65%
+  );
+  background-attachment: fixed;
   color: var(--dark);
   line-height: 1.6;
   min-height: 100vh;
@@ -219,7 +225,7 @@ main { flex: 1; padding: 2rem 0; }
 
 .dropdown-header {
   padding: 0.875rem 1rem;
-  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
+  background: var(--brand);
   color: #fff;
 }
 
@@ -1607,12 +1613,6 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
   position: relative;
   overflow: hidden;
 }
-.unpaid-card-stripe {
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b);
-}
 .pay-now-btn {
   display: inline-flex;
   align-items: center;
@@ -1958,6 +1958,34 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
   font-size: 0.7rem;
   color: var(--brand);
   font-weight: 600;
+}
+
+.pcard-desc {
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pcard-allergens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.pcard-allergen-tag {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  line-height: 1.4;
 }
 
 .pcard-foot {

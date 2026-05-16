@@ -14,6 +14,13 @@
 
 {% with url_name=request.resolver_match.url_name %}
 
+<style>
+.main-wrapper.no-sidebar {
+  margin-left: 0;
+}
+</style>
+
+{% if request.user.is_authenticated and request.user.role != 'customer' %}
 <!-- ── Left Sidebar ─────────────────────────────────────── -->
 <nav class="left-sidebar">
 
@@ -98,9 +105,10 @@
     </div>
 
 </nav>
+{% endif %}
 
 <!-- ── Main Wrapper ─────────────────────────────────────── -->
-<div class="main-wrapper">
+<div class="main-wrapper {% if not request.user.is_authenticated or request.user.role == 'customer' %}no-sidebar{% endif %}">
 
     <nav class="navbar-custom">
         <div class="container navbar-content">
@@ -113,8 +121,6 @@
             <!-- Nav Links -->
             <div class="navbar-menu">
                 <a href="{% url 'product_list' %}" class="nav-link {% if url_name == 'product_list' %}active-nav{% endif %}">Menu</a>
-                <a href="/" class="nav-link">About</a>
-                <a href="/" class="nav-link">Contact</a>
                 {% if request.user.is_authenticated and request.user.role == 'customer' %}
                 <a href="{% url 'customer_orders' %}" class="nav-link {% if url_name == 'customer_orders' %}active-nav{% endif %}">My Orders</a>
                 {% endif %}
@@ -125,7 +131,13 @@
                 <!-- Notifications bell (customers only) -->
                 {% if request.user.is_authenticated and request.user.role == 'customer' %}
                 <div class="cart-badge" style="margin-right:0.25rem;">
-                    <a href="{% url 'notifications_list' %}" class="cart-link" title="Notifications">🔔</a>
+                    <a href="{% url 'notifications_list' %}" class="cart-link" title="Notifications">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                           stroke-linecap="round" stroke-linejoin="round" width="20" height="20" aria-hidden="true">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                      </svg>
+                    </a>
                     {% if unread_notification_count %}
                     <span class="badge-count">{{ unread_notification_count }}</span>
                     {% endif %}
@@ -162,7 +174,7 @@
                             <a href="{% url 'product_list' %}" class="dropdown-item">🍽 Browse Menu</a>
                             <a href="{% url 'cart' %}" class="dropdown-item">🛒 My Cart</a>
                             <a href="{% url 'customer_orders' %}" class="dropdown-item">📋 My Orders</a>
-                            <a href="#" class="dropdown-item" onclick="openProfileModal();return false;">✏️ Edit Profile</a>
+                            <a href="{% url 'customer_profile' %}" class="dropdown-item">👤 My Profile</a>
                         {% elif request.user.is_superuser or request.user.role in 'manager|sales_admin' %}
                             <a href="{% url 'sales_admin_dashboard' %}" class="dropdown-item">📊 Dashboard</a>
                             {% if request.user.is_superuser or request.user.role == 'manager' %}

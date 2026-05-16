@@ -11,7 +11,7 @@
         </div>
       {% endif %}
       {% if p.category %}
-        <span class="pcard-cat">{{ p.category.name }}</span>
+        <span class="pcard-cat">{{ p.category.name|slice:":1"|upper }}</span>
       {% endif %}
       {% if request.user.is_authenticated %}
         <button class="pcard-fav {% if p.id in favourite_ids %}pcard-fav-on{% endif %}"
@@ -27,6 +27,16 @@
     </div>
     <div class="pcard-body">
       <div class="pcard-name">{{ p.name }}</div>
+      {% if p.description %}
+      <div class="pcard-desc">{{ p.description|truncatechars:60 }}</div>
+      {% endif %}
+      {% if p.allergies.all %}
+      <div class="pcard-allergens">
+        {% for a in p.allergies.all %}
+        <span class="pcard-allergen-tag" title="{{ a.name }}">{{ a.name|slice:":4"|upper }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
       {% if p.stock > 0 and p.stock <= 5 %}
         <div class="pcard-meta">Only {{ p.stock }} left</div>
       {% endif %}

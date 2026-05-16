@@ -2021,4 +2021,130 @@ def toggle_customer_vip(request, user_id):
     profile.save(update_fields=['is_vip'])
     log_audit(request, 'order_approved', target=profile,
               description=f"Customer '{customer.username}' VIP status set to {profile.is_vip} by {request.user.username}")
+
+
+# ---------------------------------------------------------------------------
+# ADMIN PROFILE
+# ---------------------------------------------------------------------------
+
+@sales_admin_required
+def admin_profile(request):
+    from django.contrib.auth import update_session_auth_hash
+    from .models import RejectedOrder
+
+    user = request.user
+    week_ago = timezone.now() - timedelta(days=7)
+    show_pw_form = False
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'update_profile':
+            user.first_name = request.POST.get('first_name', '').strip()
+            user.last_name = request.POST.get('last_name', '').strip()
+            user.phone_number = request.POST.get('phone_number', '').strip()
+            user.save(update_fields=['first_name', 'last_name', 'phone_number'])
+            messages.success(request, 'Profile updated.')
+            return redirect('admin_profile')
+
+        if action == 'change_password':
+            current = request.POST.get('current_password', '')
+            new_pw = request.POST.get('new_password', '')
+            confirm_pw = request.POST.get('confirm_password', '')
+
+            if not user.check_password(current):
+                messages.error(request, 'Current password is incorrect.')
+                show_pw_form = True
+            elif len(new_pw) < 8:
+                messages.error(request, 'New password must be at least 8 characters.')
+                show_pw_form = True
+            elif new_pw != confirm_pw:
+                messages.error(request, 'Passwords do not match.')
+                show_pw_form = True
+            else:
+                user.set_password(new_pw)
+                user.save()
+                update_session_auth_hash(request, user)
+                messages.success(request, 'Password changed successfully.')
+                return redirect('admin_profile')
+
+    approved_total = user.approved_orders.count()
+    approved_week = user.approved_orders.filter(approved_at__gte=week_ago).count()
+    rejected_total = RejectedOrder.objects.filter(rejected_by=user).count()
+    rejected_week = RejectedOrder.objects.filter(rejected_by=user, rejected_at__gte=week_ago).count()
+    recent_approved = user.approved_orders.select_related('customer').order_by('-approved_at')[:6]
+
+    return render(request, 'admins/admin_profile.html', {
+        'approved_total': approved_total,
+        'approved_week': approved_week,
+        'rejected_total': rejected_total,
+        'rejected_week': rejected_week,
+        'recent_approved': recent_approved,
+        'show_pw_form': show_pw_form,
+    })
+
+
+@manager_required
+def manager_profile(request):
+    from django.contrib.auth import update_session_auth_hash
+    from .models import RejectedOrder, EmailCampaign
+
+    user = request.user
+    week_ago = timezone.now() - timedelta(days=7)
+    show_pw_form = False
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'update_profile':
+            user.first_name = request.POST.get('first_name', '').strip()
+            user.last_name = request.POST.get('last_name', '').strip()
+            user.phone_number = request.POST.get('phone_number', '').strip()
+            user.save(update_fields=['first_name', 'last_name', 'phone_number'])
+            messages.success(request, 'Profile updated.')
+            return redirect('manager_profile')
+
+        if action == 'change_password':
+            current = request.POST.get('current_password', '')
+            new_pw = request.POST.get('new_password', '')
+            confirm_pw = request.POST.get('confirm_password', '')
+            if not user.check_password(current):
+                messages.error(request, 'Current password is incorrect.')
+                show_pw_form = True
+            elif len(new_pw) < 8:
+                messages.error(request, 'New password must be at least 8 characters.')
+                show_pw_form = True
+            elif new_pw != confirm_pw:
+                messages.error(request, 'Passwords do not match.')
+                show_pw_form = True
+            else:
+                user.set_password(new_pw)
+                user.save()
+                update_session_auth_hash(request, user)
+                messages.success(request, 'Password changed successfully.')
+                return redirect('manager_profile')
+
+    approved_total = user.approved_orders.count()
+    approved_week = user.approved_orders.filter(approved_at__gte=week_ago).count()
+    rejected_total = RejectedOrder.objects.filter(rejected_by=user).count()
+    rejected_week = RejectedOrder.objects.filter(rejected_by=user, rejected_at__gte=week_ago).count()
+    campaigns_total = EmailCampaign.objects.filter(sent_by=user).count()
+    campaigns_week = EmailCampaign.objects.filter(sent_by=user, sent_at__gte=week_ago).count()
+    total_recipients = EmailCampaign.objects.filter(sent_by=user).aggregate(
+        total=Sum('sent_count'))['total'] or 0
+    recent_approved = user.approved_orders.select_related('customer').order_by('-approved_at')[:5]
+    recent_campaigns = EmailCampaign.objects.filter(sent_by=user).order_by('-sent_at')[:5]
+
+    return render(request, 'admins/manager_profile.html', {
+        'approved_total': approved_total,
+        'approved_week': approved_week,
+        'rejected_total': rejected_total,
+        'rejected_week': rejected_week,
+        'campaigns_total': campaigns_total,
+        'campaigns_week': campaigns_week,
+        'total_recipients': total_recipients,
+        'recent_approved': recent_approved,
+        'recent_campaigns': recent_campaigns,
+        'show_pw_form': show_pw_form,
+    })
     return JsonResponse({'is_vip': profile.is_vip})

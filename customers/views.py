@@ -78,6 +78,10 @@ def product_list(request):
     if allergy_id:
         products = products.exclude(allergies__id=allergy_id)
 
+    q = request.GET.get('q', '').strip()
+    if q:
+        products = products.filter(name__icontains=q)
+
     hide_soldout = request.GET.get('hide_soldout') == '1'
     if hide_soldout:
         products = products.filter(stock__gt=0)
@@ -1266,3 +1270,80 @@ def reorder(request, order_id):
     else:
         messages.error(request, "None of the items from that order are currently in stock.")
         return redirect('customer_orders')
+
+
+@login_required
+def customer_profile(request):
+    from customers.models import CustomerProfile, User as UserModel
+    from django.contrib.auth import update_session_auth_hash
+
+    if request.user.role != 'customer':
+        return redirect('product_list')
+
+    profile, _ = CustomerProfile.objects.get_or_create(user=request.user)
+    show_pw_form = False
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        user = request.user
+
+        if action == 'update_info':
+            user.first_name = request.POST.get('first_name', '').strip()
+            user.last_name = request.POST.get('last_name', '').strip()
+            user.phone_number = request.POST.get('phone_number', '').strip()
+            email = request.POST.get('email', '').strip()
+            if email and email != user.email:
+                if UserModel.objects.filter(email=email).exclude(pk=user.pk).exists():
+                    messages.error(request, 'That email is already in use.')
+                else:
+                    user.email = email
+            user.save()
+            profile.default_address = request.POST.get('default_address', '').strip()
+            profile.default_phone = request.POST.get('default_phone', '').strip()
+            profile.marketing_opt_in = 'marketing_opt_in' in request.POST
+            profile.save()
+            messages.success(request, 'Profile updated.')
+            return redirect('customer_profile')
+
+        if action == 'change_password':
+            current = request.POST.get('current_password', '')
+            new_pw = request.POST.get('new_password', '')
+            confirm_pw = request.POST.get('confirm_password', '')
+            if not user.check_password(current):
+                messages.error(request, 'Current password is incorrect.')
+                show_pw_form = True
+            elif len(new_pw) < 8:
+                messages.error(request, 'New password must be at least 8 characters.')
+                show_pw_form = True
+            elif new_pw != confirm_pw:
+                messages.error(request, 'Passwords do not match.')
+                show_pw_form = True
+            else:
+                user.set_password(new_pw)
+                user.save()
+                update_session_auth_hash(request, user)
+                messages.success(request, 'Password changed successfully.')
+                return redirect('customer_profile')
+
+    TIER_ORDER = ['bronze', 'silver', 'gold', 'platinum']
+    TIER_THRESHOLDS = {'bronze': 0, 'silver': 500, 'gold': 2000, 'platinum': 5000}
+    tier = profile.loyalty_tier
+    tier_index = TIER_ORDER.index(tier)
+    if tier_index < len(TIER_ORDER) - 1:
+        next_tier = TIER_ORDER[tier_index + 1]
+        next_threshold = TIER_THRESHOLDS[next_tier]
+        progress_pct = min(100, int(float(profile.total_spent) / next_threshold * 100)) if next_threshold else 0
+        amount_to_next = max(0, next_threshold - float(profile.total_spent))
+    else:
+        next_tier = None
+        progress_pct = 100
+        amount_to_next = 0
+
+    return render(request, 'customers/customer_profile.html', {
+        'profile': profile,
+        'tier': tier,
+        'next_tier': next_tier,
+        'progress_pct': progress_pct,
+        'amount_to_next': amount_to_next,
+        'show_pw_form': show_pw_form,
+    })

@@ -11,6 +11,11 @@
       <h1 class="menu-hero-title">What are you having?</h1>
     </div>
     <div class="menu-filter-form">
+      <div class="search-input-wrap">
+        <input type="search" id="productSearch" class="filter-inline-select"
+               placeholder="Search menu…" autocomplete="off"
+               style="min-width:160px;">
+      </div>
       <div class="filter-select-wrap">
         <select name="allergy" id="filterAllergy" class="filter-inline-select">
           <option value="">No allergy filter</option>
@@ -36,7 +41,7 @@
       </a>
       {% for cat in categories %}
         <a href="?category={{ cat.id }}" class="cat-card pill {% if request.GET.category == cat.id|stringformat:"s" %}pill-active{% endif %}">
-          <div class="cat-icon-wrap" style="font-size:0.8rem;font-weight:800;letter-spacing:0.03em;" aria-hidden="true">{{ cat.name|slice:":3"|upper }}</div>
+          <div class="cat-icon-wrap" style="font-size:0.8rem;font-weight:800;letter-spacing:0.03em;" aria-hidden="true">{{ cat.name|slice:":1"|upper }}</div>
           <span class="cat-name">{{ cat.name }}</span>
         </a>
       {% endfor %}
@@ -69,10 +74,12 @@
   /* ── helpers ─────────────────────────────── */
   function buildParams() {
     const alg = document.getElementById('filterAllergy').value;
+    const q   = document.getElementById('productSearch').value.trim();
     const p   = new URLSearchParams();
     if (currentCategory) p.set('category', currentCategory);
     if (alg) p.set('allergy', alg);
     if (hideSoldOut) p.set('hide_soldout', '1');
+    if (q) p.set('q', q);
     return p;
   }
 
@@ -125,9 +132,17 @@
   document.getElementById('filterReset').addEventListener('click', () => {
     currentCategory = '';
     document.getElementById('filterAllergy').value  = '';
+    document.getElementById('productSearch').value  = '';
     document.querySelectorAll('.pill').forEach(p => p.classList.remove('pill-active'));
     document.querySelector('.pill')?.classList.add('pill-active');
     loadGrid(new URLSearchParams());
+  });
+
+  /* ── search input (debounced) ───────────── */
+  let searchTimeout;
+  document.getElementById('productSearch').addEventListener('input', () => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => loadGrid(buildParams()), 350);
   });
 
   /* ── favourite toggle (event delegation) ───*/

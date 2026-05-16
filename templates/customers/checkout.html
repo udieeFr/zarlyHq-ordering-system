@@ -105,15 +105,49 @@
 
   .btn-place-order {
     width: 100%; padding: .85rem; border: none; border-radius: 12px;
-    background: linear-gradient(135deg, #ff9933, #f97316);
+    background: #ff9933;
     color: #fff; font-size: 1rem; font-weight: 800; cursor: pointer;
-    transition: opacity .15s; margin-top: 1.25rem;
+    transition: background .15s, opacity .15s; margin-top: 1.25rem;
   }
-  .btn-place-order:hover { opacity: .9; }
+  .btn-place-order:hover { background: #e07e1e; }
   .btn-place-order:disabled { opacity: .5; cursor: not-allowed; }
 
   .terms-row { display: flex; align-items: flex-start; gap: .6rem; margin: 1rem 0; font-size: .78rem; color: #6b7280; }
   .terms-row input { margin-top: 2px; accent-color: var(--orange); }
+
+  /* Mobile sticky CTA */
+  .mobile-cta-bar {
+    display: none;
+  }
+  @media (max-width: 640px) {
+    .mobile-cta-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #fff;
+      border-top: 1px solid #e5e7eb;
+      padding: .75rem 1.25rem;
+      z-index: 200;
+      box-shadow: 0 -4px 16px rgba(15,23,42,.08);
+    }
+    .mobile-cta-total {
+      font-size: .9rem;
+      color: #374151;
+    }
+    .mobile-cta-total strong {
+      color: #ff9933;
+      font-weight: 900;
+    }
+    /* Add bottom padding to the form wrap so content isn't hidden behind the sticky bar */
+    .co-wrap {
+      padding-bottom: 6rem;
+    }
+  }
 </style>
 
 <main class="co-wrap">
@@ -294,6 +328,15 @@
 
     </div>
   </form>
+
+  <!-- Mobile sticky CTA -->
+  <div class="mobile-cta-bar" id="mobileCta">
+    <div class="mobile-cta-total">Total: <strong>RM {{ total_price }}</strong></div>
+    <button type="submit" form="checkoutForm" class="btn-place-order" id="placeOrderBtnMobile"
+            style="margin-top:0;width:auto;padding:.75rem 1.75rem;font-size:.9rem;">
+      Confirm Order →
+    </button>
+  </div>
 </main>
 
 <!-- Saved address data for JS -->
@@ -450,6 +493,20 @@
   document.addEventListener('DOMContentLoaded', () => {
     const isManual = document.getElementById('payManual').checked;
     if (isManual) document.getElementById('manual-suboptions').classList.add('visible');
+  });
+
+  // Prevent double-submit and show loading state on both desktop and mobile buttons
+  document.getElementById('checkoutForm').addEventListener('submit', function() {
+    const btns = [
+      document.getElementById('placeOrderBtn'),
+      document.getElementById('placeOrderBtnMobile')
+    ];
+    btns.forEach(btn => {
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Placing order…';
+      }
+    });
   });
 </script>
 {% endblock %}

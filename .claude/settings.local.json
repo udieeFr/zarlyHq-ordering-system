@@ -16,7 +16,12 @@
       "Bash(ls .venv)",
       "Bash(ls venv *)",
       "Bash(ls env *)",
-      "Bash(.venv/Scripts/python manage.py makemigrations customers --name favourite_model)"
+      "Bash(.venv/Scripts/python manage.py makemigrations customers --name favourite_model)",
+      "Bash(venv/Scripts/python.exe manage.py check)",
+      "Bash(npx agent-skills-cli@latest add @Jeffallan/claude-skills)",
+      "Bash(Get-ChildItem -Recurse \"C:\\\\Users\\\\rusdi\\\\.claude\" -Filter \"*.md\")",
+      "Bash(Select-Object FullName)",
+      "Bash(dir \"C:\\\\Users\\\\rusdi\\\\.claude\\\\plugins\\\\cache\")"
     ]
   },
   "enabledPlugins": {
