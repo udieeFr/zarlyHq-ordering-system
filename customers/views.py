@@ -7,7 +7,7 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
-from .models import Product, Category, Allergy
+from .models import Product, Category, Allergy, Favourite
 from admins.models import Order, OrderItem, Complaint, Payment, DigitalSignature
 from admins.utils import generate_invoice_pdf  # The PDF generation engine
 from admins.notifications import log_audit, notify, notify_admins
@@ -102,11 +102,11 @@ def product_list(request):
 
     user_orders = []
     completed_orders = []
+    favourite_ids = set()
     if request.user.is_authenticated:
-        # Display latest status in sidebar
         user_orders = Order.objects.filter(customer=request.user).order_by('-created_at')[:5]
-        # Receipt validation: Only orders that were 'approved' can have complaints
         completed_orders = Order.objects.filter(customer=request.user, status='approved')
+        favourite_ids = set(Favourite.objects.filter(customer=request.user).values_list('product_id', flat=True))
 
     context = {
         'products': product_page,
@@ -118,12 +118,39 @@ def product_list(request):
         'user_orders': user_orders,
         'completed_orders': completed_orders,
         'hide_soldout': hide_soldout,
+        'favourite_ids': favourite_ids,
     }
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return render(request, 'customers/partials/product_grid.html', context)
 
     return render(request, 'customers/product_list.html', context)
+
+@login_required
+def favourites_list(request):
+    fav_ids = set(Favourite.objects.filter(customer=request.user).values_list('product_id', flat=True))
+    products = Product.objects.filter(id__in=fav_ids, is_available=True).order_by('name')
+    cart = request.session.get('cart', {})
+    return render(request, 'customers/favourites.html', {
+        'products': products,
+        'favourite_ids': fav_ids,
+        'cart_count': sum(cart.values()),
+    })
+
+
+@login_required
+def toggle_favourite(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    product = get_object_or_404(Product, id=request.POST.get('product_id'))
+    fav, created = Favourite.objects.get_or_create(customer=request.user, product=product)
+    if not created:
+        fav.delete()
+        is_fav = False
+    else:
+        is_fav = True
+    return JsonResponse({'is_favourite': is_fav})
+
 
 @login_required
 def download_invoice(request, order_id):

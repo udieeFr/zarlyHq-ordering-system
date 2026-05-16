@@ -1,0 +1,180 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block page_title %}Favourites | Zarly BigFood{% endblock %}
+
+{% block content %}
+<div class="fav-page">
+
+  <div class="fav-header">
+    <h1 class="fav-title">Your favourites</h1>
+    {% if products %}
+    <p class="fav-subtitle">{{ products|length }} saved item{{ products|length|pluralize }}</p>
+    {% endif %}
+  </div>
+
+  {% if products %}
+  <div class="row g-3" id="fav-grid">
+    {% for p in products %}
+    <div class="col-6 col-md-4 col-lg-3">
+      <div class="pcard">
+        <div class="pcard-img-wrap">
+          <img src="{% if p.image %}{{ p.image.url }}{% else %}{% static 'images/products/promo1.jpg' %}{% endif %}"
+               alt="{{ p.name }}" loading="lazy">
+          {% if p.stock <= 0 %}
+            <div class="pcard-soldout-overlay">
+              <span class="pcard-soldout-label">SOLD OUT</span>
+            </div>
+          {% endif %}
+          {% if p.category %}
+            <span class="pcard-cat">{{ p.category.name }}</span>
+          {% endif %}
+          <button class="pcard-fav pcard-fav-on" type="button"
+                  data-fav-btn data-product-id="{{ p.id }}"
+                  aria-label="Remove from favourites">
+            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"
+                 stroke-linecap="round" stroke-linejoin="round" width="14" height="14" fill="currentColor">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+          </button>
+        </div>
+        <div class="pcard-body">
+          <div class="pcard-name">{{ p.name }}</div>
+          {% if p.stock > 0 and p.stock <= 5 %}
+            <div class="pcard-meta">Only {{ p.stock }} left</div>
+          {% endif %}
+          <div class="pcard-foot">
+            <span class="pcard-price">RM {{ p.price }}</span>
+            {% if p.stock > 0 %}
+              <form method="post" action="{% url 'add_to_cart' %}" data-cart-form>
+                {% csrf_token %}
+                <input type="hidden" name="product_id" value="{{ p.id }}">
+                <input type="hidden" name="quantity" value="1">
+                <button type="submit" class="pcard-add" aria-label="Add {{ p.name }} to cart">+</button>
+              </form>
+            {% else %}
+              <button class="pcard-add" disabled aria-label="{{ p.name }} unavailable">+</button>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="fav-empty">
+    <div class="fav-empty-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round" width="28" height="28">
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+      </svg>
+    </div>
+    <h2 class="fav-empty-title">Nothing saved yet</h2>
+    <p class="fav-empty-body">Tap the heart on any item in the menu to save it here.</p>
+    <a href="{% url 'product_list' %}" class="fav-browse-btn">Go to menu</a>
+  </div>
+  {% endif %}
+
+</div>
+
+<style>
+.fav-page { max-width: 1100px; margin: 0 auto; padding: 2rem 0 4rem; }
+.fav-header { margin-bottom: 1.75rem; }
+.fav-title { font-size: 1.375rem; font-weight: 800; color: var(--dark); letter-spacing: -0.03em; margin: 0 0 0.125rem; }
+.fav-subtitle { font-size: 0.8rem; font-weight: 500; color: var(--muted); margin: 0; }
+
+.fav-empty {
+  text-align: center;
+  padding: 5rem 2rem 4rem;
+}
+.fav-empty-icon {
+  width: 60px; height: 60px; border-radius: 50%;
+  background: oklch(93% 0.055 20);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 1.5rem;
+  color: oklch(52% 0.16 20);
+}
+.fav-empty-title { font-size: 1.2rem; font-weight: 800; color: var(--dark); letter-spacing: -0.02em; margin: 0 0 0.5rem; }
+.fav-empty-body { font-size: 0.875rem; color: var(--muted); margin: 0 0 2rem; line-height: 1.6; }
+.fav-browse-btn {
+  background: var(--brand); color: oklch(99% 0.006 68);
+  padding: 0.75rem 1.75rem; border-radius: 10px;
+  font-weight: 800; font-size: 0.875rem; text-decoration: none;
+  display: inline-flex; align-items: center;
+  transition: background 0.15s ease-out, transform 0.15s ease-out;
+}
+.fav-browse-btn:hover { background: var(--brand-dark); color: oklch(99% 0.006 68); transform: translateY(-1px); }
+</style>
+
+<script>
+(function () {
+  const grid  = document.getElementById('fav-grid');
+  const csrf  = '{{ csrf_token }}';
+
+  if (!grid) return;
+
+  /* ── favourite toggle ───────────────────── */
+  grid.addEventListener('click', async e => {
+    const btn = e.target.closest('[data-fav-btn]');
+    if (!btn) return;
+    const productId = btn.dataset.productId;
+    try {
+      const res  = await fetch("{% url 'toggle_favourite' %}", {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+        body: new URLSearchParams({ product_id: productId }),
+      });
+      const data = await res.json();
+      if (!data.is_favourite) {
+        btn.closest('.col-6').remove();
+        const remaining = grid.querySelectorAll('.col-6').length;
+        if (remaining === 0) location.reload();
+      }
+    } catch {}
+  });
+
+  /* ── add to cart ────────────────────────── */
+  grid.addEventListener('submit', async e => {
+    const form = e.target.closest('[data-cart-form]');
+    if (!form) return;
+    e.preventDefault();
+    const btn = form.querySelector('button[type="submit"]');
+    btn.textContent = '✓';
+    try {
+      const res  = await fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      const data = await res.json();
+      if (data.success) {
+        document.querySelectorAll('.cart-badge-count').forEach(b => {
+          b.textContent = data.cart_count;
+          b.style.display = data.cart_count > 0 ? '' : 'none';
+        });
+        showToast(data.message);
+      } else {
+        showToast(data.message, 'error');
+      }
+    } catch {
+      showToast('Something went wrong.', 'error');
+    } finally {
+      setTimeout(() => { btn.textContent = '+'; }, 800);
+    }
+  });
+
+  function showToast(msg, type = 'success') {
+    const t = document.createElement('div');
+    t.className = 'zarly-toast zarly-toast-' + type;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    requestAnimationFrame(() => t.classList.add('show'));
+    setTimeout(() => {
+      t.classList.remove('show');
+      t.addEventListener('transitionend', () => t.remove(), { once: true });
+    }, 3000);
+  }
+})();
+</script>
+{% endblock %}

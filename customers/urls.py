@@ -48,4 +48,8 @@ urlpatterns = [
 
     # Cancel order
     path('order/<int:order_id>/cancel/', views.cancel_order, name='cancel_order'),
+
+    # Favourites
+    path('favourites/', views.favourites_list, name='favourites'),
+    path('favourites/toggle/', views.toggle_favourite, name='toggle_favourite'),
 ]

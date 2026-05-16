@@ -53,6 +53,18 @@ class Product(models.Model):
         return self.name
 
 
+class Favourite(models.Model):
+    customer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favourites')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='favourited_by')
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('customer', 'product')
+
+    def __str__(self):
+        return f"{self.customer.username} → {self.product.name}"
+
+
 class CustomerProfile(models.Model):
     """
     Extended CRM data for customers. Tracks lifetime value, loyalty tier,

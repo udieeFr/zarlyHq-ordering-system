@@ -8,7 +8,15 @@
       "Bash(npx --yes impeccable detect --json \"templates/admins/manager_dashboard.html\")",
       "Bash(npx impeccable *)",
       "Bash(echo \"EXIT:$?\")",
-      "Bash(not exist *)"
+      "Bash(not exist *)",
+      "Bash(python manage.py makemigrations customers --name favourite_model)",
+      "Skill(impeccable)",
+      "Bash(python3 manage.py makemigrations customers --name favourite_model)",
+      "Bash(py manage.py makemigrations customers --name favourite_model)",
+      "Bash(ls .venv)",
+      "Bash(ls venv *)",
+      "Bash(ls env *)",
+      "Bash(.venv/Scripts/python manage.py makemigrations customers --name favourite_model)"
     ]
   },
   "enabledPlugins": {

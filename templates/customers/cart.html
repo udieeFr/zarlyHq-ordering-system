@@ -1,187 +1,419 @@
 {% extends 'base.html' %}
+{% block page_title %}Your order | Zarly BigFood{% endblock %}
 
 {% block content %}
 <style>
-  :root { --orange: #ff9933; --navy: #0f172a; }
+/* ── Cart page redesign ─────────────────────────────────── */
+.crt {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2.25rem 1.25rem 5rem;
+}
 
-  .cart-wrap { max-width: 900px; margin: 0 auto; padding: 2rem 1rem 4rem; }
-  .cart-title { font-size: 1.5rem; font-weight: 900; color: var(--navy); margin-bottom: 1.5rem; }
+/* Header */
+.crt-header { margin-bottom: 2rem; }
 
-  .cart-grid { display: grid; grid-template-columns: 1fr 300px; gap: 1.5rem; align-items: start; }
-  @media(max-width:700px){ .cart-grid { grid-template-columns: 1fr; } }
+.crt-title {
+  font-size: 1.375rem;
+  font-weight: 800;
+  color: var(--dark);
+  letter-spacing: -0.03em;
+  margin: 0 0 0.125rem;
+}
 
-  /* Item card */
-  .cart-item-card {
-    background: #fff; border-radius: 14px; padding: 1.1rem 1.3rem;
-    box-shadow: 0 2px 12px rgba(15,23,42,.07); margin-bottom: .85rem;
-    display: flex; align-items: center; gap: 1rem;
-  }
-  .cart-item-info { flex: 1; min-width: 0; }
-  .cart-item-name { font-weight: 700; color: var(--navy); font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .cart-item-unit { font-size: .78rem; color: #9ca3af; margin-top: .15rem; }
+.crt-subtitle {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted);
+}
 
-  /* Qty stepper */
-  .qty-stepper { display: flex; align-items: center; gap: .35rem; }
-  .qty-btn {
-    width: 30px; height: 30px; border-radius: 8px; border: 1.5px solid #e5e7eb;
-    background: #f9fafb; color: var(--navy); font-size: 1rem; font-weight: 700;
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-    transition: background .12s, border .12s;
-  }
-  .qty-btn:hover { background: var(--orange); border-color: var(--orange); color: #fff; }
-  .qty-num { font-weight: 800; font-size: .9rem; min-width: 24px; text-align: center; color: var(--navy); }
+/* ── Item list ──────────────────────────────────────────── */
+.crt-list {
+  border-top: 1px solid var(--border);
+}
 
-  .cart-item-subtotal { font-weight: 800; font-size: 1rem; color: var(--orange); min-width: 80px; text-align: right; }
+.crt-item {
+  display: grid;
+  grid-template-columns: 56px 1fr auto auto auto;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border);
+}
 
-  .btn-remove {
-    background: none; border: none; color: #d1d5db; cursor: pointer; padding: .25rem;
-    font-size: 1rem; line-height: 1; transition: color .12s;
-  }
-  .btn-remove:hover { color: #ef4444; }
+/* Thumbnail */
+.crt-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: oklch(90% 0.055 70);
+  flex-shrink: 0;
+}
 
-  /* Summary */
-  .cart-summary-card {
-    background: #fff; border-radius: 14px;
-    box-shadow: 0 2px 12px rgba(15,23,42,.07); padding: 1.4rem;
-    position: sticky; top: 80px;
-  }
-  .summary-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #9ca3af; margin-bottom: .9rem; }
-  .summary-line { display: flex; justify-content: space-between; font-size: .85rem; padding: .3rem 0; color: #374151; }
-  .summary-total-line { display: flex; justify-content: space-between; font-size: 1.1rem; font-weight: 900; color: var(--navy); padding: .75rem 0 0; border-top: 1px solid #f3f4f6; margin-top: .5rem; }
-  .summary-total-line span:last-child { color: var(--orange); }
+.crt-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 
-  .btn-checkout {
-    display: block; width: 100%; padding: .85rem; border: none; border-radius: 12px;
-    background: linear-gradient(135deg, #ff9933, #f97316);
-    color: #fff; font-size: .95rem; font-weight: 800; text-align: center;
-    text-decoration: none; margin-top: 1rem; cursor: pointer; transition: opacity .15s;
-  }
-  .btn-checkout:hover { opacity: .9; color: #fff; }
+.crt-thumb-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.125rem;
+  color: oklch(48% 0.14 70);
+}
 
-  .btn-clear-cart {
-    display: block; width: 100%; padding: .5rem; border: 1.5px solid #e5e7eb;
-    border-radius: 10px; background: #fff; color: #6b7280; font-size: .8rem;
-    font-weight: 600; text-align: center; cursor: pointer; margin-top: .6rem;
-    transition: border .15s, color .15s;
-  }
-  .btn-clear-cart:hover { border-color: #ef4444; color: #ef4444; }
+/* Item info */
+.crt-info { min-width: 0; }
 
-  /* Empty state */
-  .empty-cart { text-align: center; padding: 5rem 1rem; background: #fff; border-radius: 16px; box-shadow: 0 2px 12px rgba(15,23,42,.07); }
-  .empty-icon { font-size: 4rem; margin-bottom: 1rem; }
+.crt-name {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+  margin-bottom: 0.2rem;
+}
+
+.crt-unit {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* Stepper */
+.crt-stepper {
+  display: flex;
+  align-items: center;
+  background: oklch(96.5% 0.004 70);
+  border-radius: 999px;
+  padding: 3px;
+}
+
+.crt-step-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: oklch(99% 0.006 68);
+  color: var(--dark);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease-out, color 0.15s ease-out;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.07);
+  line-height: 1;
+  font-family: inherit;
+}
+
+.crt-step-btn:hover:not(:disabled) {
+  background: var(--brand);
+  color: oklch(99% 0.006 68);
+}
+
+.crt-step-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.crt-step-num {
+  width: 28px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 0.875rem;
+  color: var(--dark);
+}
+
+/* Subtotal */
+.crt-subtotal {
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: var(--dark);
+  text-align: right;
+  min-width: 68px;
+}
+
+/* Remove */
+.crt-remove {
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  border: none;
+  background: none;
+  color: var(--border);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease-out, background 0.15s ease-out;
+  padding: 0;
+}
+
+.crt-remove:hover {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+/* ── Total ──────────────────────────────────────────────── */
+.crt-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 0;
+  border-top: 2px solid var(--border);
+  margin-top: 0.25rem;
+}
+
+.crt-total-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.crt-total-amount {
+  font-size: 1.375rem;
+  font-weight: 900;
+  color: var(--brand);
+  letter-spacing: -0.025em;
+}
+
+/* ── Actions ────────────────────────────────────────────── */
+.crt-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.crt-browse-link {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.15s ease-out;
+}
+
+.crt-browse-link:hover { color: var(--dark); }
+
+.crt-confirm-btn {
+  background: var(--brand);
+  color: oklch(99% 0.006 68);
+  border: none;
+  padding: 0.8rem 2rem;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 0.01em;
+  transition: background 0.15s ease-out, transform 0.15s ease-out, box-shadow 0.15s ease-out;
+}
+
+.crt-confirm-btn:hover {
+  background: var(--brand-dark);
+  color: oklch(99% 0.006 68);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(255, 153, 51, 0.3);
+}
+
+/* ── Empty state ────────────────────────────────────────── */
+.crt-empty {
+  text-align: center;
+  padding: 5rem 2rem 4rem;
+}
+
+.crt-empty-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: oklch(91% 0.06 68);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.5rem;
+}
+
+.crt-empty-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--dark);
+  letter-spacing: -0.02em;
+  margin: 0 0 0.5rem;
+}
+
+.crt-empty-body {
+  font-size: 0.875rem;
+  color: var(--muted);
+  margin: 0 0 2rem;
+  line-height: 1.6;
+}
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media (max-width: 520px) {
+  .crt { padding: 1.5rem 1rem 4rem; }
+  .crt-item { grid-template-columns: 48px 1fr auto auto auto; gap: 0.625rem; }
+  .crt-thumb { width: 48px; height: 48px; border-radius: 8px; }
+  .crt-name { font-size: 0.825rem; }
+  .crt-confirm-btn { padding: 0.75rem 1.5rem; font-size: 0.85rem; }
+}
+
+@media (max-width: 380px) {
+  .crt-item { grid-template-columns: 44px 1fr auto auto auto; gap: 0.5rem; }
+  .crt-thumb { width: 44px; height: 44px; }
+  .crt-step-btn { width: 26px; height: 26px; }
+  .crt-step-num { width: 24px; }
+  .crt-subtotal { min-width: 56px; font-size: 0.825rem; }
+}
 </style>
 
-<div class="cart-wrap">
-  <div class="cart-title">My Cart 🛒</div>
+<div class="crt">
+
+  <!-- Header -->
+  <div class="crt-header">
+    <h1 class="crt-title">Your order</h1>
+    {% if cart_items %}
+    <p class="crt-subtitle">{{ cart_items|length }} item{{ cart_items|length|pluralize }}</p>
+    {% endif %}
+  </div>
 
   {% if messages %}
-    {% for msg in messages %}
-    <div class="alert alert-{{ msg.tags }} alert-dismissible fade show mb-3" role="alert" style="border-radius:12px;">
-      {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-    {% endfor %}
+  {% for msg in messages %}
+  <div class="alert alert-{{ msg.tags }} mb-3" style="border-radius: var(--radius-sm); font-size: 0.875rem;">{{ msg }}</div>
+  {% endfor %}
   {% endif %}
 
   {% if cart_items %}
-  <div class="cart-grid">
 
-    <!-- Items -->
-    <div>
-      {% for item in cart_items %}
-      <div class="cart-item-card">
-        <div class="cart-item-info">
-          <div class="cart-item-name">{{ item.product.name }}</div>
-          <div class="cart-item-unit">RM {{ item.product.price }} each · {{ item.product.stock }} left in stock</div>
-        </div>
+  <!-- Item list -->
+  <div class="crt-list">
+    {% for item in cart_items %}
+    <div class="crt-item">
 
-        <!-- Quantity stepper — auto-submits -->
-        <form method="post" action="{% url 'update_cart' %}" id="form-{{ item.product.id }}">
-          {% csrf_token %}
-          <input type="hidden" name="product_id" value="{{ item.product.id }}">
-          <input type="hidden" name="quantity" id="qty-{{ item.product.id }}" value="{{ item.quantity }}">
-          <div class="qty-stepper">
-            <button type="button" class="qty-btn"
-                    onclick="changeQty('{{ item.product.id }}', -1, {{ item.product.stock }})">−</button>
-            <span class="qty-num" id="display-{{ item.product.id }}">{{ item.quantity }}</span>
-            <button type="button" class="qty-btn"
-                    onclick="changeQty('{{ item.product.id }}', +1, {{ item.product.stock }})">+</button>
-          </div>
-        </form>
-
-        <div class="cart-item-subtotal">RM {{ item.subtotal }}</div>
-
-        <!-- Remove -->
-        <form method="post" action="{% url 'remove_from_cart' %}">
-          {% csrf_token %}
-          <input type="hidden" name="product_id" value="{{ item.product.id }}">
-          <button type="submit" class="btn-remove" title="Remove">✕</button>
-        </form>
+      <!-- Thumbnail -->
+      <div class="crt-thumb">
+        {% if item.product.image %}
+        <img src="{{ item.product.image.url }}" alt="{{ item.product.name }}" loading="lazy">
+        {% else %}
+        <div class="crt-thumb-fallback">{{ item.product.name|slice:":1"|upper }}</div>
+        {% endif %}
       </div>
-      {% endfor %}
 
-      <a href="{% url 'product_list' %}" style="font-size:.82rem;color:#9ca3af;text-decoration:none;">← Continue shopping</a>
-    </div>
-
-    <!-- Summary -->
-    <div>
-      <div class="cart-summary-card">
-        <div class="summary-label">Order Summary</div>
-        {% for item in cart_items %}
-        <div class="summary-line">
-          <span>{{ item.product.name }} ×{{ item.quantity }}</span>
-          <span>RM {{ item.subtotal }}</span>
-        </div>
-        {% endfor %}
-        <div class="summary-total-line">
-          <span>Total</span>
-          <span>RM {{ total_price }}</span>
-        </div>
-        <a href="{% url 'checkout' %}" class="btn-checkout">Checkout →</a>
-        <button class="btn-clear-cart" onclick="clearCart()">Clear cart</button>
+      <!-- Info -->
+      <div class="crt-info">
+        <div class="crt-name">{{ item.product.name }}</div>
+        <div class="crt-unit">RM {{ item.product.price }} each</div>
       </div>
-    </div>
 
+      <!-- Stepper -->
+      <form method="post" action="{% url 'update_cart' %}" id="form-{{ item.product.id }}">
+        {% csrf_token %}
+        <input type="hidden" name="product_id" value="{{ item.product.id }}">
+        <input type="hidden" name="quantity" id="qty-{{ item.product.id }}" value="{{ item.quantity }}">
+        <div class="crt-stepper">
+          <button type="button" class="crt-step-btn"
+                  data-minus="{{ item.product.id }}"
+                  onclick="changeQty('{{ item.product.id }}', -1, {{ item.product.stock }})"
+                  {% if item.quantity <= 1 %}disabled{% endif %}>−</button>
+          <span class="crt-step-num" id="display-{{ item.product.id }}">{{ item.quantity }}</span>
+          <button type="button" class="crt-step-btn"
+                  onclick="changeQty('{{ item.product.id }}', +1, {{ item.product.stock }})">+</button>
+        </div>
+      </form>
+
+      <!-- Line total -->
+      <div class="crt-subtotal">RM {{ item.subtotal }}</div>
+
+      <!-- Remove -->
+      <form method="post" action="{% url 'remove_from_cart' %}">
+        {% csrf_token %}
+        <input type="hidden" name="product_id" value="{{ item.product.id }}">
+        <button type="submit" class="crt-remove" aria-label="Remove {{ item.product.name }}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14H6L5 6"/>
+            <path d="M10 11v6M14 11v6"/>
+            <path d="M9 6V4h6v2"/>
+          </svg>
+        </button>
+      </form>
+
+    </div>
+    {% endfor %}
   </div>
+
+  <!-- Your total -->
+  <div class="crt-total">
+    <span class="crt-total-label">Your total</span>
+    <span class="crt-total-amount">RM {{ total_price }}</span>
+  </div>
+
+  <!-- Actions -->
+  <div class="crt-foot">
+    <a href="{% url 'product_list' %}" class="crt-browse-link">Keep browsing</a>
+    <a href="{% url 'checkout' %}" class="crt-confirm-btn">Confirm order</a>
+  </div>
+
   {% else %}
-  <div class="empty-cart">
-    <div class="empty-icon">🛒</div>
-    <h3 style="color:#374151;font-weight:800;margin-bottom:.5rem;">Your cart is empty</h3>
-    <p style="color:#9ca3af;margin-bottom:1.5rem;">Browse our menu and add something delicious.</p>
-    <a href="{% url 'product_list' %}" class="btn-checkout" style="display:inline-block;width:auto;padding:.75rem 2rem;">Browse Menu</a>
+
+  <!-- Empty state -->
+  <div class="crt-empty">
+    <div class="crt-empty-icon">
+      <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+        <path d="M6 14C6 14 5 23 16 23C27 23 26 14 26 14"
+              fill="oklch(90% 0.06 68)" stroke="oklch(58% 0.13 68)"
+              stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="4" y1="14" x2="28" y2="14"
+              stroke="oklch(58% 0.13 68)" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="14" y1="8" x2="15" y2="14"
+              stroke="oklch(58% 0.13 68)" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="18" y1="7" x2="19" y2="14"
+              stroke="oklch(58% 0.13 68)" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <h2 class="crt-empty-title">Nothing here yet</h2>
+    <p class="crt-empty-body">Head back to the menu and pick something good.</p>
+    <a href="{% url 'product_list' %}" class="crt-confirm-btn">Go to menu</a>
   </div>
+
   {% endif %}
+
 </div>
 
-<!-- Clear cart form -->
-<form id="clearForm" method="post" action="{% url 'update_cart' %}" style="display:none;">
-  {% csrf_token %}
-  <input type="hidden" name="clear_cart" value="1">
-</form>
-
 <script>
-  function changeQty(productId, delta, maxStock) {
-    const hidden  = document.getElementById('qty-' + productId);
-    const display = document.getElementById('display-' + productId);
-    let current   = parseInt(hidden.value);
-    let next      = current + delta;
+function changeQty(productId, delta, maxStock) {
+  var hidden   = document.getElementById('qty-' + productId);
+  var display  = document.getElementById('display-' + productId);
+  var minusBtn = document.querySelector('[data-minus="' + productId + '"]');
+  var current  = parseInt(hidden.value);
+  var next     = current + delta;
 
-    if (next < 0) next = 0;
-    if (next > maxStock) next = maxStock;
+  if (next < 1)        next = 1;
+  if (next > maxStock) next = maxStock;
 
-    hidden.value   = next;
-    display.textContent = next;
+  hidden.value        = next;
+  display.textContent = next;
+  if (minusBtn) minusBtn.disabled = (next <= 1);
 
-    // Auto-submit after a short debounce
-    clearTimeout(window['_qt_' + productId]);
-    window['_qt_' + productId] = setTimeout(() => {
-      document.getElementById('form-' + productId).submit();
-    }, 600);
-  }
-
-  function clearCart() {
-    if (confirm('Remove all items from your cart?')) {
-      document.getElementById('clearForm').submit();
-    }
-  }
+  clearTimeout(window['_qt_' + productId]);
+  window['_qt_' + productId] = setTimeout(function() {
+    document.getElementById('form-' + productId).submit();
+  }, 600);
+}
 </script>
 {% endblock %}

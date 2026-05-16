@@ -8,50 +8,35 @@
   <div class="menu-hero">
     <div class="menu-hero-text">
       <p class="eyebrow">Food Menu</p>
-      <h1 class="menu-hero-title">Popular Delicious Foods</h1>
+      <h1 class="menu-hero-title">What are you having?</h1>
     </div>
-    <form method="get" class="menu-filter-form">
-      <div class="filter-select-wrap">
-        <select name="category" id="filterCategory" class="filter-inline-select">
-          <option value="">All Categories</option>
-          {% for cat in categories %}
-            <option value="{{ cat.id }}" {% if request.GET.category == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
+    <div class="menu-filter-form">
       <div class="filter-select-wrap">
         <select name="allergy" id="filterAllergy" class="filter-inline-select">
           <option value="">No allergy filter</option>
           {% for al in allergies %}
-            <option value="{{ al.id }}" {% if request.GET.allergy == al.id|stringformat:"s" %}selected{% endif %}>🚫 Hide {{ al.name }}</option>
+            <option value="{{ al.id }}" {% if request.GET.allergy == al.id|stringformat:"s" %}selected{% endif %}>Hide {{ al.name }}</option>
           {% endfor %}
         </select>
       </div>
-      <button type="button" id="filterReset" class="filter-reset-btn">✕ Reset</button>
+      <button type="button" id="filterReset" class="filter-reset-btn">Reset</button>
       <button type="button" id="toggleUnavailable" class="filter-reset-btn"
         style="background:{% if hide_soldout %}#fef3c7{% else %}#f1f5f9{% endif %};color:{% if hide_soldout %}#92400e{% else %}#475569{% endif %};border:1.5px solid #e2e8f0;">
-        {% if hide_soldout %}👁 Show Sold Out{% else %}🙈 Hide Sold Out{% endif %}
+        {% if hide_soldout %}Show sold out{% else %}Hide sold out{% endif %}
       </button>
-    </form>
+    </div>
   </div>
 
   <!-- ── Category Cards ─────────────────────────────────── -->
   <div class="categories-section">
     <div class="categories-scroll">
       <a href="{% url 'product_list' %}" class="cat-card pill {% if not request.GET.category %}pill-active{% endif %}">
-        <div class="cat-icon-wrap">🍽️</div>
+        <div class="cat-icon-wrap" style="font-size:0.8rem;font-weight:800;letter-spacing:0.03em;" aria-hidden="true">ALL</div>
         <span class="cat-name">All Menu</span>
       </a>
       {% for cat in categories %}
         <a href="?category={{ cat.id }}" class="cat-card pill {% if request.GET.category == cat.id|stringformat:"s" %}pill-active{% endif %}">
-          <div class="cat-icon-wrap">
-            {% if forloop.counter|divisibleby:6 %}🌶️
-            {% elif forloop.counter|divisibleby:5 %}🥘
-            {% elif forloop.counter|divisibleby:4 %}🍜
-            {% elif forloop.counter|divisibleby:3 %}🥗
-            {% elif forloop.counter|divisibleby:2 %}🍖
-            {% else %}🍱{% endif %}
-          </div>
+          <div class="cat-icon-wrap" style="font-size:0.8rem;font-weight:800;letter-spacing:0.03em;" aria-hidden="true">{{ cat.name|slice:":3"|upper }}</div>
           <span class="cat-name">{{ cat.name }}</span>
         </a>
       {% endfor %}
@@ -65,19 +50,29 @@
 
 </div>
 
+<!-- ── Sticky cart FAB ─────────────────────────────────── -->
+<a href="{% url 'cart' %}" class="cart-fab" aria-label="View your cart">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+       stroke-linecap="round" stroke-linejoin="round" width="20" height="20" aria-hidden="true">
+    <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+  </svg>
+  <span class="cart-fab-label">View cart</span>
+  <span class="cart-fab-badge cart-badge-count"{% if not cart_count %} style="display:none"{% endif %}>{{ cart_count|default:0 }}</span>
+</a>
+
 <script>
 (function () {
   const grid = document.getElementById('product-grid');
+  let currentCategory = '{{ request.GET.category|default:"" }}';
 
   /* ── helpers ─────────────────────────────── */
-  function buildParams(extra = {}) {
-    const cat = document.getElementById('filterCategory').value;
+  function buildParams() {
     const alg = document.getElementById('filterAllergy').value;
     const p   = new URLSearchParams();
-    if (cat) p.set('category', cat);
+    if (currentCategory) p.set('category', currentCategory);
     if (alg) p.set('allergy', alg);
     if (hideSoldOut) p.set('hide_soldout', '1');
-    Object.entries(extra).forEach(([k, v]) => { if (v) p.set(k, v); else p.delete(k); });
     return p;
   }
 
@@ -91,7 +86,7 @@
     if (hideSoldOut) p.set('hide_soldout', '1'); else p.delete('hide_soldout');
     p.delete('page');
     loadGrid(p);
-    toggleBtn.textContent  = hideSoldOut ? '👁 Show Sold Out' : '🙈 Hide Sold Out';
+    toggleBtn.textContent  = hideSoldOut ? 'Show sold out' : 'Hide sold out';
     toggleBtn.style.background = hideSoldOut ? '#fef3c7' : '#f1f5f9';
     toggleBtn.style.color      = hideSoldOut ? '#92400e'  : '#475569';
   });
@@ -117,25 +112,42 @@
       e.preventDefault();
       document.querySelectorAll('.pill').forEach(p => p.classList.remove('pill-active'));
       pill.classList.add('pill-active');
-      const href   = pill.getAttribute('href') || '';
-      const params = new URLSearchParams(href.split('?')[1] || '');
-      const catVal = params.get('category') || '';
-      document.getElementById('filterCategory').value = catVal;
-      loadGrid(params);
+      const href = pill.getAttribute('href') || '';
+      const pillParams = new URLSearchParams(href.split('?')[1] || '');
+      currentCategory = pillParams.get('category') || '';
+      loadGrid(buildParams());
     });
   });
 
-  /* ── dropdowns ───────────────────────────── */
-  ['filterCategory', 'filterAllergy'].forEach(id => {
-    document.getElementById(id).addEventListener('change', () => loadGrid(buildParams()));
-  });
+  /* ── allergy dropdown ────────────────────── */
+  document.getElementById('filterAllergy').addEventListener('change', () => loadGrid(buildParams()));
 
   document.getElementById('filterReset').addEventListener('click', () => {
-    document.getElementById('filterCategory').value = '';
+    currentCategory = '';
     document.getElementById('filterAllergy').value  = '';
     document.querySelectorAll('.pill').forEach(p => p.classList.remove('pill-active'));
     document.querySelector('.pill')?.classList.add('pill-active');
     loadGrid(new URLSearchParams());
+  });
+
+  /* ── favourite toggle (event delegation) ───*/
+  const csrfToken = '{{ csrf_token }}';
+  grid.addEventListener('click', async e => {
+    const btn = e.target.closest('[data-fav-btn]');
+    if (!btn) return;
+    const productId = btn.dataset.productId;
+    try {
+      const res  = await fetch("{% url 'toggle_favourite' %}", {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
+        body: new URLSearchParams({ product_id: productId }),
+      });
+      const data = await res.json();
+      const svg  = btn.querySelector('svg');
+      btn.classList.toggle('pcard-fav-on', data.is_favourite);
+      btn.setAttribute('aria-label', data.is_favourite ? 'Remove from favourites' : 'Add to favourites');
+      if (svg) svg.setAttribute('fill', data.is_favourite ? 'currentColor' : 'none');
+    } catch {}
   });
 
   /* ── pagination (event delegation) ─────────*/
@@ -154,10 +166,8 @@
     if (!form) return;
     e.preventDefault();
 
-    const btn  = form.querySelector('button[type="submit"]');
-    const orig = btn.textContent;
+    const btn = form.querySelector('button[type="submit"]');
     btn.textContent = '✓';
-    btn.disabled = true;
 
     try {
       const res  = await fetch(form.action, {
@@ -168,17 +178,19 @@
       const data = await res.json();
 
       if (data.success) {
-        document.querySelectorAll('.badge-count').forEach(b => b.textContent = data.cart_count);
-        const sideCount = document.querySelector('.sidebar-cart-count');
-        if (sideCount) sideCount.textContent = data.cart_count;
-        showToast('🛒 ' + data.message);
+        const count = data.cart_count;
+        document.querySelectorAll('.cart-badge-count').forEach(b => {
+          b.textContent = count;
+          b.style.display = count > 0 ? '' : 'none';
+        });
+        showToast(data.message);
       } else {
         showToast(data.message, 'error');
       }
     } catch {
       showToast('Something went wrong.', 'error');
     } finally {
-      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1200);
+      setTimeout(() => { btn.textContent = '+'; }, 800);
     }
   });
 

@@ -414,13 +414,13 @@ input:focus, select:focus, textarea:focus {
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
-  border-left: 3px solid;
+  border: 1.5px solid transparent;
 }
 
-.alert-success { background: var(--success-bg); color: #047857; border-color: var(--success); }
-.alert-danger  { background: var(--danger-bg);  color: #b91c1c; border-color: var(--danger); }
-.alert-warning { background: var(--warning-bg); color: #92400e; border-color: var(--warning); }
-.alert-info    { background: var(--info-bg);    color: #0369a1; border-color: var(--info); }
+.alert-success { background: var(--success-bg); color: #047857; border-color: #bbf7d0; }
+.alert-danger  { background: var(--danger-bg);  color: #b91c1c; border-color: #fecaca; }
+.alert-warning { background: var(--warning-bg); color: #92400e; border-color: #fde68a; }
+.alert-info    { background: var(--info-bg);    color: #0369a1; border-color: #bae6fd; }
 
 /* =========================================
    FILTER BAR
@@ -872,8 +872,8 @@ footer {
 }
 
 .zarly-toast.show { opacity: 1; transform: translateY(0); }
-.zarly-toast-success { border-left: 3px solid var(--success); }
-.zarly-toast-error   { border-left: 3px solid var(--danger); background: #1e1e1e; }
+.zarly-toast-success { border-top: 3px solid var(--success); }
+.zarly-toast-error   { border-top: 3px solid var(--danger); background: #1e1e1e; }
 
 /* =========================================
    RESPONSIVE
@@ -1274,10 +1274,8 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
 }
 
 .lsb-link.lsb-active {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.28);
   color: #fff;
-  border-left: 3px solid #fff;
-  padding-left: calc(0.8rem - 3px);
 }
 
 .lsb-icon {
@@ -1826,3 +1824,211 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
   .upcoming-grid { grid-template-columns: 1fr; }
   .previous-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Sticky cart FAB ───────────────────────────────────── */
+.cart-fab {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 900;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--brand);
+  color: oklch(99% 0.006 68);
+  text-decoration: none;
+  border-radius: 999px;
+  padding: 0.8rem 1.375rem;
+  font-weight: 800;
+  font-size: 0.875rem;
+  font-family: inherit;
+  box-shadow: 0 4px 24px rgba(255, 153, 51, 0.38), 0 1px 4px rgba(15, 23, 42, 0.1);
+  transition: background 0.15s ease-out, transform 0.15s ease-out, box-shadow 0.15s ease-out;
+}
+.cart-fab:hover {
+  background: var(--brand-dark);
+  color: oklch(99% 0.006 68);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(255, 153, 51, 0.42), 0 2px 6px rgba(15, 23, 42, 0.1);
+}
+.cart-fab:active { transform: translateY(0); }
+
+.cart-fab-badge {
+  background: oklch(99% 0.006 68);
+  color: var(--brand);
+  font-size: 0.72rem;
+  font-weight: 900;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.3rem;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+@media (max-width: 480px) {
+  .cart-fab { padding: 0.75rem 1.125rem; bottom: 1.25rem; right: 1.25rem; }
+  .cart-fab-label { display: none; }
+}
+
+/* ── Product card (.pcard) ──────────────────────────────── */
+.pcard {
+  background: oklch(99% 0.005 68);
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid oklch(92% 0.008 68);
+  transition: box-shadow 0.18s ease-out, transform 0.18s ease-out;
+  display: flex;
+  flex-direction: column;
+}
+.pcard:hover {
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.09);
+  transform: translateY(-2px);
+}
+
+.pcard-img-wrap {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: oklch(91% 0.055 68);
+}
+.pcard-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.3s ease-out;
+}
+.pcard:hover .pcard-img-wrap img { transform: scale(1.04); }
+
+.pcard-soldout-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.52);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pcard-soldout-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: oklch(96% 0.012 68);
+  background: rgba(15, 23, 42, 0.55);
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+}
+
+.pcard-cat {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: oklch(99% 0.006 68);
+  background: rgba(15, 23, 42, 0.52);
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  backdrop-filter: blur(4px);
+}
+
+.pcard-body {
+  padding: 0.625rem 0.75rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+}
+
+.pcard-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: oklch(18% 0.015 68);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pcard-meta {
+  font-size: 0.7rem;
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.pcard-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.4rem;
+}
+
+.pcard-price {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: oklch(18% 0.015 68);
+  letter-spacing: -0.02em;
+}
+
+.pcard-add {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: var(--brand);
+  color: oklch(99% 0.006 68);
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease-out, transform 0.15s ease-out, box-shadow 0.15s ease-out;
+  font-family: inherit;
+  flex-shrink: 0;
+  padding: 0;
+}
+.pcard-add:hover:not(:disabled) {
+  background: var(--brand-dark);
+  transform: scale(1.1);
+  box-shadow: 0 4px 14px rgba(255, 153, 51, 0.4);
+}
+.pcard-add:active:not(:disabled) { transform: scale(0.94); }
+.pcard-add:disabled {
+  background: oklch(87% 0.006 68);
+  color: oklch(62% 0.01 68);
+  cursor: not-allowed;
+}
+
+.pcard-fav {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(4px);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: oklch(62% 0.01 68);
+  transition: background 0.15s ease-out, color 0.15s ease-out, transform 0.15s ease-out;
+}
+.pcard-fav:hover {
+  background: #fff;
+  color: #ef4444;
+  transform: scale(1.14);
+}
+.pcard-fav-on {
+  color: #ef4444;
+}
+.pcard-fav-on svg { fill: #ef4444; }
