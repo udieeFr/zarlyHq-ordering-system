@@ -7,3 +7,4 @@ secure_keys/
 .DS_Store
 .env
 .md
+agent/

@@ -1,0 +1,193 @@
+{% extends 'admin_base.html' %}
+{% load admin_extras %}
+{% block page_title %}Sales Report{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Sales Report</h1>
+  <p>Revenue, refund analytics, and product performance.</p>
+</div>
+
+<!-- Period selector -->
+<form method="get" class="mb-4 d-flex align-items-center gap-2 flex-wrap">
+  <span class="fw-bold small">Period:</span>
+  {% for label, val in period_choices.items %}
+  <a href="?period={{ val }}" class="btn btn-sm {% if period == val %}btn-dark{% else %}btn-outline-secondary{% endif %}">{{ label }}</a>
+  {% endfor %}
+  <span class="text-muted small ms-2">{{ since }} → {{ today }}</span>
+</form>
+
+<!-- KPI row -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="content-card text-center py-3">
+      <div class="text-muted small">Revenue</div>
+      <div class="fw-bold fs-4 text-success">RM {{ revenue_total|floatformat:2 }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="content-card text-center py-3">
+      <div class="text-muted small">Orders</div>
+      <div class="fw-bold fs-4">{{ orders_count }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="content-card text-center py-3">
+      <div class="text-muted small">Avg Order Value</div>
+      <div class="fw-bold fs-4">RM {{ avg_order_val }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="content-card text-center py-3">
+      <div class="text-muted small">Refund Rate</div>
+      <div class="fw-bold fs-4 {% if refund_rate > 10 %}text-danger{% else %}text-success{% endif %}">{{ refund_rate }}%</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- Revenue chart -->
+  <div class="col-lg-8">
+    <div class="content-card">
+      <h6 class="fw-bold mb-3">Daily Revenue</h6>
+      <canvas id="revenueChart" height="100"></canvas>
+    </div>
+  </div>
+  <!-- Order status funnel -->
+  <div class="col-lg-4">
+    <div class="content-card h-100">
+      <h6 class="fw-bold mb-3">Order Funnel (All Time)</h6>
+      {% for status, count in status_counts.items %}
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="small text-capitalize">{{ status|replace:"_, " }}</span>
+        <span class="badge bg-secondary">{{ count }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- Top products -->
+  <div class="col-lg-6">
+    <div class="content-card">
+      <h6 class="fw-bold mb-3">Top Products by Revenue</h6>
+      <table class="table table-sm table-hover mb-0">
+        <thead class="table-light small text-uppercase">
+          <tr><th>Product</th><th>Category</th><th class="text-end">Qty</th><th class="text-end">Revenue</th></tr>
+        </thead>
+        <tbody>
+          {% for p in top_products %}
+          <tr>
+            <td class="fw-bold">{{ p.product__name }}</td>
+            <td class="text-muted small">{{ p.product__category__name }}</td>
+            <td class="text-end">{{ p.qty }}</td>
+            <td class="text-end fw-bold text-success">RM {{ p.revenue|floatformat:2 }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-muted text-center py-3">No data for this period.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Category breakdown -->
+  <div class="col-lg-6">
+    <div class="content-card">
+      <h6 class="fw-bold mb-3">Revenue by Category</h6>
+      <canvas id="categoryChart" height="180"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Refund analytics -->
+<div class="row g-4 mb-4">
+  <div class="col-lg-6">
+    <div class="content-card">
+      <h6 class="fw-bold mb-3">Refund Analytics</h6>
+      <div class="row g-3 mb-3">
+        <div class="col-4 text-center">
+          <div class="text-muted small">Total Refunded</div>
+          <div class="fw-bold text-danger">RM {{ refund_total|floatformat:2 }}</div>
+        </div>
+        <div class="col-4 text-center">
+          <div class="text-muted small">Refunds Issued</div>
+          <div class="fw-bold">{{ refund_count }}</div>
+        </div>
+        <div class="col-4 text-center">
+          <div class="text-muted small">Pending Action</div>
+          <div class="fw-bold text-warning">{{ pending_refunds }}</div>
+        </div>
+      </div>
+      <table class="table table-sm mb-0">
+        <thead class="table-light small text-uppercase"><tr><th>Source</th><th class="text-end">Count</th><th class="text-end">Amount</th></tr></thead>
+        <tbody>
+          {% for r in refunds_by_source %}
+          <tr>
+            <td>{{ r.source|replace:"_, "|capfirst }}</td>
+            <td class="text-end">{{ r.count }}</td>
+            <td class="text-end text-danger">RM {{ r.total|floatformat:2 }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="text-center text-muted py-2">No refunds in this period.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Loyalty tier breakdown -->
+  <div class="col-lg-6">
+    <div class="content-card">
+      <h6 class="fw-bold mb-3">Customer Loyalty Tiers</h6>
+      <canvas id="tierChart" height="180"></canvas>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const labels  = {{ chart_labels|safe }};
+const revenue = {{ chart_revenue|safe }};
+const orders  = {{ chart_orders|safe }};
+
+new Chart(document.getElementById('revenueChart'), {
+  type: 'bar',
+  data: {
+    labels,
+    datasets: [
+      { label: 'Revenue (RM)', data: revenue, backgroundColor: 'rgba(249,115,22,.7)', yAxisID: 'y' },
+      { label: 'Orders', data: orders, type: 'line', borderColor: '#0f172a', backgroundColor: 'transparent', yAxisID: 'y1', tension: .3 }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { position: 'bottom' } },
+    scales: {
+      y:  { position: 'left',  title: { display: true, text: 'RM' } },
+      y1: { position: 'right', title: { display: true, text: 'Orders' }, grid: { drawOnChartArea: false } }
+    }
+  }
+});
+
+const catLabels = [{% for c in category_revenue %}"{{ c.product__category__name }}"{% if not forloop.last %},{% endif %}{% endfor %}];
+const catRevenue = [{% for c in category_revenue %}{{ c.revenue|floatformat:2 }}{% if not forloop.last %},{% endif %}{% endfor %}];
+new Chart(document.getElementById('categoryChart'), {
+  type: 'doughnut',
+  data: { labels: catLabels, datasets: [{ data: catRevenue, backgroundColor: ['#f97316','#0f172a','#94a3b8','#fbbf24','#7c3aed','#10b981'] }] },
+  options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+});
+
+const tierData = {
+  labels: ['Bronze','Silver','Gold','Platinum'],
+  datasets: [{ data: [{{ tier_map.bronze|default:0 }},{{ tier_map.silver|default:0 }},{{ tier_map.gold|default:0 }},{{ tier_map.platinum|default:0 }}],
+    backgroundColor: ['#cd7f32','#94a3b8','#fbbf24','#7c3aed'] }]
+};
+new Chart(document.getElementById('tierChart'), {
+  type: 'doughnut',
+  data: tierData,
+  options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+});
+</script>
+{% endblock %}

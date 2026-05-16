@@ -43,6 +43,9 @@ urlpatterns = [
     # Reorder
     path('order/<int:order_id>/reorder/', views.reorder, name='reorder'),
 
+    # Profile
+    path('profile/update/', views.update_profile, name='update_profile'),
+
     # Cancel order
     path('order/<int:order_id>/cancel/', views.cancel_order, name='cancel_order'),
 ]

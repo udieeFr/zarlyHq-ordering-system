@@ -46,6 +46,7 @@ class Product(models.Model):
     weight_grams = models.IntegerField(default=0)
     stock = models.IntegerField(default=0)
     image = models.ImageField(upload_to='products/', null=True, blank=True)
+    is_available = models.BooleanField(default=True)
     allergies = models.ManyToManyField(Allergy, blank=True)
 
     def __str__(self):
@@ -75,6 +76,7 @@ class CustomerProfile(models.Model):
     default_phone = models.CharField(max_length=20, blank=True)
     default_address = models.TextField(blank=True)
     admin_notes = models.TextField(blank=True, help_text="Internal CRM notes — not visible to customer")
+    is_vip = models.BooleanField(default=False, help_text="VIP/priority customer flag — surfaces orders at top of queue")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

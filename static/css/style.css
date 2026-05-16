@@ -1574,8 +1574,65 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
   flex-shrink: 0;
 }
 .upcoming-track-btn:hover { background: var(--brand-dark); color: #fff; transform: translateY(-1px); }
-.upcoming-track-btn.btn-pay { background: #1d4ed8; }
-.upcoming-track-btn.btn-pay:hover { background: #1e40af; }
+
+/* Unpaid / awaiting payment within upcoming orders */
+.upcoming-subgroup-label {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #b45309;
+  padding: .35rem 0 .1rem;
+  border-top: 1.5px solid #fde68a;
+  margin-top: .25rem;
+}
+.upcoming-subgroup-label:first-child { border-top: none; margin-top: 0; }
+.subgroup-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 20px;
+  font-size: .7rem;
+  font-weight: 700;
+}
+.unpaid-card {
+  border: 1.5px solid #fde68a !important;
+  background: #fffdf5 !important;
+  position: relative;
+  overflow: hidden;
+}
+.unpaid-card-stripe {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b);
+}
+.pay-now-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .42rem 1rem;
+  background: #d97706;
+  color: #fff;
+  border-radius: 8px;
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-decoration: none;
+  border: none;
+  transition: var(--transition);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.pay-now-btn:hover { background: #b45309; color: #fff; transform: translateY(-1px); }
 
 /* Progress steps */
 .order-progress {

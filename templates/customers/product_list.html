@@ -28,6 +28,10 @@
         </select>
       </div>
       <button type="button" id="filterReset" class="filter-reset-btn">✕ Reset</button>
+      <button type="button" id="toggleUnavailable" class="filter-reset-btn"
+        style="background:{% if hide_soldout %}#fef3c7{% else %}#f1f5f9{% endif %};color:{% if hide_soldout %}#92400e{% else %}#475569{% endif %};border:1.5px solid #e2e8f0;">
+        {% if hide_soldout %}👁 Show Sold Out{% else %}🙈 Hide Sold Out{% endif %}
+      </button>
     </form>
   </div>
 
@@ -72,9 +76,25 @@
     const p   = new URLSearchParams();
     if (cat) p.set('category', cat);
     if (alg) p.set('allergy', alg);
+    if (hideSoldOut) p.set('hide_soldout', '1');
     Object.entries(extra).forEach(([k, v]) => { if (v) p.set(k, v); else p.delete(k); });
     return p;
   }
+
+  /* ── hide sold-out toggle (server-side filter) ── */
+  let hideSoldOut = {{ hide_soldout|yesno:"true,false" }};
+  const toggleBtn = document.getElementById('toggleUnavailable');
+
+  toggleBtn.addEventListener('click', () => {
+    hideSoldOut = !hideSoldOut;
+    const p = buildParams();
+    if (hideSoldOut) p.set('hide_soldout', '1'); else p.delete('hide_soldout');
+    p.delete('page');
+    loadGrid(p);
+    toggleBtn.textContent  = hideSoldOut ? '👁 Show Sold Out' : '🙈 Hide Sold Out';
+    toggleBtn.style.background = hideSoldOut ? '#fef3c7' : '#f1f5f9';
+    toggleBtn.style.color      = hideSoldOut ? '#92400e'  : '#475569';
+  });
 
   async function loadGrid(params) {
     grid.style.opacity = '0.45';

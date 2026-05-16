@@ -200,6 +200,7 @@
                             <a href="{% url 'product_list' %}" class="dropdown-item">🍽 Browse Menu</a>
                             <a href="{% url 'cart' %}" class="dropdown-item">🛒 My Cart</a>
                             <a href="{% url 'customer_orders' %}" class="dropdown-item">📋 My Orders</a>
+                            <a href="#" class="dropdown-item" onclick="openProfileModal();return false;">✏️ Edit Profile</a>
                         {% elif request.user.is_superuser or request.user.role in 'manager|sales_admin' %}
                             <a href="{% url 'sales_admin_dashboard' %}" class="dropdown-item">📊 Dashboard</a>
                             {% if request.user.is_superuser or request.user.role == 'manager' %}
@@ -269,5 +270,109 @@
 </div><!-- /.main-wrapper -->
 
 {% endwith %}
+
+{% if request.user.is_authenticated and request.user.role == 'customer' %}
+<!-- Profile Edit Modal -->
+<div id="profileModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.45);backdrop-filter:blur(2px);align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:18px;width:100%;max-width:460px;margin:1rem;box-shadow:0 24px 60px rgba(0,0,0,.18);overflow:hidden;">
+    <div style="padding:1.5rem 1.5rem 0;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <h5 style="font-weight:800;margin:0;font-size:1.1rem;">Edit Profile</h5>
+        <p style="margin:.2rem 0 0;font-size:.8rem;color:#64748b;">Changes save instantly</p>
+      </div>
+      <button onclick="closeProfileModal()" style="background:none;border:none;font-size:1.3rem;color:#94a3b8;cursor:pointer;line-height:1;padding:.25rem;">✕</button>
+    </div>
+    <div style="padding:1.25rem 1.5rem 1.5rem;">
+      <div id="profileAlert" style="display:none;padding:.6rem .9rem;border-radius:8px;font-size:.82rem;margin-bottom:1rem;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem;">
+        <div>
+          <label style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;display:block;margin-bottom:.3rem;">First Name</label>
+          <input id="pf-first" type="text" value="{{ request.user.first_name }}" style="width:100%;padding:.5rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.9rem;outline:none;" onfocus="this.style.borderColor='#f97316'" onblur="this.style.borderColor='#e2e8f0'">
+        </div>
+        <div>
+          <label style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;display:block;margin-bottom:.3rem;">Last Name</label>
+          <input id="pf-last" type="text" value="{{ request.user.last_name }}" style="width:100%;padding:.5rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.9rem;outline:none;" onfocus="this.style.borderColor='#f97316'" onblur="this.style.borderColor='#e2e8f0'">
+        </div>
+      </div>
+      <div style="margin-bottom:.75rem;">
+        <label style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;display:block;margin-bottom:.3rem;">Email</label>
+        <input id="pf-email" type="email" value="{{ request.user.email }}" style="width:100%;padding:.5rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.9rem;outline:none;" onfocus="this.style.borderColor='#f97316'" onblur="this.style.borderColor='#e2e8f0'">
+      </div>
+      <div style="margin-bottom:.75rem;">
+        <label style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;display:block;margin-bottom:.3rem;">Phone Number</label>
+        <input id="pf-phone" type="tel" value="{{ request.user.phone_number|default:'' }}" style="width:100%;padding:.5rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.9rem;outline:none;" onfocus="this.style.borderColor='#f97316'" onblur="this.style.borderColor='#e2e8f0'">
+      </div>
+      <div style="margin-bottom:1rem;">
+        <label style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;display:block;margin-bottom:.3rem;">Default Delivery Address</label>
+        <textarea id="pf-address" rows="2" style="width:100%;padding:.5rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.9rem;outline:none;resize:vertical;" onfocus="this.style.borderColor='#f97316'" onblur="this.style.borderColor='#e2e8f0'">{{ request.user.customer_profile.default_address|default:'' }}</textarea>
+      </div>
+      <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;margin-bottom:1.25rem;font-size:.88rem;">
+        <input id="pf-optin" type="checkbox" {% if request.user.customer_profile.marketing_opt_in %}checked{% endif %} style="width:16px;height:16px;accent-color:#f97316;">
+        <span>Receive promotional emails &amp; offers</span>
+      </label>
+      <button onclick="saveProfile()" id="pf-save-btn"
+        style="width:100%;padding:.65rem;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;border:none;border-radius:10px;font-weight:700;font-size:.95rem;cursor:pointer;transition:opacity .15s;">
+        Save Changes
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+function openProfileModal() {
+  const m = document.getElementById('profileModal');
+  m.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function closeProfileModal() {
+  document.getElementById('profileModal').style.display = 'none';
+  document.body.style.overflow = '';
+  document.getElementById('profileAlert').style.display = 'none';
+}
+document.getElementById('profileModal').addEventListener('click', function(e) {
+  if (e.target === this) closeProfileModal();
+});
+function saveProfile() {
+  const btn   = document.getElementById('pf-save-btn');
+  const alert = document.getElementById('profileAlert');
+  btn.disabled   = true;
+  btn.textContent = 'Saving…';
+  alert.style.display = 'none';
+
+  fetch("{% url 'update_profile' %}", {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+    body: JSON.stringify({
+      first_name:      document.getElementById('pf-first').value,
+      last_name:       document.getElementById('pf-last').value,
+      email:           document.getElementById('pf-email').value,
+      phone_number:    document.getElementById('pf-phone').value,
+      default_address: document.getElementById('pf-address').value,
+      marketing_opt_in: document.getElementById('pf-optin').checked,
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      alert.style.cssText = 'display:block;background:#d1fae5;color:#065f46;padding:.6rem .9rem;border-radius:8px;font-size:.82rem;margin-bottom:1rem;';
+      alert.textContent = '✓ Profile updated successfully.';
+      setTimeout(closeProfileModal, 1400);
+    } else {
+      alert.style.cssText = 'display:block;background:#fee2e2;color:#991b1b;padding:.6rem .9rem;border-radius:8px;font-size:.82rem;margin-bottom:1rem;';
+      alert.textContent = data.error || 'Something went wrong. Please try again.';
+    }
+  })
+  .catch(() => {
+    alert.style.cssText = 'display:block;background:#fee2e2;color:#991b1b;padding:.6rem .9rem;border-radius:8px;font-size:.82rem;margin-bottom:1rem;';
+    alert.textContent = 'Network error. Please try again.';
+  })
+  .finally(() => {
+    btn.disabled    = false;
+    btn.textContent = 'Save Changes';
+  });
+}
+</script>
+{% endif %}
+
 </body>
 </html>

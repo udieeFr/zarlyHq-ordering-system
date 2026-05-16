@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import login, logout
+from django_ratelimit.decorators import ratelimit
 from django.utils import timezone
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
@@ -104,6 +105,7 @@ def finalize_order_approval(order, user, request=None):
     except Exception:
         pass
 
+@ratelimit(key='ip', rate='10/m', method='POST', block=False)
 def unified_login(request):
     """
     Unified login view that redirects users to appropriate dashboard based on role.
@@ -112,8 +114,14 @@ def unified_login(request):
     if request.user.is_authenticated:
         # Already logged in, redirect to dashboard
         return redirect(get_user_dashboard_url(request.user))
-    
+
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            log_audit(request, 'login_rate_limited',
+                      description=f"Rate limit hit on login from IP for username '{request.POST.get('username', '')[:50]}'")
+            messages.error(request, "Too many login attempts. Please wait a minute before trying again.")
+            return render(request, 'registration/login.html', {'form': AuthenticationForm()})
+
         form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
@@ -131,7 +139,7 @@ def unified_login(request):
             messages.error(request, "Invalid username or password.")
     else:
         form = AuthenticationForm()
-    
+
     return render(request, 'registration/login.html', {'form': form})
 
 def admin_login(request):
@@ -680,11 +688,16 @@ def sales_admin_dashboard(request):
     urgent_pending_ids = list(base_pending.filter(created_at__gte=timezone.now() - timedelta(hours=1)).values_list('id', flat=True))
     high_value_pending_ids = list(base_pending.filter(total_amount__gte=150).values_list('id', flat=True))
 
+    # Week starts Sunday — reset every Sunday 00:00
+    _now = timezone.now()
+    _days_since_sunday = (_now.weekday() + 1) % 7  # Mon=1 … Sat=6 … Sun=0
+    week_start_dt = (_now - timedelta(days=_days_since_sunday)).replace(hour=0, minute=0, second=0, microsecond=0)
+
     dashboard_metrics = {
         'pending_count': base_pending.count(),
         'pending_payment_count': base_pending_payment.count(),
-        'approved_count': approved_orders_qs.count(),
-        'rejected_count': Order.objects.filter(status='rejected').count(),
+        'approved_count': Order.objects.filter(approved_at__gte=week_start_dt).count(),
+        'rejected_count': Order.objects.filter(status='rejected', rejection_record__rejected_at__gte=week_start_dt).count(),
         'today_revenue': Order.objects.filter(status='approved', approved_at__date=timezone.now().date()).aggregate(total=Sum('total_amount'))['total'] or 0,
         'urgent_pending_count': len(urgent_pending_ids),
         'high_value_pending_count': len(high_value_pending_ids),
@@ -717,7 +730,7 @@ def sales_admin_dashboard(request):
 @sales_admin_required
 def approved_orders_list(request):
     """List all approved orders with filtering and search."""
-    queryset = Order.objects.filter(status='approved').select_related('customer', 'approved_by').prefetch_related('items__product')
+    queryset = Order.objects.filter(status='approved').select_related('customer', 'approved_by').prefetch_related('items__product', 'payments')
 
     # Search
     search_query = request.GET.get('q', '').strip()
@@ -752,10 +765,12 @@ def approved_orders_list(request):
     if order_by in ['approved_at', '-approved_at', 'total_amount', '-total_amount', 'customer__username']:
         queryset = queryset.order_by(order_by)
 
-    approved_orders = queryset
+    approved_orders = list(queryset)
+    unpaid_ids = {o.id for o in approved_orders if not order_has_confirmed_payment(o)}
 
     return render(request, 'admins/approved_orders.html', {
         'approved_orders': approved_orders,
+        'unpaid_ids': unpaid_ids,
         'search_query': search_query,
         'days_filter': days_filter,
         'order_count_filter': order_count_filter,
@@ -884,18 +899,18 @@ def reject_pending_payment(request, order_id):
 
 @sales_admin_required
 def print_order_summary(request, order_id):
-    """Generate a printable order summary PDF."""
-    order = get_object_or_404(Order, id=order_id, status='approved')
-    # Reuse existing PDF generation logic
+    """Generate a printable order summary / proforma invoice PDF."""
+    ALLOWED_STATUSES = ['approved', 'pending_payment', 'prepared', 'ready_for_delivery', 'out_for_delivery', 'delivered']
+    order = get_object_or_404(Order, id=order_id, status__in=ALLOWED_STATUSES)
     try:
         pdf_path = generate_invoice_pdf(order)
         with open(pdf_path, 'rb') as f:
             response = HttpResponse(f.read(), content_type='application/pdf')
-            response['Content-Disposition'] = f'inline; filename="order_{order.id}_summary.pdf"'
+            response['Content-Disposition'] = f'inline; filename="order_{order.id}_invoice.pdf"'
             return response
     except Exception as e:
-        messages.error(request, f"Error generating PDF: {str(e)}")
-        return redirect('approved_orders_list')
+        messages.error(request, f"Error generating invoice: {str(e)}")
+        return redirect('admin_order_detail', order_id=order_id)
 
 @sales_admin_required
 def print_prep_list(request):
@@ -991,8 +1006,19 @@ def prepared_orders_list(request):
     if db_order in ['created_at', '-created_at', '_total_orders', '-_total_orders', '_total_amount', '-_total_amount']:
         prep_groups = prep_groups.order_by(db_order)
 
+    from django.db.models import Prefetch as _Prefetch
+    groups_list = list(prep_groups)
+    groups_with_orders = PrepGroup.objects.filter(
+        pk__in=[g.pk for g in groups_list]
+    ).prefetch_related(_Prefetch('orders', queryset=Order.objects.prefetch_related('payments')))
+    unpaid_group_ids = set()
+    for g in groups_with_orders:
+        if any(not order_has_confirmed_payment(o) for o in g.orders.all()):
+            unpaid_group_ids.add(g.pk)
+
     return render(request, 'admins/prepared_orders.html', {
-        'prep_groups': prep_groups,
+        'prep_groups': groups_list,
+        'unpaid_group_ids': unpaid_group_ids,
         'search_query': search_query,
         'days_filter': days_filter,
         'order_count_filter': order_count_filter,
@@ -1003,11 +1029,13 @@ def prepared_orders_list(request):
 def prep_group_detail(request, group_id):
     """View details of a specific prep group."""
     prep_group = get_object_or_404(PrepGroup, group_id=group_id)
-    orders = prep_group.orders.all().prefetch_related('items__product')
+    orders = prep_group.orders.all().prefetch_related('items__product', 'payments')
+    unpaid_order_ids = {o.id for o in orders if not order_has_confirmed_payment(o)}
 
     return render(request, 'admins/prep_group_detail.html', {
         'prep_group': prep_group,
         'orders': orders,
+        'unpaid_order_ids': unpaid_order_ids,
     })
 
 @sales_admin_required
@@ -1104,7 +1132,7 @@ def mark_order_delivered(request, order_id):
 @sales_admin_required
 def delivery_orders_list(request):
     """List orders in the delivery workflow."""
-    queryset = Order.objects.filter(status__in=['ready_for_delivery', 'out_for_delivery', 'delivered']).select_related('customer', 'ready_for_delivery_by', 'delivery_assigned_by').prefetch_related('items__product')
+    queryset = Order.objects.filter(status__in=['ready_for_delivery', 'out_for_delivery', 'delivered']).select_related('customer', 'ready_for_delivery_by', 'delivery_assigned_by').prefetch_related('items__product', 'payments')
 
     # Search
     search_query = request.GET.get('q', '').strip()
@@ -1143,12 +1171,14 @@ def delivery_orders_list(request):
     if order_by in ['ready_for_delivery_at', '-ready_for_delivery_at', 'total_amount', '-total_amount', 'customer__username']:
         queryset = queryset.order_by(order_by)
 
-    in_delivery_orders = queryset.filter(status__in=['ready_for_delivery', 'out_for_delivery'])
-    delivered_orders = queryset.filter(status='delivered')
+    in_delivery_orders = list(queryset.filter(status__in=['ready_for_delivery', 'out_for_delivery']))
+    delivered_orders = list(queryset.filter(status='delivered'))
+    unpaid_ids = {o.id for o in in_delivery_orders + delivered_orders if not order_has_confirmed_payment(o)}
 
     return render(request, 'admins/delivery_orders.html', {
         'in_delivery_orders': in_delivery_orders,
         'delivered_orders': delivered_orders,
+        'unpaid_ids': unpaid_ids,
         'search_query': search_query,
         'status_filter': status_filter,
         'days_filter': days_filter,
@@ -1185,9 +1215,9 @@ def mark_orders_prepared(request):
             messages.error(request, "No orders selected.")
             return redirect('approved_orders_list')
 
-        orders = Order.objects.filter(id__in=order_ids, status='approved')
+        orders = Order.objects.filter(id__in=order_ids, status__in=['approved', 'pending_payment'])
         if not orders:
-            messages.error(request, "No valid approved orders found.")
+            messages.error(request, "No valid approved or pending-payment orders found.")
             return redirect('approved_orders_list')
 
         # Create prep group
@@ -1198,6 +1228,7 @@ def mark_orders_prepared(request):
 
         # Snapshot order list BEFORE marking as prepared (update() invalidates queryset)
         order_list = list(orders)
+        unpaid_ids = [o.id for o in order_list if not order_has_confirmed_payment(o)]
 
         # Mark orders as prepared
         orders.update(
@@ -1209,8 +1240,9 @@ def mark_orders_prepared(request):
         for o in order_list:
             log_order_event(o, 'prepared', actor=request.user)
         log_audit(request, 'order_prepared', target=prep_group,
-                  description=f"Created Order Preparation {prep_group.group_id} with {len(order_list)} orders",
-                  metadata={'order_ids': [o.id for o in order_list]})
+                  description=f"Created Order Preparation {prep_group.group_id} with {len(order_list)} orders"
+                              + (f" ({len(unpaid_ids)} unpaid)" if unpaid_ids else ""),
+                  metadata={'order_ids': [o.id for o in order_list], 'unpaid_order_ids': unpaid_ids})
         for o in order_list:
             if not o.is_walk_in:
                 notify(o.customer,
@@ -1237,6 +1269,31 @@ def set_pending_payment(request, order_id):
         log_order_event(order, 'pending_payment', actor=request.user)
         messages.success(request, f"Order #{order.id} marked as Accepted and Waiting for Payment.")
     return redirect('sales_admin_dashboard')
+
+@sales_admin_required
+def force_approve_unpaid(request, order_id):
+    """Move a pending_payment order to approved without confirmed payment.
+    Order is tagged unpaid — staff must collect payment on delivery.
+    """
+    if request.method != 'POST':
+        return redirect('admin_order_detail', order_id=order_id)
+    order = get_object_or_404(Order, id=order_id, status='pending_payment')
+    order.status = 'approved'
+    order.approved_at = timezone.now()
+    order.approved_by = request.user
+    order.save()
+    log_order_event(order, 'approved_unpaid', actor=request.user)
+    log_audit(request, 'order_approved_unpaid', target=order,
+              description=f"Order #{order.id} force-approved without payment — collect on delivery",
+              metadata={'order_id': order.id, 'approved_by': request.user.username})
+    if not order.is_walk_in:
+        notify(order.customer,
+               title="Your order has been approved",
+               message=f"Order #{order.id} is approved. Payment will be collected on delivery.",
+               link="/orders/",
+               notification_type='order_update')
+    messages.success(request, f"Order #{order.id} moved to Approved (unpaid — collect on delivery).")
+    return redirect('approved_orders_list')
 
 @sales_admin_required
 def bulk_accept_orders(request):
@@ -1788,3 +1845,180 @@ def campaign_history(request):
     from admins.models import EmailCampaign
     campaigns = EmailCampaign.objects.select_related('sent_by', 'template').all()
     return render(request, 'admins/campaign_history.html', {'campaigns': campaigns})
+
+
+# ---------------------------------------------------------------------------
+# SALES REPORT
+# ---------------------------------------------------------------------------
+
+@manager_required
+@sudo_required
+def sales_report(request):
+    """Detailed revenue, refund, and product sales analytics with date range filter."""
+    import json
+    from django.db.models import Sum, Count, Avg, F
+    from django.db.models.functions import TruncDate, TruncMonth
+    from admins.models import Refund
+    from customers.models import CustomerProfile
+
+    # --- Date range ---
+    period = request.GET.get('period', '30')
+    try:
+        days = int(period)
+    except ValueError:
+        days = 30
+    now = timezone.now()
+    today = now.date()
+    since = now - timedelta(days=days)
+
+    completed = Order.objects.filter(status__in=['approved', 'delivered'])
+    in_range  = completed.filter(approved_at__gte=since)
+
+    # --- Revenue summary ---
+    rev = in_range.aggregate(
+        total=Sum('total_amount'),
+        count=Count('id'),
+        avg=Avg('total_amount'),
+    )
+    revenue_total  = rev['total'] or 0
+    orders_count   = rev['count'] or 0
+    avg_order_val  = round(rev['avg'] or 0, 2)
+
+    # --- Daily revenue chart ---
+    daily_qs = (
+        in_range
+        .annotate(day=TruncDate('approved_at'))
+        .values('day')
+        .annotate(total=Sum('total_amount'), orders=Count('id'))
+        .order_by('day')
+    )
+    daily_map = {row['day']: {'rev': float(row['total'] or 0), 'orders': row['orders']} for row in daily_qs}
+    chart_labels, chart_revenue, chart_orders = [], [], []
+    for i in range(days - 1, -1, -1):
+        d = today - timedelta(days=i)
+        chart_labels.append(d.strftime('%d %b'))
+        chart_revenue.append(daily_map.get(d, {}).get('rev', 0))
+        chart_orders.append(daily_map.get(d, {}).get('orders', 0))
+
+    # --- Top products ---
+    top_products = (
+        OrderItem.objects
+        .filter(order__approved_at__gte=since, order__status__in=['approved', 'delivered'])
+        .values('product__name', 'product__category__name')
+        .annotate(qty=Sum('quantity'), revenue=Sum('subtotal'))
+        .order_by('-revenue')[:10]
+    )
+
+    # --- Category breakdown ---
+    category_revenue = (
+        OrderItem.objects
+        .filter(order__approved_at__gte=since, order__status__in=['approved', 'delivered'])
+        .values('product__category__name')
+        .annotate(revenue=Sum('subtotal'), qty=Sum('quantity'))
+        .order_by('-revenue')
+    )
+
+    # --- Refund analytics ---
+    refunds_qs = Refund.objects.filter(created_at__gte=since)
+    refund_total  = refunds_qs.filter(status='succeeded').aggregate(t=Sum('amount'))['t'] or 0
+    refund_count  = refunds_qs.filter(status='succeeded').count()
+    refund_rate   = round((refund_count / orders_count * 100) if orders_count else 0, 1)
+    refunds_by_source = (
+        refunds_qs.filter(status='succeeded')
+        .values('source')
+        .annotate(total=Sum('amount'), count=Count('id'))
+        .order_by('-total')
+    )
+    pending_refunds = Refund.objects.filter(status__in=['manual', 'pending', 'failed']).count()
+
+    # --- Order status funnel (all time) ---
+    status_counts = {s: Order.objects.filter(status=s).count() for s in
+                     ['pending', 'approved', 'prepared', 'out_for_delivery', 'delivered', 'rejected', 'cancelled']}
+
+    # --- Loyalty tier breakdown ---
+    tier_counts = (
+        CustomerProfile.objects.values('loyalty_tier')
+        .annotate(n=Count('id'))
+        .order_by('loyalty_tier')
+    )
+    tier_map = {t['loyalty_tier']: t['n'] for t in tier_counts}
+
+    period_choices = {'7 days': 7, '30 days': 30, '90 days': 90, '1 year': 365}
+
+    return render(request, 'admins/sales_report.html', {
+        'period': days,
+        'period_choices': period_choices,
+        'since': since.date(),
+        'today': today,
+        # Revenue
+        'revenue_total': revenue_total,
+        'orders_count': orders_count,
+        'avg_order_val': avg_order_val,
+        # Charts (JSON)
+        'chart_labels': json.dumps(chart_labels),
+        'chart_revenue': json.dumps(chart_revenue),
+        'chart_orders': json.dumps(chart_orders),
+        # Products
+        'top_products': list(top_products),
+        'category_revenue': list(category_revenue),
+        # Refunds
+        'refund_total': refund_total,
+        'refund_count': refund_count,
+        'refund_rate': refund_rate,
+        'refunds_by_source': list(refunds_by_source),
+        'pending_refunds': pending_refunds,
+        # Funnel
+        'status_counts': status_counts,
+        # CRM
+        'tier_map': tier_map,
+    })
+
+
+# ---------------------------------------------------------------------------
+# AVAILABILITY TOGGLE
+# ---------------------------------------------------------------------------
+
+@manager_required
+def toggle_product_availability(request, product_id):
+    """AJAX POST — flip a product's is_available flag."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    product = get_object_or_404(Product, id=product_id)
+    product.is_available = not product.is_available
+    product.save(update_fields=['is_available'])
+    log_audit(request, 'inventory_updated', target=product,
+              description=f"Product '{product.name}' availability set to {product.is_available}")
+    return JsonResponse({'is_available': product.is_available, 'name': product.name})
+
+
+# ---------------------------------------------------------------------------
+# PRIORITY TAGGING
+# ---------------------------------------------------------------------------
+
+@sales_admin_required
+def toggle_order_priority(request, order_id):
+    """AJAX POST — flip an order's is_priority flag."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    order = get_object_or_404(Order, id=order_id)
+    order.is_priority = not order.is_priority
+    order.save(update_fields=['is_priority'])
+    log_audit(request, 'order_approved', target=order,
+              description=f"Order #{order.id} priority {'enabled' if order.is_priority else 'disabled'} by {request.user.username}")
+    return JsonResponse({'is_priority': order.is_priority})
+
+
+@manager_required
+def toggle_customer_vip(request, user_id):
+    """AJAX POST — flip a customer profile's is_vip flag."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    from customers.models import CustomerProfile
+    from customers.models import User as CustomerUser
+    customer = get_object_or_404(CustomerUser, id=user_id)
+    profile, _ = CustomerProfile.objects.get_or_create(user=customer)
+    profile.is_vip = not profile.is_vip
+    profile.save(update_fields=['is_vip'])
+    log_audit(request, 'order_approved', target=profile,
+              description=f"Customer '{customer.username}' VIP status set to {profile.is_vip} by {request.user.username}")
+    return JsonResponse({'is_vip': profile.is_vip})

@@ -97,8 +97,11 @@
             </thead>
             <tbody>
                 {% for order in in_delivery_orders %}
-                <tr>
-                    <td data-sort="{{ order.id }}"><a href="{% url 'admin_order_detail' order.id %}">#{{ order.id }}</a></td>
+                <tr {% if order.id in unpaid_ids %}style="background:#fffbeb;"{% endif %}>
+                    <td data-sort="{{ order.id }}">
+                        <a href="{% url 'admin_order_detail' order.id %}">#{{ order.id }}</a>
+                        {% if order.id in unpaid_ids %}<span class="badge ms-1" style="background:#f59e0b;color:#000;font-size:.65rem;">UNPAID</span>{% endif %}
+                    </td>
                     <td>{{ order.customer_label }}<br>{{ order.full_name }}</td>
                     <td>{{ order.phone_number }}</td>
                     <td>
@@ -158,8 +161,11 @@
             </thead>
             <tbody>
                 {% for order in delivered_orders %}
-                <tr>
-                    <td data-sort="{{ order.id }}"><a href="{% url 'admin_order_detail' order.id %}">#{{ order.id }}</a></td>
+                <tr {% if order.id in unpaid_ids %}style="background:#fffbeb;"{% endif %}>
+                    <td data-sort="{{ order.id }}">
+                        <a href="{% url 'admin_order_detail' order.id %}">#{{ order.id }}</a>
+                        {% if order.id in unpaid_ids %}<span class="badge ms-1" style="background:#f59e0b;color:#000;font-size:.65rem;">UNPAID</span>{% endif %}
+                    </td>
                     <td>{{ order.customer_label }}<br>{{ order.full_name }}</td>
                     <td>{{ order.phone_number }}</td>
                     <td>

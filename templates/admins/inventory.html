@@ -34,8 +34,9 @@
                 <th class="text-end">Price</th>
                 <th class="text-center">Current Stock</th>
                 <th style="width: 130px;">Update Stock</th>
-                <th class="text-center">Status</th>
+                <th class="text-center">Stock Status</th>
                 {% if request.user.role == 'manager' or request.user.is_superuser %}
+                <th class="text-center">Available</th>
                 <th class="text-end pe-4">Actions</th>
                 {% endif %}
             </tr>
@@ -58,6 +59,8 @@
                 <td class="text-center">
                     {% if item.has_change %}
                         <span class="badge bg-primary">Updating</span>
+                    {% elif not item.product.is_available %}
+                        <span class="badge bg-secondary">Hidden</span>
                     {% elif item.product.stock <= 0 %}
                         <span class="badge bg-danger">Out of Stock</span>
                     {% else %}
@@ -65,6 +68,16 @@
                     {% endif %}
                 </td>
                 {% if request.user.role == 'manager' or request.user.is_superuser %}
+                <td class="text-center">
+                    <div class="form-check form-switch d-inline-block">
+                        <input class="form-check-input availability-toggle" type="checkbox" role="switch"
+                               id="avail-{{ item.product.id }}"
+                               {% if item.product.is_available %}checked{% endif %}
+                               data-url="{% url 'toggle_product_availability' item.product.id %}"
+                               data-name="{{ item.product.name|escapejs }}"
+                               title="{% if item.product.is_available %}Visible to customers{% else %}Hidden from menu{% endif %}">
+                    </div>
+                </td>
                 <td class="text-end pe-4">
                     <a href="{% url 'edit_product' item.product.id %}" class="btn btn-sm btn-outline-primary me-1">Edit</a>
                     <button type="button" class="btn btn-sm btn-outline-danger"
@@ -154,6 +167,22 @@ document.querySelectorAll('.stock-input').forEach(input => {
             if (response.ok) {
                 location.reload(); 
             }
+        });
+    });
+});
+
+// Availability toggle
+document.querySelectorAll('.availability-toggle').forEach(toggle => {
+    toggle.addEventListener('change', function () {
+        const url = this.dataset.url;
+        const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        fetch(url, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(r => r.json()).then(data => {
+            const label = this.closest('td');
+            this.title = data.is_available ? 'Visible to customers' : 'Hidden from menu';
+            location.reload();
         });
     });
 });

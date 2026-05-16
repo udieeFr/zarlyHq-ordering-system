@@ -1,81 +1,128 @@
 {% extends 'admin_base.html' %}
-
-{% block page_title %}Order Details #{{ order.id }}{% endblock %}
+{% block page_title %}Order #{{ order.id }}{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>Order #{{ order.id }}</h1>
-    <p>Complete order details and verification</p>
-</div>
 
-<div class="mb-4">
-    <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
+<!-- Header -->
+<div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-4">
+    <div>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <a href="{% url 'sales_admin_dashboard' %}" class="text-muted small text-decoration-none">← Dashboard</a>
+        </div>
+        <h1 class="fw-bold mb-2" style="font-size:1.9rem;letter-spacing:-.02em;">Order #{{ order.id }}</h1>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="px-3 py-1 rounded-pill fw-semibold small"
+                style="{% if order.status == 'pending' %}background:#fef9c3;color:#854d0e;
+                       {% elif order.status == 'pending_payment' %}background:#dbeafe;color:#1e40af;
+                       {% elif order.status == 'approved' %}background:#d1fae5;color:#065f46;
+                       {% elif order.status == 'prepared' %}background:#e0e7ff;color:#3730a3;
+                       {% elif order.status == 'ready_for_delivery' or order.status == 'out_for_delivery' %}background:#fce7f3;color:#9d174d;
+                       {% elif order.status == 'delivered' %}background:#d1fae5;color:#065f46;
+                       {% elif order.status == 'rejected' %}background:#fee2e2;color:#991b1b;
+                       {% else %}background:#f1f5f9;color:#475569;{% endif %}">
+                {% if order.status == 'pending' %}🟡 Pending Review
+                {% elif order.status == 'pending_payment' %}💳 Awaiting Payment
+                {% elif order.status == 'approved' %}✅ Approved
+                {% elif order.status == 'prepared' %}👨‍🍳 Prepared
+                {% elif order.status == 'ready_for_delivery' %}📦 Ready for Delivery
+                {% elif order.status == 'out_for_delivery' %}🚚 Out for Delivery
+                {% elif order.status == 'delivered' %}✅ Delivered
+                {% elif order.status == 'rejected' %}❌ Rejected
+                {% endif %}
+            </span>
+            {% if order.is_priority %}
+            <span class="px-3 py-1 rounded-pill fw-semibold small" style="background:#fff7ed;color:#c2410c;">⚡ Priority</span>
+            {% endif %}
+            {% if order.is_walk_in %}
+            <span class="px-3 py-1 rounded-pill fw-semibold small" style="background:#f0fdf4;color:#166534;">🏪 Walk-in</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="text-end">
+        <div class="fw-black" style="font-size:2rem;color:#0f172a;letter-spacing:-.03em;">RM {{ order.total_amount }}</div>
+        <div class="text-muted small">Placed {{ order.created_at|date:"d M Y, H:i" }}</div>
+        {% if order.approved_at %}
+        <div class="text-muted small">Approved {{ order.approved_at|date:"d M Y, H:i" }}</div>
+        {% endif %}
+    </div>
 </div>
 
 <div class="row g-4">
-    <div class="col-md-7">
 
-        <!-- Customer Information -->
-        <div class="content-card">
-            <h5 class="fw-bold border-bottom pb-3 mb-3">👤 Customer Information</h5>
-            <div class="row small">
-                <div class="col-6 mb-3">
-                    <strong>Name:</strong><br>
-                    <span class="text-muted">{{ order.full_name }}</span>
+    <!-- ── LEFT COLUMN ── -->
+    <div class="col-lg-7">
+
+        <!-- Customer card -->
+        <div class="content-card mb-4">
+            <div class="d-flex align-items-center justify-content-between border-bottom pb-3 mb-3">
+                <div class="d-flex align-items-center gap-2">
+                    <div style="width:32px;height:32px;background:#f1f5f9;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.9rem;">👤</div>
+                    <h6 class="fw-bold mb-0">Customer</h6>
                 </div>
-                <div class="col-6 mb-3">
-                    <strong>Phone:</strong><br>
-                    <span class="text-muted">{{ order.phone_number }}</span>
+                {% with c=order.customer.approved_orders.count %}
+                {% if c > 0 %}
+                <span class="badge rounded-pill" style="background:#e0f2fe;color:#0369a1;">Returning · {{ c }} order{{ c|pluralize }}</span>
+                {% else %}
+                <span class="badge rounded-pill bg-light text-secondary border">New Customer</span>
+                {% endif %}
+                {% endwith %}
+            </div>
+
+            <div class="row g-3 small">
+                <div class="col-sm-6">
+                    <div class="text-muted mb-1 fw-medium" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Full Name</div>
+                    <div class="fw-semibold">{{ order.full_name }}</div>
                 </div>
-                <div class="col-12 mb-3">
-                    <strong>Delivery Address:</strong><br>
-                    <span class="text-muted">{{ order.address_summary }}</span>
-                </div>
-                <div class="col-12 mb-3">
-                    <strong>Coordinates:</strong><br>
-                    <span class="text-muted">{{ order.latitude }}, {{ order.longitude }}</span>
-                </div>
-                <div class="col-12 mb-3">
-                    <strong>Order Notes:</strong><br>
-                    <span class="text-muted">{{ order.order_notes|default:"None" }}</span>
+                <div class="col-sm-6">
+                    <div class="text-muted mb-1 fw-medium" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Phone</div>
+                    <div class="fw-semibold">{{ order.phone_number }}</div>
                 </div>
                 <div class="col-12">
-                    <strong>Customer Status:</strong><br>
-                    {% with approved_count=order.customer.approved_orders.count %}
-                        {% if approved_count > 0 %}
-                            <span class="badge bg-info">Returning ({{ approved_count }} approved orders)</span>
-                        {% else %}
-                            <span class="badge bg-secondary">New Customer</span>
-                        {% endif %}
-                    {% endwith %}
+                    <div class="text-muted mb-1 fw-medium" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Delivery Address</div>
+                    <div>{{ order.address_summary }}</div>
+                    {% if order.latitude and order.longitude %}
+                    <div class="mt-1" style="color:#94a3b8;font-size:.75rem;">📍 {{ order.latitude }}, {{ order.longitude }}</div>
+                    {% endif %}
                 </div>
+                {% if order.order_notes %}
+                <div class="col-12">
+                    <div class="text-muted mb-1 fw-medium" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Order Notes</div>
+                    <div class="px-3 py-2 rounded-3" style="background:#f8fafc;border:1px solid #e2e8f0;line-height:1.5;">{{ order.order_notes }}</div>
+                </div>
+                {% endif %}
             </div>
         </div>
 
-        <!-- Order Items -->
+        <!-- Order items card -->
         <div class="content-card">
-            <h5 class="fw-bold border-bottom pb-3 mb-3">📦 Order Items</h5>
-            <table class="table table-sm table-hover">
-                <thead class="bg-light">
+            <div class="d-flex align-items-center gap-2 border-bottom pb-3 mb-3">
+                <div style="width:32px;height:32px;background:#f1f5f9;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.9rem;">📦</div>
+                <h6 class="fw-bold mb-0">Order Items</h6>
+                <span class="badge bg-light text-secondary border ms-auto">{{ order.items.count }} item{{ order.items.count|pluralize }}</span>
+            </div>
+            <table class="table table-sm mb-0" style="border-collapse:separate;border-spacing:0;">
+                <thead>
                     <tr>
-                        <th>Product</th>
-                        <th class="text-center">Qty</th>
-                        <th class="text-end">Subtotal</th>
+                        <th class="ps-0 pb-2 text-muted fw-medium border-0" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Product</th>
+                        <th class="text-center pb-2 text-muted fw-medium border-0" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Qty</th>
+                        <th class="text-end pe-0 pb-2 text-muted fw-medium border-0" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Subtotal</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for item in order.items.all %}
-                    <tr>
-                        <td>{{ item.product.name }}</td>
-                        <td class="text-center">{{ item.quantity }}</td>
-                        <td class="text-end fw-bold">RM {{ item.subtotal }}</td>
+                    <tr style="border-bottom:1px solid #f1f5f9;">
+                        <td class="ps-0 py-2 fw-medium">{{ item.product.name }}</td>
+                        <td class="text-center py-2">
+                            <span class="px-2 py-1 rounded" style="background:#f1f5f9;font-size:.8rem;font-weight:600;">×{{ item.quantity }}</span>
+                        </td>
+                        <td class="text-end pe-0 py-2 fw-semibold">RM {{ item.subtotal }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
-                <tfoot class="bg-light">
+                <tfoot>
                     <tr>
-                        <td colspan="2" class="text-end fw-bold">Grand Total:</td>
-                        <td class="text-end fw-bold" style="color: #3b82f6; font-size: 1.1rem;">RM {{ order.total_amount }}</td>
+                        <td colspan="2" class="text-end ps-0 pt-3 pb-0 fw-bold border-0" style="font-size:.9rem;">Total Amount</td>
+                        <td class="text-end pe-0 pt-3 pb-0 border-0 fw-black" style="font-size:1.25rem;color:#0f172a;">RM {{ order.total_amount }}</td>
                     </tr>
                 </tfoot>
             </table>
@@ -83,194 +130,152 @@
 
     </div>
 
-    <div class="col-md-5">
+    <!-- ── RIGHT COLUMN ── -->
+    <div class="col-lg-5">
 
-        <!-- Payment Verification -->
-        <div class="content-card" style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);">
-            <h5 class="fw-bold border-bottom pb-3 mb-3" style="color: #0369a1;">💳 Payment Verification</h5>
+        <!-- Payment card -->
+        <div class="content-card mb-4" style="background:linear-gradient(145deg,#f0f9ff 0%,#e0f2fe 100%);">
+            <div class="d-flex align-items-center gap-2 border-bottom pb-3 mb-3" style="border-color:#bae6fd !important;">
+                <div style="width:32px;height:32px;background:#bae6fd;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.9rem;">💳</div>
+                <h6 class="fw-bold mb-0" style="color:#0369a1;">Payment</h6>
+                {% if has_payment %}
+                <span class="badge ms-auto" style="background:#d1fae5;color:#065f46;">Confirmed</span>
+                {% else %}
+                <span class="badge ms-auto" style="background:#fee2e2;color:#991b1b;">Not Confirmed</span>
+                {% endif %}
+            </div>
 
             {% if stripe_payment %}
-            <!--
-                STRIPE PAYMENT BLOCK
-                Shows status-appropriate badge and messaging.
-                No manual proof upload is shown for Stripe orders — Stripe
-                confirmation via webhook IS the proof.
-            -->
-            <div class="alert
-                {% if stripe_payment.status == 'succeeded' %}alert-success
-                {% elif stripe_payment.status == 'processing' %}alert-warning
-                {% elif stripe_payment.status == 'pending' %}alert-secondary
-                {% else %}alert-danger
-                {% endif %} mb-3"
-                style="border-left: 4px solid
-                {% if stripe_payment.status == 'succeeded' %}#10b981
-                {% elif stripe_payment.status == 'processing' %}#f59e0b
-                {% elif stripe_payment.status == 'pending' %}#64748b
-                {% else %}#ef4444{% endif %};">
-
-                <strong>
-                    {% if stripe_payment.status == 'succeeded' %}
-                        ✅ Stripe Payment Confirmed
-                    {% elif stripe_payment.status == 'processing' %}
-                        ⏳ Stripe Payment Processing
-                    {% elif stripe_payment.status == 'pending' %}
-                        🧾 Stripe Checkout Started
-                    {% elif stripe_payment.status == 'failed' %}
-                        ❌ Stripe Payment Failed
-                    {% elif stripe_payment.status == 'cancelled' %}
-                        🚫 Stripe Payment Cancelled
-                    {% else %}
-                        💳 Stripe Payment Record
-                    {% endif %}
-                </strong><br>
-
-                <small class="text-muted">
-                    <strong>Method:</strong> Stripe Card Payment<br>
-                    <strong>Amount:</strong> RM {{ stripe_payment.amount|floatformat:2 }}<br>
-                    <strong>Status:</strong>
-                    <span style="color:
-                        {% if stripe_payment.status == 'succeeded' %}#10b981
-                        {% elif stripe_payment.status == 'processing' %}#d97706
-                        {% elif stripe_payment.status == 'pending' %}#64748b
-                        {% else %}#dc2626{% endif %};
-                        font-weight: bold;">
-                        {{ stripe_payment.get_status_display }}
-                    </span>
-                </small>
-
-                <!-- Status-specific guidance for admin -->
+            <div class="rounded-3 p-3 mb-3 small"
+                style="background:{% if stripe_payment.status == 'succeeded' %}#d1fae5{% elif stripe_payment.status == 'processing' %}#fef3c7{% else %}#f1f5f9{% endif %};
+                       border-left:4px solid {% if stripe_payment.status == 'succeeded' %}#10b981{% elif stripe_payment.status == 'processing' %}#f59e0b{% else %}#94a3b8{% endif %};">
+                <div class="fw-semibold mb-1">
+                    {% if stripe_payment.status == 'succeeded' %}✅ Stripe Payment Confirmed
+                    {% elif stripe_payment.status == 'processing' %}⏳ Stripe Processing
+                    {% elif stripe_payment.status == 'pending' %}🧾 Checkout Started
+                    {% elif stripe_payment.status == 'failed' %}❌ Payment Failed
+                    {% else %}💳 Stripe Payment{% endif %}
+                </div>
+                <div class="text-muted">RM {{ stripe_payment.amount|floatformat:2 }} · {{ stripe_payment.get_status_display }}</div>
                 {% if stripe_payment.status == 'pending' %}
-                <div class="mt-2 pt-2 border-top border-secondary border-opacity-25">
-                    <small class="text-muted">
-                        ℹ️ Customer opened Stripe checkout. Payment confirmation arrives
-                        automatically via webhook once the customer completes payment —
-                        no manual proof needed. If this stays pending after the customer
-                        pays, ask your system administrator to check the webhook configuration.
-                    </small>
-                </div>
-                {% elif stripe_payment.status == 'succeeded' %}
-                <div class="mt-2 pt-2 border-top border-success border-opacity-25">
-                    <small class="text-success">
-                        <!-- ✔ Payment verified by Stripe. Safe to approve this order. -->
-                    </small>
-                </div>
+                <div class="text-muted mt-2" style="font-size:.75rem;">Awaiting webhook confirmation — no manual proof needed.</div>
                 {% endif %}
             </div>
             {% endif %}
 
-            <!--
-                MANUAL PAYMENT PROOF BLOCK
-                Only shown for non-Stripe orders (bank transfer / DuitNow).
-                Hidden when a Stripe payment record exists.
-            -->
             {% if order.payment_proof and not stripe_payment %}
             <div class="mb-3">
-                <strong class="text-muted">📸 Payment Proof (Bank Transfer / DuitNow)</strong>
-                <img src="{{ order.payment_proof.url }}"
-                     class="img-fluid rounded border mt-2"
-                     style="max-height: 300px; cursor: zoom-in; border-color: #0ea5e9;"
-                     onclick="window.open(this.src)">
+                <div class="small text-muted fw-semibold mb-2">📸 Bank Transfer / DuitNow Proof</div>
+                <img src="{{ order.payment_proof.url }}" class="img-fluid rounded-3 border" style="max-height:220px;width:100%;object-fit:cover;cursor:zoom-in;" onclick="window.open(this.src)">
             </div>
             {% endif %}
 
-            <!--
-                APPROVE BUTTON
-                Appears when: order.status == 'pending' (not yet acted on)
-                
-                Outcome depends on payment status:
-                - WITH payment: Moves to 'approved' with digitally signed receipt
-                - WITHOUT payment: Moves to 'pending_payment' (customer sees in Awaiting Payment list)
-            -->
-            {% if order.status == 'pending' %}
-                {% if has_payment %}
-                    <a href="{% url 'approve_order' order.id %}" class="btn btn-success w-100 fw-bold py-2">
-                         Approve order
-                    </a>
-                {% else %}
-                    <a href="{% url 'approve_order' order.id %}" class="btn btn-warning w-100 fw-bold py-2">
-                         Approve (No Payment Yet - Will Go to Awaiting Payment List)
-                    </a>
-                    <!--
-                        No confirmed payment yet.
-                        Show info about why payment is missing depending on Stripe status.
-                    -->
-                    {% if stripe_payment %}
-                        <p class="text-muted small mt-2 text-center">
-                            <span style="font-size: 1.5rem; display: block; margin-bottom: 0.25rem;">⏳</span>
-                            Awaiting Stripe confirmation via webhook.
-                        </p>
-                    {% else %}
-                        <p class="text-muted small mt-2 text-center">
-                            <span style="font-size: 1.5rem; display: block; margin-bottom: 0.25rem;">📄</span>
-                            Waiting for customer to upload payment proof.
-                        </p>
-                    {% endif %}
-                {% endif %}
+            {% if not stripe_payment and not order.payment_proof %}
+            <div class="text-center py-2 small text-muted">
+                {% if order.status == 'pending_payment' %}📄 Waiting for customer to upload payment proof.
+                {% else %}No payment record.{% endif %}
+            </div>
             {% endif %}
 
+            {% if order.status == 'pending' %}
+                {% if has_payment %}
+                <a href="{% url 'approve_order' order.id %}" class="btn btn-success w-100 fw-bold mt-1">✅ Approve Order</a>
+                {% else %}
+                <a href="{% url 'approve_order' order.id %}" class="btn btn-warning w-100 fw-semibold mt-1 mb-2">Approve → Awaiting Payment List</a>
+                <p class="text-muted small text-center mb-0">{% if stripe_payment %}⏳ Awaiting Stripe webhook.{% else %}📄 No payment yet.{% endif %}</p>
+                {% endif %}
+            {% endif %}
         </div>
 
-        <!-- Digital Signature Status -->
+        <!-- Signature / Invoice card -->
         {% if order.digital_signature %}
-        <div class="content-card" style="border: 2px solid #10b981; background: linear-gradient(135deg, #f0fdf4 0%, #e8fce6 100%);">
-            <div class="text-center">
-                <h6 class="fw-bold" style="color: #10b981;">✅ Digitally Signed</h6>
-                <p class="small text-muted mb-3">Hash: <code>{{ order.digital_signature.signature_hash|truncatechars:20 }}</code></p>
-                <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-success w-100" download>📄 Download Signed Receipt</a>
+        <div class="content-card mb-4" style="border:2px solid #10b981;background:linear-gradient(145deg,#f0fdf4,#dcfce7);">
+            <div class="text-center py-2">
+                <div style="font-size:2rem;line-height:1;margin-bottom:.5rem;">🔏</div>
+                <div class="fw-bold mb-1" style="color:#065f46;">Digitally Signed</div>
+                <div class="small text-muted mb-3">Hash: <code style="font-size:.7rem;">{{ order.digital_signature.signature_hash|truncatechars:24 }}</code></div>
+                <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-success w-100 mb-2 fw-semibold" download>📄 Download Signed Receipt</a>
+                <a href="{% url 'print_order_summary' order.id %}" class="btn btn-outline-secondary w-100 btn-sm" target="_blank">🖨️ View Invoice</a>
+            </div>
+        </div>
+        {% elif order.status in 'approved,pending_payment,prepared,ready_for_delivery,out_for_delivery,delivered' %}
+        <div class="content-card mb-4">
+            <div class="text-center py-1">
+                <div class="small text-muted mb-2">No digital signature on file.</div>
+                <a href="{% url 'print_order_summary' order.id %}" class="btn btn-outline-secondary w-100 btn-sm" target="_blank">🖨️ View / Print Invoice</a>
             </div>
         </div>
         {% endif %}
 
-        <!-- Order Status Card -->
-        <div class="content-card">
-            <h6 class="fw-bold mb-3">📊 Order Status</h6>
-            <div class="alert alert-info mb-0">
-                <small>
-                    <strong>Current Status:</strong><br>
-                    {% if order.status == 'pending' %}
-                        🟡 Pending Review
-                    {% elif order.status == 'pending_payment' %}
-                        💳 Awaiting Payment
-                    {% elif order.status == 'approved' %}
-                        ✅ Approved & Signed
-                    {% elif order.status == 'rejected' %}
-                        ❌ Rejected
-                    {% endif %}
-                </small>
-                {% if order.status == 'rejected' and order.rejection_record %}
-                <p class="small mt-2 text-danger">
-                    <strong>Rejected on:</strong> {{ order.rejection_record.rejected_at|date:"d M Y, H:i" }}<br>
-                    <strong>Reason:</strong> {{ order.rejection_record.get_rejection_reason_display }}<br>
-                    <strong>Rejected by:</strong> {{ order.rejection_record.rejected_by.get_full_name|default:order.rejection_record.rejected_by.username }}
-                </p>
-                {% endif %}
+        <!-- Unpaid → force approve -->
+        {% if order.status == 'pending_payment' %}
+        <div class="content-card mb-4" style="border:1px solid #fcd34d;background:#fffbeb;">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span style="font-size:1rem;">⚠️</span>
+                <span class="fw-bold small" style="color:#92400e;">Payment Not Yet Received</span>
+            </div>
+            <p class="small text-muted mb-3">Approve anyway — order moves to the Approved list tagged <strong>UNPAID</strong>. Staff must collect payment on delivery.</p>
+            <form method="post" action="{% url 'force_approve_unpaid' order.id %}">
+                {% csrf_token %}
+                <button type="submit" class="btn w-100 fw-semibold"
+                        style="background:#f59e0b;color:#000;border:none;"
+                        onclick="return confirm('Approve Order #{{ order.id }} without confirmed payment?\n\nIt will appear in the Approved Orders list tagged UNPAID.')">
+                    ✅ Approve — Collect on Delivery
+                </button>
+            </form>
+        </div>
+        {% endif %}
+
+        <!-- Rejected details -->
+        {% if order.status == 'rejected' and order.rejection_record %}
+        <div class="content-card mb-4" style="border:1px solid #fca5a5;background:#fff5f5;">
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <div style="width:32px;height:32px;background:#fee2e2;border-radius:8px;display:flex;align-items:center;justify-content:center;">❌</div>
+                <h6 class="fw-bold mb-0" style="color:#991b1b;">Rejection Details</h6>
+            </div>
+            <div class="small">
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Date</span>
+                    <span class="fw-semibold">{{ order.rejection_record.rejected_at|date:"d M Y, H:i" }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Reason</span>
+                    <span class="fw-semibold text-end" style="max-width:60%;">{{ order.rejection_record.get_rejection_reason_display }}</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted">Rejected by</span>
+                    <span class="fw-semibold">{{ order.rejection_record.rejected_by.get_full_name|default:order.rejection_record.rejected_by.username }}</span>
+                </div>
             </div>
         </div>
+        {% endif %}
 
+        <!-- Reject form -->
         {% if order.status == 'pending' %}
         <div class="content-card">
-            <h6 class="fw-bold mb-3">❌ Reject Order</h6>
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <div style="width:32px;height:32px;background:#fee2e2;border-radius:8px;display:flex;align-items:center;justify-content:center;">❌</div>
+                <h6 class="fw-bold mb-0">Reject Order</h6>
+            </div>
             <form method="post" action="{% url 'reject_order' order.id %}">
                 {% csrf_token %}
                 <div class="mb-3">
-                    <label for="rejection_reason_id" class="form-label">Select Rejection Reason</label>
-                    <select name="rejection_reason_id" id="rejection_reason_id" class="form-select">
-                        <option value="">-- Choose a reason (or enter custom below) --</option>
+                    <label class="form-label small fw-semibold">Rejection Reason</label>
+                    <select name="rejection_reason_id" class="form-select form-select-sm">
+                        <option value="">— Select a reason —</option>
                         {% for reason in rejection_reasons %}
                         <option value="{{ reason.id }}" title="{{ reason.internal_note }}">
-                            {{ reason.reason_text }} {% if reason.category != 'other' %}({{ reason.get_category_display }}){% endif %}
+                            {{ reason.reason_text }}{% if reason.category != 'other' %} ({{ reason.get_category_display }}){% endif %}
                         </option>
                         {% endfor %}
                     </select>
-                    <small class="text-muted">Hover over options to see internal notes</small>
+                    <div class="text-muted mt-1" style="font-size:.72rem;">Hover to see internal notes</div>
                 </div>
                 <div class="mb-3">
-                    <label for="custom_reason" class="form-label">Custom Rejection Reason</label>
-                    <textarea name="custom_reason" id="custom_reason" class="form-control" rows="3"
-                              placeholder="Or type a custom reason here (optional - overrides selected reason)"></textarea>
-                    <small class="text-muted">Leave blank to use the selected reason above</small>
+                    <label class="form-label small fw-semibold">Custom Reason <span class="fw-normal text-muted">(optional)</span></label>
+                    <textarea name="custom_reason" class="form-control form-control-sm" rows="2" placeholder="Overrides selected reason above"></textarea>
                 </div>
-                <button type="submit" class="btn btn-outline-danger w-100">Reject Order</button>
+                <button type="submit" class="btn btn-outline-danger w-100 btn-sm fw-semibold">Reject Order</button>
             </form>
         </div>
         {% endif %}

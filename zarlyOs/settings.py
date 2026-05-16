@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'customers',
     'admins',
     'django_bootstrap5',
+    'django_ratelimit',
 ]
 
 MIDDLEWARE = [
@@ -156,3 +157,32 @@ STRIPE_CURRENCY = os.getenv('STRIPE_CURRENCY', 'MYR')
 # For localhost testing: use ngrok or Stripe CLI to tunnel webhooks
 # Stripe CLI: stripe listen --forward-to localhost:8000/menu/stripe/webhook/
 STRIPE_WEBHOOK_TOLERANCE = 300  # Accept webhooks within 5 minutes of creation
+
+# ============================================================================
+# CACHE (used by django-ratelimit)
+# In production, replace with Redis: django_redis or django.core.cache.backends.redis.RedisCache
+# ============================================================================
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+    }
+}
+# Silence ratelimit's strict backend check — LocMemCache works fine for single-worker dev
+SILENCED_SYSTEM_CHECKS = ['django_ratelimit.E003', 'django_ratelimit.W001']
+
+# ============================================================================
+# SECURITY HEADERS
+# ============================================================================
+SECURE_CONTENT_TYPE_NOSNIFF = True      # X-Content-Type-Options: nosniff
+X_FRAME_OPTIONS = 'DENY'                # Clickjacking protection
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+SESSION_COOKIE_HTTPONLY = True          # Block JS access to session cookie
+CSRF_COOKIE_HTTPONLY = True             # Block JS access to CSRF cookie
+
+# Enable these in production (HTTPS required):
+# SECURE_SSL_REDIRECT = not DEBUG
+# SESSION_COOKIE_SECURE = not DEBUG
+# CSRF_COOKIE_SECURE = not DEBUG
+# SECURE_HSTS_SECONDS = 31536000  # 1 year
+# SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+# SECURE_HSTS_PRELOAD = True

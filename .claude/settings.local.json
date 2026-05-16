@@ -3,7 +3,8 @@
     "allow": [
       "Bash(grep -E \"\\\\.py$\")",
       "Bash(python manage.py check --deploy)",
-      "Bash(python manage.py check)"
+      "Bash(python manage.py check)",
+      "Bash(node *)"
     ]
   },
   "enabledPlugins": {

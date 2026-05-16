@@ -74,6 +74,7 @@
                         <a href="{% url 'prep_group_detail' group.group_id %}" class="text-decoration-none fw-bold">
                             {{ group.group_id }}
                         </a>
+                        {% if group.pk in unpaid_group_ids %}<span class="badge ms-1" style="background:#f59e0b;color:#000;font-size:.65rem;">UNPAID</span>{% endif %}
                     </td>
                     <td>
                         <div>{{ group.created_at|date:"d M Y" }}</div>

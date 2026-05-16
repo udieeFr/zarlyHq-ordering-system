@@ -69,14 +69,20 @@
             </thead>
             <tbody>
                 {% for order in approved_orders %}
-                <tr>
+                <tr {% if order.id in unpaid_ids and order.is_priority %}style="background:#fef3c7;"{% elif order.id in unpaid_ids %}style="background:#fffbeb;"{% elif order.is_priority %}style="background:#fff7ed;"{% endif %}>
                     <td>
-                        <input type="checkbox" class="order-checkbox form-check-input" value="{{ order.id }}" data-order-id="{{ order.id }}">
+                        <input type="checkbox" class="order-checkbox form-check-input" value="{{ order.id }}" data-order-id="{{ order.id }}" data-unpaid="{% if order.id in unpaid_ids %}true{% else %}false{% endif %}">
                     </td>
                     <td>
                         <a href="{% url 'admin_order_detail' order.id %}" class="text-decoration-none fw-bold">
                             #{{ order.id }}
                         </a>
+                        {% if order.is_priority %}<span class="badge bg-warning text-dark ms-1" title="Priority">⚡</span>{% endif %}
+                        {% if order.id in unpaid_ids %}<span class="badge ms-1" style="background:#f59e0b;color:#000;" title="Payment not yet received">UNPAID</span>{% endif %}
+                        <button class="btn btn-sm p-0 ms-1 priority-toggle border-0 bg-transparent"
+                                data-url="{% url 'toggle_order_priority' order.id %}"
+                                title="{% if order.is_priority %}Remove priority{% else %}Mark priority{% endif %}"
+                                style="font-size:.85rem;opacity:.5;">{% if order.is_priority %}⚡{% else %}☆{% endif %}</button>
                     </td>
                     <td>
                         <div>{{ order.customer_label }}</div>
@@ -125,6 +131,10 @@
         <h5 class="fw-bold mb-0">Order Preparation Summary</h5>
         <button id="clear-selection" class="btn btn-sm btn-outline-secondary">Clear Selection</button>
     </div>
+    <!-- Unpaid warning banner -->
+    <div id="unpaid-warning" class="alert alert-warning d-none mb-3" role="alert">
+        <strong>⚠ Unpaid orders included:</strong> <span id="unpaid-count">0</span> order(s) in this batch have not yet received confirmed payment. They will be tagged <strong>UNPAID</strong> in the prep group. Ensure payment is collected before or upon delivery.
+    </div>
     <div class="row">
         <div class="col-md-3">
             <div class="text-center">
@@ -165,6 +175,7 @@ const ordersData = [
     {
         id: {{ order.id }},
         total_amount: {{ order.total_amount }},
+        unpaid: {% if order.id in unpaid_ids %}true{% else %}false{% endif %},
         items: [
             {% for item in order.items.all %}
             {
@@ -193,12 +204,14 @@ function updateSummary() {
 
     // Calculate totals
     let totalAmount = 0;
+    let unpaidCount = 0;
     const itemCounts = {};
 
     selectedOrders.forEach(orderId => {
         const order = ordersData.find(o => o.id === orderId);
         if (order) {
             totalAmount += order.total_amount;
+            if (order.unpaid) unpaidCount++;
             order.items.forEach(item => {
                 if (itemCounts[item.name]) {
                     itemCounts[item.name] += item.quantity;
@@ -208,6 +221,15 @@ function updateSummary() {
             });
         }
     });
+
+    // Unpaid warning
+    const warning = document.getElementById('unpaid-warning');
+    if (unpaidCount > 0) {
+        document.getElementById('unpaid-count').textContent = unpaidCount;
+        warning.classList.remove('d-none');
+    } else {
+        warning.classList.add('d-none');
+    }
 
     // Update display
     const now = new Date(); const yy=String(now.getFullYear()).slice(2), mm=String(now.getMonth()+1).padStart(2,'0'), dd=String(now.getDate()).padStart(2,'0');
@@ -278,6 +300,17 @@ document.getElementById('print-prep-list').addEventListener('click', function() 
     });
 
     form.submit();
+});
+
+// Priority toggle
+document.querySelectorAll('.priority-toggle').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const url = this.dataset.url;
+        const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrf } })
+            .then(r => r.json()).then(() => location.reload());
+    });
 });
 </script>
 {% endblock %}

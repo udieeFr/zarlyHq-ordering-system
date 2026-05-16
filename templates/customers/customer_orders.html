@@ -6,13 +6,119 @@
 {% block content %}
 <div class="orders-page">
 
+  <!-- ── Loyalty Tier + Stats ─────────────────────────── -->
+  {% with tier_colors="bronze:#cd7f32|silver:#94a3b8|gold:#f59e0b|platinum:#7c3aed" %}
+  <div class="content-card mb-4" style="border-radius:16px;overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#0f172a,#1e293b);padding:20px 24px;color:white;">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+          <div class="small text-white-50 mb-1">Loyalty Status</div>
+          <div class="d-flex align-items-center gap-2">
+            <span style="font-size:1.4rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;
+              color:{% if tier == 'bronze' %}#cd7f32{% elif tier == 'silver' %}#cbd5e1{% elif tier == 'gold' %}#fbbf24{% else %}#a78bfa{% endif %};">
+              {{ tier|capfirst }}
+            </span>
+            {% if profile.is_vip %}<span style="background:#f59e0b;color:#000;font-size:.65rem;font-weight:700;padding:2px 8px;border-radius:20px;">VIP</span>{% endif %}
+          </div>
+          {% if next_tier %}
+          <div class="mt-2" style="font-size:.78rem;color:#94a3b8;">
+            RM {{ amount_to_next|floatformat:2 }} more to reach <strong style="color:white;">{{ next_tier|capfirst }}</strong>
+          </div>
+          <div style="background:#1e293b;border-radius:4px;height:6px;width:200px;margin-top:6px;overflow:hidden;">
+            <div style="background:{% if tier == 'bronze' %}#cd7f32{% elif tier == 'silver' %}#cbd5e1{% elif tier == 'gold' %}#fbbf24{% else %}#a78bfa{% endif %};height:100%;width:{{ progress_pct }}%;border-radius:4px;"></div>
+          </div>
+          {% else %}
+          <div class="mt-1" style="font-size:.78rem;color:#a78bfa;">Maximum tier reached 🎉</div>
+          {% endif %}
+        </div>
+        <div class="d-flex gap-4 text-center">
+          <div>
+            <div style="font-size:1.6rem;font-weight:800;">{{ total_orders }}</div>
+            <div style="font-size:.72rem;color:#94a3b8;">Orders</div>
+          </div>
+          <div>
+            <div style="font-size:1.6rem;font-weight:800;">RM {{ total_spent|floatformat:2 }}</div>
+            <div style="font-size:.72rem;color:#94a3b8;">Total Spent</div>
+          </div>
+          <div>
+            <div style="font-size:1.6rem;font-weight:800;">RM {{ avg_order|floatformat:2 }}</div>
+            <div style="font-size:.72rem;color:#94a3b8;">Avg Order</div>
+          </div>
+          {% if top_item %}
+          <div>
+            <div style="font-size:1rem;font-weight:700;max-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ top_item.product__name }}</div>
+            <div style="font-size:.72rem;color:#94a3b8;">Favourite (×{{ top_item.qty }})</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endwith %}
+
   <!-- ── Upcoming Orders ──────────────────────────────── -->
   <div class="orders-section-header">
     <h2 class="orders-section-title">Upcoming orders</h2>
   </div>
 
-  {% if upcoming_orders %}
+  {% if unpaid_orders or upcoming_orders %}
   <div class="upcoming-grid">
+
+    {% if unpaid_orders %}
+    <!-- Unpaid sub-header -->
+    <div class="col-12 upcoming-subgroup-label unpaid-subgroup-label">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Awaiting Payment
+      <span class="subgroup-count">{{ unpaid_orders|length }}</span>
+    </div>
+
+    {% for o in unpaid_orders %}
+    <div class="upcoming-card unpaid-card">
+      <div class="unpaid-card-stripe"></div>
+
+      <div class="upcoming-card-header">
+        <div>
+          <a href="{% url 'order_success' o.id %}" class="upcoming-order-id" style="text-decoration:none;color:inherit;">Order #{{ o.id }}</a>
+          <div class="upcoming-order-date">{{ o.created_at|date:"N j, Y" }} · {{ o.created_at|time:"g:i A" }}</div>
+        </div>
+        <span class="order-status-pill status-pay">💳 Awaiting Payment</span>
+      </div>
+
+      <div class="upcoming-items-section">
+        <div class="upcoming-items-list">
+          {% for item in o.items.all|slice:":3" %}
+          <div class="upcoming-item-row">
+            <span class="upcoming-item-qty">{{ item.quantity }}×</span>
+            <span class="upcoming-item-name">{{ item.product.name }}</span>
+            <span class="upcoming-item-price">RM {{ item.product.price }}</span>
+          </div>
+          {% endfor %}
+          {% if o.items.count > 3 %}
+          <div class="upcoming-item-more">+ {{ o.items.count|add:"-3" }} more item{{ o.items.count|add:"-3"|pluralize }}</div>
+          {% endif %}
+        </div>
+        <div class="upcoming-card-bottom">
+          <span class="upcoming-total-label">Total: <strong>RM {{ o.total_amount }}</strong></span>
+          <a href="{% url 'payment_page' o.id %}" class="pay-now-btn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+            PAY NOW
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if upcoming_orders %}
+    {% if unpaid_orders %}
+    <!-- Divider between unpaid and the rest -->
+    <div class="col-12 upcoming-subgroup-label" style="color:#64748b;border-color:#e2e8f0;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      In Progress
+      <span class="subgroup-count" style="background:#e2e8f0;color:#475569;">{{ upcoming_orders|length }}</span>
+    </div>
+    {% endif %}
+
     {% for o in upcoming_orders %}
     <div class="upcoming-card">
       <!-- Header: ID + status -->
@@ -23,13 +129,11 @@
         </div>
         <span class="order-status-pill
           {% if o.status == 'pending' %}status-pending
-          {% elif o.status == 'pending_payment' %}status-pay
           {% elif o.status == 'prepared' %}status-preparing
           {% elif o.status == 'ready_for_delivery' %}status-ready
           {% elif o.status == 'out_for_delivery' %}status-on-way
           {% endif %}">
           {% if o.status == 'pending' %}⏳ Order Received
-          {% elif o.status == 'pending_payment' %}💳 Awaiting Payment
           {% elif o.status == 'prepared' %}👨‍🍳 Preparing
           {% elif o.status == 'ready_for_delivery' %}📦 Ready
           {% elif o.status == 'out_for_delivery' %}🛵 On the Way
@@ -53,9 +157,7 @@
         </div>
         <div class="upcoming-card-bottom">
           <span class="upcoming-total-label">Total: <strong>RM {{ o.total_amount }}</strong></span>
-          {% if o.status == 'pending_payment' %}
-            <a href="{% url 'payment_page' o.id %}" class="upcoming-track-btn btn-pay">PAY NOW</a>
-          {% elif o.tracking_number %}
+          {% if o.tracking_number %}
             <a href="https://www.citylinkexpress.com/track-your-shipment/?trackingNo={{ o.tracking_number }}"
                class="upcoming-track-btn" target="_blank" rel="noopener noreferrer" style="background:#f59e0b;color:#fff;">
               🚚 TRACK
@@ -80,9 +182,7 @@
           <span>Placed</span>
         </div>
         <div class="progress-step
-          {% if o.status == 'pending_payment' %}active
-          {% elif o.status in 'prepared,ready_for_delivery,out_for_delivery' %}done
-          {% endif %}">
+          {% if o.status in 'prepared,ready_for_delivery,out_for_delivery' %}done{% endif %}">
           <span>Approved</span>
         </div>
         <div class="progress-step
@@ -98,6 +198,8 @@
       </div>
     </div>
     {% endfor %}
+    {% endif %}
+
   </div>
   {% else %}
   <div class="orders-empty">

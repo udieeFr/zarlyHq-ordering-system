@@ -117,8 +117,9 @@
                         {% endif %}
                     </td>
                     <td>
-                        <strong>{{ p.user.username }}</strong><br>
-                        <small class="text-muted">{{ p.user.first_name }} {{ p.user.last_name }}</small>
+                        <strong>{{ p.user.username }}</strong>
+                        {% if p.is_vip %}<span style="background:#f59e0b;color:#000;font-size:.6rem;font-weight:700;padding:1px 6px;border-radius:10px;vertical-align:middle;margin-left:4px;">VIP</span>{% endif %}
+                        <br><small class="text-muted">{{ p.user.first_name }} {{ p.user.last_name }}</small>
                     </td>
                     <td>{{ p.user.email }}</td>
                     <td style="font-size:.82rem;color:#475569;">{{ p.default_phone|default:"—" }}</td>
@@ -134,6 +135,12 @@
                         {% endif %}
                     </td>
                     <td class="text-end">
+                        <button class="btn btn-sm {% if p.is_vip %}btn-warning{% else %}btn-outline-secondary{% endif %} me-1 vip-toggle"
+                                data-url="{% url 'toggle_customer_vip' p.user.id %}"
+                                data-id="{{ p.user.id }}"
+                                title="{% if p.is_vip %}Remove VIP{% else %}Mark as VIP{% endif %}">
+                            ★
+                        </button>
                         <a href="{% url 'customer_crm_detail' p.user.id %}" class="btn btn-sm btn-outline-primary">View</a>
                     </td>
                 </tr>
@@ -153,6 +160,7 @@
     <button class="btn-campaign" onclick="sendCampaign()">📧 Send Campaign Email</button>
     <button class="btn-clear" onclick="clearAll()">Clear selection</button>
 </div>
+{% csrf_token %}
 
 {% endblock %}
 
@@ -180,5 +188,15 @@
     const params = ids.map(id => 'ids=' + id).join('&');
     window.location.href = "{% url 'campaign_compose' %}?" + params;
   }
+
+  // VIP toggle
+  document.querySelectorAll('.vip-toggle').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const url = this.dataset.url;
+      const csrf = document.querySelector('[name=csrfmiddlewaretoken]') || { value: '' };
+      fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrf.value, 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.json()).then(() => location.reload());
+    });
+  });
 </script>
 {% endblock %}

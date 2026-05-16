@@ -13,6 +13,7 @@ urlpatterns = [
     path('approved-orders/', views.approved_orders_list, name='approved_orders_list'),
     path('pending-payment-orders/', views.pending_payment_orders_list, name='pending_payment_orders_list'),
     path('order/<int:order_id>/approve-payment/', views.approve_pending_payment, name='approve_pending_payment'),
+    path('order/<int:order_id>/force-approve-unpaid/', views.force_approve_unpaid, name='force_approve_unpaid'),
     path('order/<int:order_id>/reject-payment/', views.reject_pending_payment, name='reject_pending_payment'),
     path('prepared-orders/', views.prepared_orders_list, name='prepared_orders_list'),
     path('prep-group/<str:group_id>/', views.prep_group_detail, name='prep_group_detail'),
@@ -56,6 +57,16 @@ urlpatterns = [
     # Customer CRM
     path('customers/', views.customers_crm_list, name='customers_crm_list'),
     path('customers/<int:user_id>/', views.customer_crm_detail, name='customer_crm_detail'),
+
+    # Sales Report
+    path('reports/', views.sales_report, name='sales_report'),
+
+    # Availability Toggle
+    path('inventory/<int:product_id>/toggle-availability/', views.toggle_product_availability, name='toggle_product_availability'),
+
+    # Priority Toggles
+    path('order/<int:order_id>/toggle-priority/', views.toggle_order_priority, name='toggle_order_priority'),
+    path('customers/<int:user_id>/toggle-vip/', views.toggle_customer_vip, name='toggle_customer_vip'),
 
     # Email Campaigns
     path('email-templates/', views.email_template_list, name='email_template_list'),

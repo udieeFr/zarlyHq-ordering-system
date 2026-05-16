@@ -6,6 +6,7 @@ from django.http import HttpResponse, JsonResponse  # Required for PDF downloads
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
+from django_ratelimit.decorators import ratelimit
 from .models import Product, Category, Allergy
 from admins.models import Order, OrderItem, Complaint, Payment, DigitalSignature
 from admins.utils import generate_invoice_pdf  # The PDF generation engine
@@ -73,9 +74,13 @@ def product_list(request):
 
     if cat_id:
         products = products.filter(category_id=cat_id)
-        
+
     if allergy_id:
         products = products.exclude(allergies__id=allergy_id)
+
+    hide_soldout = request.GET.get('hide_soldout') == '1'
+    if hide_soldout:
+        products = products.filter(stock__gt=0)
 
     # 2. Pagination
     paginator = Paginator(products.order_by('name'), 12)
@@ -112,6 +117,7 @@ def product_list(request):
         'cart_count': cart_count,
         'user_orders': user_orders,
         'completed_orders': completed_orders,
+        'hide_soldout': hide_soldout,
     }
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -148,19 +154,31 @@ def download_invoice(request, order_id):
     return redirect('product_list')
 
 @login_required
+@ratelimit(key='user', rate='10/h', method='POST', block=False)
 def upload_payment_proof(request, order_id):
     """
     Handles payment proof upload from the order detail page with validation.
     Once uploaded, the order status is set to 'pending_payment' for admin verification.
-    
+
     Validates:
     - File exists
     - File size (max 5MB)
     - File type (images and PDF)
     - File integrity
+    - Replay attack: blocks upload if Stripe payment already confirmed
     """
     order = get_object_or_404(Order, id=order_id, customer=request.user)
-    
+
+    if request.method == 'POST' and getattr(request, 'limited', False):
+        messages.error(request, 'Too many upload attempts. Please wait before trying again.')
+        return redirect('order_success', order_id=order.id)
+
+    # Replay attack protection: block manual proof upload if Stripe already confirmed payment
+    stripe_confirmed = order.payments.filter(payment_method='stripe', status='succeeded').exists()
+    if stripe_confirmed:
+        messages.error(request, 'This order has already been paid via card. No manual proof required.')
+        return redirect('order_success', order_id=order.id)
+
     # Only allow proof upload for pending_payment orders
     if order.status not in ['pending_payment', 'pending']:
         messages.error(request, "Payment proof can only be uploaded for pending orders.")
@@ -268,15 +286,22 @@ def start_stripe_payment(request, order_id):
     return redirect(checkout_url)
 
 @login_required
+@ratelimit(key='user', rate='60/m', method='POST', block=False)
 def add_to_cart(request):
     """
     Adds a product to the cart session using POST data.
     Returns JSON for AJAX requests, redirects otherwise.
     """
     if request.method == 'POST':
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        if getattr(request, 'limited', False):
+            if is_ajax:
+                return JsonResponse({'success': False, 'message': 'Too many requests. Please slow down.'}, status=429)
+            messages.error(request, 'Too many requests. Please slow down.')
+            return redirect('product_list')
+
         product_id = request.POST.get('product_id')
         quantity = int(request.POST.get('quantity', 1))
-        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
         cart = request.session.get('cart', {})
 
@@ -374,6 +399,7 @@ def checkout(request):
     })
 
 @login_required
+@ratelimit(key='user', rate='10/m', method='POST', block=False)
 def submit_order(request):
     """
     Processes the checkout form: captures realistic shipping details,
@@ -381,6 +407,10 @@ def submit_order(request):
     For Stripe, redirects to Stripe Checkout. For manual, stores proof and awaits admin.
     """
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many orders submitted. Please wait a moment before trying again.')
+            return redirect('checkout')
+
         cart_items, total_price = get_cart_from_session(request)
         
         if not cart_items:
@@ -589,22 +619,52 @@ def logout_view(request):
     return redirect('product_list')
 
 @login_required
+@ratelimit(key='user', rate='5/h', method='POST', block=False)
 def submit_complaint(request):
     """Handles the complaint submission form"""
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many complaints submitted. Please wait before trying again.')
+            return redirect('customer_support')
+
         order_id = request.POST.get('order_id')
         order = get_object_or_404(Order, id=order_id, customer=request.user)
+
+        # Evidence image validation
+        evidence_image = request.FILES.get('evidence_image')
+        if evidence_image:
+            is_valid, error_msg = validate_payment_proof(evidence_image, max_size_mb=5)
+            if not is_valid:
+                messages.error(request, f'Evidence upload failed: {error_msg}')
+                return redirect('customer_support')
+
+        # Receipt hash verification — check if invoice is intact, log result for admins
+        receipt_verified = None
+        try:
+            sig = DigitalSignature.objects.get(order=order)
+            pdf_path = os.path.join(settings.MEDIA_ROOT, str(sig.pdf_path))
+            if os.path.exists(pdf_path):
+                sha256 = hashlib.sha256()
+                with open(pdf_path, 'rb') as f:
+                    for block in iter(lambda: f.read(4096), b''):
+                        sha256.update(block)
+                receipt_verified = sha256.hexdigest() == sig.signature_hash
+        except DigitalSignature.DoesNotExist:
+            pass  # Order doesn't have a signed receipt yet — that's fine
 
         complaint = Complaint.objects.create(
             order=order,
             customer=request.user,
             subject=request.POST.get('subject'),
             message=request.POST.get('message'),
-            evidence_image=request.FILES.get('evidence_image')
+            evidence_image=evidence_image,
         )
         log_audit(request, 'complaint_submitted', target=complaint,
                   description=f"Complaint filed on Order #{order.id}",
-                  metadata={'subject': complaint.subject[:200]})
+                  metadata={
+                      'subject': complaint.subject[:200],
+                      'receipt_verified': receipt_verified,
+                  })
         notify_admins(
             title="New customer complaint",
             message=f"{request.user.username} filed a complaint on Order #{order.id}: {complaint.subject[:120]}",
@@ -742,16 +802,20 @@ def stripe_webhook(request):
 
 @login_required
 def customer_orders(request):
-    """
-    Dedicated orders page showing upcoming and previous orders.
-    Replaces the sidebar order widget from the product list page.
-    """
-    upcoming_statuses = ['pending', 'pending_payment', 'prepared', 'ready_for_delivery', 'out_for_delivery']
-    previous_statuses = ['approved', 'delivered', 'rejected']
+    """Order history page with stats, loyalty tier, and per-order detail."""
+    from django.db.models import Sum, Count, Avg
+    from customers.models import CustomerProfile
+
+    previous_statuses = ['approved', 'delivered', 'rejected', 'cancelled']
+
+    unpaid_orders = Order.objects.filter(
+        customer=request.user,
+        status='pending_payment',
+    ).prefetch_related('items__product').order_by('-created_at')
 
     upcoming_orders = Order.objects.filter(
         customer=request.user,
-        status__in=upcoming_statuses
+        status__in=['pending', 'prepared', 'ready_for_delivery', 'out_for_delivery'],
     ).prefetch_related('items__product').order_by('-created_at')
 
     previous_orders = Order.objects.filter(
@@ -760,18 +824,66 @@ def customer_orders(request):
     ).prefetch_related('items__product').order_by('-created_at')
 
     completed_orders = Order.objects.filter(
-        customer=request.user,
-        status__in=['approved', 'delivered']
+        customer=request.user, status__in=['approved', 'delivered']
     )
 
+    # --- Stats ---
+    agg = completed_orders.aggregate(
+        total_spent=Sum('total_amount'),
+        total_orders=Count('id'),
+        avg_order=Avg('total_amount'),
+    )
+    total_spent  = agg['total_spent'] or 0
+    total_orders = agg['total_orders'] or 0
+    avg_order    = round(agg['avg_order'] or 0, 2)
+
+    # Most ordered product
+    top_item = (
+        OrderItem.objects
+        .filter(order__customer=request.user, order__status__in=['approved', 'delivered'])
+        .values('product__name')
+        .annotate(qty=Sum('quantity'))
+        .order_by('-qty')
+        .first()
+    )
+
+    # Loyalty tier + progress to next tier
+    profile, _ = CustomerProfile.objects.get_or_create(user=request.user)
+    profile.recalculate()
+    TIER_THRESHOLDS = {'bronze': 0, 'silver': 500, 'gold': 2000, 'platinum': 5000}
+    TIER_ORDER = ['bronze', 'silver', 'gold', 'platinum']
+    tier = profile.loyalty_tier
+    tier_index = TIER_ORDER.index(tier)
+    if tier_index < len(TIER_ORDER) - 1:
+        next_tier = TIER_ORDER[tier_index + 1]
+        next_threshold = TIER_THRESHOLDS[next_tier]
+        progress_pct = min(100, int(float(total_spent) / next_threshold * 100))
+        amount_to_next = max(0, next_threshold - float(total_spent))
+    else:
+        next_tier = None
+        next_threshold = None
+        progress_pct = 100
+        amount_to_next = 0
+
     cart = request.session.get('cart', {})
-    cart_count = sum(cart.values())
 
     return render(request, 'customers/customer_orders.html', {
+        'unpaid_orders': unpaid_orders,
         'upcoming_orders': upcoming_orders,
         'previous_orders': previous_orders,
         'completed_orders': completed_orders,
-        'cart_count': cart_count,
+        'cart_count': sum(cart.values()),
+        # Stats
+        'total_spent': total_spent,
+        'total_orders': total_orders,
+        'avg_order': avg_order,
+        'top_item': top_item,
+        # Loyalty
+        'profile': profile,
+        'tier': tier,
+        'next_tier': next_tier,
+        'progress_pct': progress_pct,
+        'amount_to_next': amount_to_next,
     })
 
 
@@ -1002,6 +1114,7 @@ def notifications_mark_all_read(request):
 
 
 @login_required
+@ratelimit(key='user', rate='5/m', method='POST', block=False)
 def cancel_order(request, order_id):
     """
     Let a customer cancel their own order while it is still pending.
@@ -1012,6 +1125,10 @@ def cancel_order(request, order_id):
     from admins.notifications import log_audit, notify, notify_admins
 
     if request.method != 'POST':
+        return redirect('customer_orders')
+
+    if getattr(request, 'limited', False):
+        messages.error(request, 'Too many requests. Please wait before trying again.')
         return redirect('customer_orders')
 
     order = get_object_or_404(AdminOrder, id=order_id, customer=request.user)
@@ -1056,9 +1173,49 @@ def cancel_order(request, order_id):
 
 
 @login_required
+@login_required
+def update_profile(request):
+    if request.method != 'POST':
+        return JsonResponse({'success': False}, status=405)
+    import json
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        data = request.POST
+
+    user = request.user
+    from customers.models import User as UserModel, CustomerProfile
+
+    email = data.get('email', '').strip()
+    if email and email != user.email:
+        if UserModel.objects.filter(email=email).exclude(pk=user.pk).exists():
+            return JsonResponse({'success': False, 'error': 'That email is already in use.'})
+
+    user.first_name = data.get('first_name', '').strip()
+    user.last_name  = data.get('last_name', '').strip()
+    if email:
+        user.email = email
+    user.phone_number = data.get('phone_number', '').strip()
+    user.save()
+
+    profile, _ = CustomerProfile.objects.get_or_create(user=user)
+    profile.default_address  = data.get('default_address', '').strip()
+    profile.marketing_opt_in = data.get('marketing_opt_in') in (True, 'true', '1', 'on')
+    profile.save()
+
+    return JsonResponse({'success': True})
+
+
+@login_required
+@ratelimit(key='user', rate='20/m', block=False)
 def reorder(request, order_id):
     """Repopulate the cart from a past order, then go straight to checkout."""
     from admins.models import Order as AdminOrder
+
+    if getattr(request, 'limited', False):
+        messages.error(request, 'Too many reorder requests. Please wait a moment.')
+        return redirect('customer_orders')
+
     order = get_object_or_404(AdminOrder, id=order_id, customer=request.user)
 
     cart = {}

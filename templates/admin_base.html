@@ -377,6 +377,10 @@
                     <span class="sidebar-menu-item-icon">📈</span>
                     <span class="sidebar-menu-item-text">Analytics</span>
                 </a>
+                <a href="{% url 'sales_report' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'sales_report' %}active{% endif %}">
+                    <span class="sidebar-menu-item-icon">📊</span>
+                    <span class="sidebar-menu-item-text">Sales Report</span>
+                </a>
                 <a href="{% url 'customers_crm_list' %}" class="sidebar-menu-item {% if request.resolver_match.url_name == 'customers_crm_list' %}active{% endif %}">
                     <span class="sidebar-menu-item-icon">👥</span>
                     <span class="sidebar-menu-item-text">Customer CRM</span>
