@@ -1,0 +1,310 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block page_title %}My Profile — Zarly BigFood{% endblock %}
+
+{% block content %}
+<style>
+  .cp-wrap { max-width: 960px; margin: 0 auto; padding: 0 1rem 3rem; }
+
+  .cp-panel {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+  }
+  .cp-panel-header {
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  }
+  .cp-panel-title { font-size: 0.88rem; font-weight: 800; color: var(--dark); letter-spacing: -.01em; margin: 0; }
+  .cp-panel-body { padding: 1.25rem; }
+
+  /* Identity strip */
+  .cp-identity {
+    display: flex; align-items: center; gap: 1.1rem;
+    padding: 1.4rem 1.25rem 1.2rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .cp-avatar {
+    width: 60px; height: 60px; border-radius: 16px; flex-shrink: 0;
+    background: var(--brand);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.6rem; font-weight: 800; color: #fff; letter-spacing: -1px;
+  }
+  .cp-identity-name { font-size: 1.05rem; font-weight: 800; color: var(--dark); line-height: 1.2; margin-bottom: 0.2rem; }
+  .cp-identity-meta { font-size: 0.78rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 0 1rem; }
+
+  /* Field layout */
+  .cp-field { margin-bottom: 1rem; }
+  .cp-field:last-child { margin-bottom: 0; }
+  .cp-label { display: block; font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.3rem; }
+  .cp-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+  /* Loyalty tier */
+  .tier-badge {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.3rem 0.75rem; border-radius: 999px; font-weight: 800;
+    font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .tier-bronze  { background: #fef3c7; color: #92400e; }
+  .tier-silver  { background: #f1f5f9; color: #475569; }
+  .tier-gold    { background: #fef9c3; color: #854d0e; }
+  .tier-platinum { background: #ede9fe; color: #5b21b6; }
+
+  .tier-progress-track {
+    height: 6px; background: var(--border); border-radius: 3px;
+    overflow: hidden; margin: 0.6rem 0 0.4rem;
+  }
+  .tier-progress-fill {
+    height: 100%; border-radius: 3px;
+    background: var(--brand); transition: width .4s ease-out;
+  }
+
+  /* Stat row */
+  .cp-stat {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.55rem 0; border-bottom: 1px solid var(--border); font-size: 0.82rem;
+  }
+  .cp-stat:last-child { border-bottom: none; }
+  .cp-stat-label { color: var(--muted); }
+  .cp-stat-value { font-weight: 700; color: var(--dark); }
+
+  /* Password section */
+  #pw-section { border-top: 1px solid var(--border); padding: 1.25rem; display: none; }
+  #pw-section.open { display: block; }
+  .pw-toggle-btn {
+    font-size: 0.78rem; font-weight: 600; color: var(--muted);
+    background: none; border: none; cursor: pointer; padding: 0;
+    text-decoration: underline; text-underline-offset: 2px;
+  }
+  .pw-toggle-btn:hover { color: var(--brand); }
+
+  /* Brand button */
+  .btn-brand-cta {
+    background: var(--brand); border: 1px solid var(--brand-dark); color: #fff;
+    font-weight: 700; font-size: 0.85rem; padding: 0.45rem 1.1rem;
+    border-radius: var(--radius-sm); cursor: pointer;
+    transition: background .15s, border-color .15s;
+  }
+  .btn-brand-cta:hover { background: var(--brand-dark); border-color: var(--brand-dark); color: #fff; }
+
+  /* Opt-in toggle */
+  .opt-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.75rem 0; border-bottom: 1px solid var(--border);
+  }
+  .opt-row:last-child { border-bottom: none; }
+</style>
+
+<div class="cp-wrap">
+
+  <div style="margin-bottom:1.75rem;">
+    <h1 style="font-size:1.6rem;font-weight:800;color:var(--dark);margin-bottom:.25rem;">My Profile</h1>
+    <p style="color:var(--muted);font-size:.9rem;">Update your account details and preferences.</p>
+  </div>
+
+  <div class="row g-3">
+
+    <!-- Left: identity + forms -->
+    <div class="col-md-7">
+
+      <div class="cp-panel">
+        <div class="cp-identity">
+          <div class="cp-avatar">{{ request.user.username|first|upper }}</div>
+          <div>
+            <div class="cp-identity-name">
+              {% if request.user.first_name or request.user.last_name %}{{ request.user.first_name }} {{ request.user.last_name }}
+              {% else %}{{ request.user.username }}{% endif %}
+            </div>
+            <div class="cp-identity-meta">
+              <span>{{ request.user.email }}</span>
+              <span>Member since {{ request.user.date_joined|date:"M Y" }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="cp-panel-header" style="border-top:none;">
+          <span class="cp-panel-title">Account Details</span>
+        </div>
+
+        <div class="cp-panel-body">
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_info">
+
+            <div class="cp-row cp-field">
+              <div>
+                <label class="cp-label" for="id_first_name">First name</label>
+                <input type="text" id="id_first_name" name="first_name"
+                       value="{{ request.user.first_name }}"
+                       class="form-control form-control-sm" placeholder="First name">
+              </div>
+              <div>
+                <label class="cp-label" for="id_last_name">Last name</label>
+                <input type="text" id="id_last_name" name="last_name"
+                       value="{{ request.user.last_name }}"
+                       class="form-control form-control-sm" placeholder="Last name">
+              </div>
+            </div>
+
+            <div class="cp-field">
+              <label class="cp-label" for="id_email">Email</label>
+              <input type="email" id="id_email" name="email"
+                     value="{{ request.user.email }}"
+                     class="form-control form-control-sm">
+            </div>
+
+            <div class="cp-field">
+              <label class="cp-label" for="id_phone">Phone number</label>
+              <input type="tel" id="id_phone" name="phone_number"
+                     value="{{ request.user.phone_number|default:'' }}"
+                     class="form-control form-control-sm" placeholder="+60 12-345 6789">
+            </div>
+
+            <div class="cp-field">
+              <label class="cp-label" for="id_default_phone">Default order phone</label>
+              <input type="tel" id="id_default_phone" name="default_phone"
+                     value="{{ profile.default_phone }}"
+                     class="form-control form-control-sm" placeholder="+60 12-345 6789">
+            </div>
+
+            <div class="cp-field">
+              <label class="cp-label" for="id_address">Default delivery address</label>
+              <textarea id="id_address" name="default_address"
+                        class="form-control form-control-sm" rows="3"
+                        placeholder="Street, city, postcode">{{ profile.default_address }}</textarea>
+            </div>
+
+            <!-- Marketing opt-in -->
+            <div class="opt-row" style="margin-top:.5rem;">
+              <div>
+                <div style="font-size:.85rem;font-weight:600;color:var(--dark);">Marketing emails</div>
+                <div style="font-size:.75rem;color:var(--muted);">Receive promotions and special offers by email.</div>
+              </div>
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="id_marketing"
+                       name="marketing_opt_in" {% if profile.marketing_opt_in %}checked{% endif %}
+                       style="width:2.2em;height:1.15em;">
+              </div>
+            </div>
+
+            <div style="margin-top:1.25rem;">
+              <button type="submit" class="btn-brand-cta">Save changes</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Security -->
+      <div class="cp-panel">
+        <div class="cp-panel-header">
+          <span class="cp-panel-title">Security</span>
+          <button type="button" class="pw-toggle-btn" id="pw-toggle-btn" onclick="togglePw()">
+            {% if show_pw_form %}Cancel{% else %}Change password{% endif %}
+          </button>
+        </div>
+        <div id="pw-section" {% if show_pw_form %}class="open"{% endif %}>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="change_password">
+            <div class="cp-field">
+              <label class="cp-label" for="id_cur_pw">Current password</label>
+              <input type="password" id="id_cur_pw" name="current_password"
+                     class="form-control form-control-sm" style="max-width:320px;"
+                     autocomplete="current-password" required>
+            </div>
+            <div class="cp-field">
+              <label class="cp-label" for="id_new_pw">New password <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8;">(min. 8 characters)</span></label>
+              <input type="password" id="id_new_pw" name="new_password"
+                     class="form-control form-control-sm" style="max-width:320px;"
+                     autocomplete="new-password" required minlength="8">
+            </div>
+            <div class="cp-field">
+              <label class="cp-label" for="id_conf_pw">Confirm new password</label>
+              <input type="password" id="id_conf_pw" name="confirm_password"
+                     class="form-control form-control-sm" style="max-width:320px;"
+                     autocomplete="new-password" required>
+            </div>
+            <div style="margin-top:1rem;display:flex;gap:.5rem;align-items:center;">
+              <button type="submit" class="btn btn-sm btn-danger" style="font-size:.82rem;">Update password</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" style="font-size:.82rem;" onclick="togglePw()">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right: loyalty + stats -->
+    <div class="col-md-5">
+
+      <div class="cp-panel">
+        <div class="cp-panel-header">
+          <span class="cp-panel-title">Loyalty Status</span>
+          {% if profile.is_vip %}
+          <span style="background:#f59e0b;color:#000;font-size:.62rem;font-weight:700;padding:2px 7px;border-radius:20px;">VIP</span>
+          {% endif %}
+        </div>
+        <div class="cp-panel-body">
+          <span class="tier-badge tier-{{ tier }}">{{ tier|capfirst }}</span>
+
+          {% if next_tier %}
+          <div class="tier-progress-track">
+            <div class="tier-progress-fill" style="width:{{ progress_pct }}%;"></div>
+          </div>
+          <p style="font-size:.75rem;color:var(--muted);margin:0;">
+            RM {{ amount_to_next|floatformat:2 }} more to reach <strong style="color:var(--dark);">{{ next_tier|capfirst }}</strong>
+          </p>
+          {% else %}
+          <p style="font-size:.78rem;color:#7c3aed;margin-top:.5rem;font-weight:600;">Maximum tier reached.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="cp-panel">
+        <div class="cp-panel-header">
+          <span class="cp-panel-title">Order History</span>
+          <a href="{% url 'customer_orders' %}" style="font-size:.75rem;font-weight:600;color:var(--brand);text-decoration:none;">View orders</a>
+        </div>
+        <div class="cp-panel-body" style="padding-top:.75rem;padding-bottom:.75rem;">
+          <div class="cp-stat">
+            <span class="cp-stat-label">Total orders</span>
+            <span class="cp-stat-value">{{ profile.total_orders }}</span>
+          </div>
+          <div class="cp-stat">
+            <span class="cp-stat-label">Total spent</span>
+            <span class="cp-stat-value">RM {{ profile.total_spent|floatformat:2 }}</span>
+          </div>
+          <div class="cp-stat">
+            <span class="cp-stat-label">Last order</span>
+            <span style="font-size:.82rem;color:var(--dark);">
+              {% if profile.last_order_at %}{{ profile.last_order_at|date:"d M Y" }}{% else %}No orders yet{% endif %}
+            </span>
+          </div>
+          <div class="cp-stat">
+            <span class="cp-stat-label">Member since</span>
+            <span style="font-size:.82rem;color:var(--dark);">{{ request.user.date_joined|timesince }}</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function togglePw() {
+    const sec = document.getElementById('pw-section');
+    const btn = document.getElementById('pw-toggle-btn');
+    const open = sec.classList.toggle('open');
+    btn.textContent = open ? 'Cancel' : 'Change password';
+    if (open) document.getElementById('id_cur_pw').focus();
+  }
+</script>
+{% endblock %}
