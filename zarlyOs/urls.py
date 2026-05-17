@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.shortcuts import redirect
 from admins.views import unified_login, logout_view, dashboard_home, admin_login, customer_login, custom_login
-from customers.views import stripe_webhook
+from customers.views import stripe_webhook, home as customer_home_view
 from django.conf import settings               # <--- Add this
 from django.conf.urls.static import static
 
@@ -26,15 +26,15 @@ def home_redirect(request):
     """Redirect based on user role after accessing root"""
     if request.user.is_authenticated:
         if request.user.role == 'customer':
-            return redirect('product_list')
+            return redirect('customer_home')
         elif request.user.role == 'manager' or request.user.is_superuser:
             return redirect('manager_analytics_view')
         elif request.user.role == 'sales_admin':
             return redirect('sales_admin_dashboard')
         else:
-            return redirect('product_list')
+            return redirect('customer_home')
     else:
-        return redirect('login')
+        return redirect('customer_home')
 
 urlpatterns = [
     # Admin
@@ -47,6 +47,9 @@ urlpatterns = [
     path('login/', unified_login, name='login'),
     path('logout/', logout_view, name='logout'),
     path('home/', dashboard_home, name='dashboard_home'),
+
+    # Customer landing page (public)
+    path('start/', customer_home_view, name='customer_home'),
     
     # Legacy login URLs (kept for backwards compatibility)
     path('login/admin/', admin_login, name='admin_login'),

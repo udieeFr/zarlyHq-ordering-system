@@ -71,6 +71,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'admins.context_processors.unread_notifications',
+                'customers.context_processors.cart_context',
             ],
         },
     },
@@ -157,6 +158,13 @@ STRIPE_CURRENCY = os.getenv('STRIPE_CURRENCY', 'MYR')
 # For localhost testing: use ngrok or Stripe CLI to tunnel webhooks
 # Stripe CLI: stripe listen --forward-to localhost:8000/menu/stripe/webhook/
 STRIPE_WEBHOOK_TOLERANCE = 300  # Accept webhooks within 5 minutes of creation
+
+# ============================================================================
+# SUPPORT CHAT
+# ============================================================================
+# Fernet 32-byte URL-safe base64 key. Generate once with:
+# python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+SUPPORT_CHAT_KEY = os.getenv('SUPPORT_CHAT_KEY', '')
 
 # ============================================================================
 # CACHE (used by django-ratelimit)

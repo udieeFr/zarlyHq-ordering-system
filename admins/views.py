@@ -8,7 +8,7 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Q, Sum, Count
 from datetime import timedelta
-from .models import Order, OrderItem, DigitalSignature, Complaint, PrepGroup, Payment, AuditLog, Notification, OrderEvent
+from .models import Order, OrderItem, DigitalSignature, Complaint, PrepGroup, Payment, AuditLog, Notification, OrderEvent, SupportMessage
 from .utils import generate_invoice_pdf, sign_pdf_digitally
 from .notifications import log_audit, notify, notify_admins
 from .sudo import sudo_required, grant_sudo, SUDO_NEXT_KEY, SUDO_DURATION
@@ -603,6 +603,15 @@ def admin_create_order(request):
 
 
 # --- DASHBOARD AND ORDERS ---
+
+@sales_admin_required
+def save_internal_note(request, order_id):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False}, status=405)
+    order = get_object_or_404(Order, id=order_id)
+    order.internal_note = request.POST.get('note', '').strip()
+    order.save(update_fields=['internal_note'])
+    return JsonResponse({'ok': True})
 
 @sales_admin_required
 def admin_order_detail(request, order_id):
@@ -1474,17 +1483,37 @@ def reject_order(request, order_id):
 @sales_admin_required
 def admin_complaints_list(request):
     """Lists all customer complaints."""
+    Notification.objects.filter(
+        recipient=request.user,
+        is_read=False,
+        notification_type='complaint',
+    ).update(is_read=True)
     complaints = Complaint.objects.all().order_by('-created_at')
     return render(request, 'admins/complaint_list.html', {'complaints': complaints})
 
 @sales_admin_required
 def admin_complaint_detail(request, complaint_id):
     """Detailed view for specific complaint validation."""
+    from admins.chat_crypto import decrypt_message
     complaint = get_object_or_404(Complaint, id=complaint_id)
+    raw_msgs = SupportMessage.objects.filter(complaint=complaint).select_related('sender')
+    initial_messages = []
+    for msg in raw_msgs:
+        try:
+            body = decrypt_message(msg.body)
+        except Exception:
+            body = '[encrypted]'
+        initial_messages.append({
+            'sender': msg.sender.username if msg.sender else 'deleted',
+            'body': body,
+            'created_at': msg.created_at.strftime('%d %b %Y, %H:%M'),
+            'is_mine': msg.sender_id == request.user.id,
+        })
     return render(request, 'admins/complaint_detail.html', {
         'complaint': complaint,
         'order': complaint.order,
-        'customer': complaint.customer
+        'customer': complaint.customer,
+        'initial_messages': initial_messages,
     })
 
 @sales_admin_required
@@ -1496,6 +1525,9 @@ def resolve_complaint(request, complaint_id):
         if action:
             complaint.action_taken = action
             complaint.status = 'resolved'
+            note = request.POST.get('resolution_note', '').strip()
+            if note:
+                complaint.resolution_note = note
             complaint.save()
             log_audit(request, 'complaint_resolved', target=complaint,
                       description=f"Complaint #{complaint.id} resolved",
@@ -1525,6 +1557,54 @@ def resolve_complaint(request, complaint_id):
             messages.error(request, "Please select an action before resolving.")
         return redirect('admin_complaints_list')
     return redirect('admin_complaint_detail', complaint_id=complaint.id)
+
+
+@sales_admin_required
+def admin_complaint_messages(request, complaint_id):
+    """Poll for or send support chat messages (admin side)."""
+    from admins.chat_crypto import encrypt_message, decrypt_message
+    from django.utils.dateparse import parse_datetime
+
+    complaint = get_object_or_404(Complaint, id=complaint_id)
+
+    if request.method == 'GET':
+        since_raw = request.GET.get('since')
+        qs = SupportMessage.objects.filter(complaint=complaint).select_related('sender')
+        if since_raw:
+            since_dt = parse_datetime(since_raw)
+            if since_dt:
+                qs = qs.filter(created_at__gt=since_dt)
+        msgs = []
+        for msg in qs:
+            try:
+                body = decrypt_message(msg.body)
+            except Exception:
+                body = '[encrypted]'
+            msgs.append({
+                'id': msg.id,
+                'sender': msg.sender.username if msg.sender else 'deleted',
+                'body': body,
+                'created_at': msg.created_at.isoformat(),
+                'is_mine': msg.sender_id == request.user.id,
+            })
+        return JsonResponse({'messages': msgs, 'locked': complaint.status == 'resolved'})
+
+    if request.method == 'POST':
+        if complaint.status == 'resolved':
+            return JsonResponse({'error': 'Chat is locked'}, status=403)
+        body = request.POST.get('body', '').strip()
+        if not body:
+            return JsonResponse({'error': 'Message cannot be empty'}, status=400)
+        SupportMessage.objects.create(
+            complaint=complaint,
+            sender=request.user,
+            body=encrypt_message(body),
+        )
+        log_audit(request, 'support_message_sent', target=complaint,
+                  description=f'Admin sent support message on Complaint #{complaint.id}')
+        return JsonResponse({'ok': True})
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
 # --- AUDIT LOG ---
