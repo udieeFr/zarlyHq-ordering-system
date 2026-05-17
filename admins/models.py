@@ -56,6 +56,14 @@ class Order(models.Model):
                                   related_name='remakes')
     is_priority = models.BooleanField(default=False)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['status', '-created_at']),
+            models.Index(fields=['customer', '-created_at']),
+            models.Index(fields=['is_priority', 'status']),
+        ]
+
     @property
     def customer_label(self):
         """Display name for this order's customer — handles walk-in orders gracefully."""
@@ -152,8 +160,8 @@ class Payment(models.Model):
         indexes = [
             models.Index(fields=['order', '-created_at']),
             models.Index(fields=['status', 'created_at']),
-            models.Index(fields=['stripe_session_id']),
             models.Index(fields=['stripe_payment_intent_id']),
+            # stripe_session_id omitted — unique=True already creates an index
         ]
 
 class Complaint(models.Model):
@@ -176,10 +184,31 @@ class Complaint(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     # NEW: Field to store the admin's decision
     action_taken = models.CharField(max_length=50, choices=ACTION_CHOICES, null=True, blank=True)
+    resolution_note = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['order', 'status']),
+        ]
 
     def __str__(self):
         return f"Complaint #{self.id} - Order #{self.order.id}"
+
+class SupportMessage(models.Model):
+    complaint  = models.ForeignKey(Complaint, on_delete=models.CASCADE, related_name='messages')
+    sender     = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    body       = models.TextField()  # Fernet-encrypted ciphertext
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    is_read    = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['created_at']
+        indexes  = [
+            models.Index(fields=['complaint', 'created_at']),
+        ]
+
 
 class PrepGroup(models.Model):
     """Groups orders that were prepared together."""
@@ -195,7 +224,7 @@ class PrepGroup(models.Model):
             prefix = f'OP-{today}-'
             last = (PrepGroup.objects
                     .filter(group_id__startswith=prefix)
-                    .order_by('-group_id')
+                    .order_by('-id')
                     .first())
             seq = int(last.group_id.split('-')[-1]) + 1 if last else 1
             self.group_id = f'{prefix}{seq:02d}'
@@ -221,7 +250,7 @@ class PrepGroup(models.Model):
     def item_summary(self):
         """Aggregate items across all orders in this group."""
         item_counts = {}
-        for order in self.orders.all():
+        for order in self.orders.prefetch_related('items__product').all():
             for item in order.items.all():
                 key = item.product.name
                 if key in item_counts:
@@ -387,6 +416,7 @@ class AuditLog(models.Model):
         ('refund_manual', 'Manual Refund Flagged'),
         ('refund_processed', 'Manual Refund Processed'),
         ('order_cancelled', 'Order Cancelled by Customer'),
+        ('support_message_sent', 'Support Message Sent'),
     )
 
     actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
@@ -546,6 +576,10 @@ class Refund(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['order', '-created_at']),
+            models.Index(fields=['status', '-created_at']),
+        ]
 
     def __str__(self):
         return f"Refund #{self.id} — Order #{self.order.id} ({self.get_status_display()})"

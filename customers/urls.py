@@ -33,6 +33,8 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('submit-complaint/', views.submit_complaint, name='submit_complaint'),
     path('support/', views.customer_support, name='customer_support'),
+    path('support/complaint/<int:complaint_id>/', views.customer_complaint_detail, name='customer_complaint_detail'),
+    path('support/complaint/<int:complaint_id>/messages/', views.customer_complaint_messages, name='customer_complaint_messages'),
     path('verify/<int:order_id>/', views.verify_receipt, name='verify_receipt'),
 
     # Notifications

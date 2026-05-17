@@ -6,7 +6,7 @@ from django_ratelimit.decorators import ratelimit
 from django.utils import timezone
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
-from django.db.models import Q, Sum, Count
+from django.db.models import Q, Sum, Count, Max, F
 from datetime import timedelta
 from .models import Order, OrderItem, DigitalSignature, Complaint, PrepGroup, Payment, AuditLog, Notification, OrderEvent, SupportMessage
 from .utils import generate_invoice_pdf, sign_pdf_digitally
@@ -225,8 +225,8 @@ def manager_analytics_view(request):
         chart_revenue.append(daily_map.get(d, 0))
 
     # --- Order volume ---
-    orders_today = Order.objects.filter(created_at__date=today).count()
-    orders_week  = Order.objects.filter(created_at__gte=week_ago).count()
+    orders_today = Order.objects.filter(created_at__date=today).exclude(status='rejected').count()
+    orders_week  = Order.objects.filter(created_at__gte=week_ago).exclude(status='rejected').count()
     status_breakdown = {
         'pending':             Order.objects.filter(status='pending').count(),
         'pending_payment':     Order.objects.filter(status='pending_payment').count(),
@@ -237,7 +237,7 @@ def manager_analytics_view(request):
         'delivered':           Order.objects.filter(status='delivered').count(),
         'rejected':            Order.objects.filter(status='rejected').count(),
     }
-    total_orders = sum(status_breakdown.values())
+    total_orders = sum(v for k, v in status_breakdown.items() if k != 'rejected')
     delivered_count = status_breakdown['delivered']
     delivery_rate = round((delivered_count / total_orders * 100) if total_orders > 0 else 0, 1)
 
@@ -1492,10 +1492,55 @@ def admin_complaints_list(request):
     return render(request, 'admins/complaint_list.html', {'complaints': complaints})
 
 @sales_admin_required
+def admin_support_chats(request):
+    """Lists all complaints with chat activity for the support inbox."""
+    from admins.chat_crypto import decrypt_message
+
+    complaints = (
+        Complaint.objects
+        .select_related('order', 'customer')
+        .prefetch_related('messages__sender')
+        .annotate(
+            unread_count=Count(
+                'messages',
+                filter=Q(messages__is_read=False, messages__sender__role='customer'),
+            ),
+            last_msg_at=Max('messages__created_at'),
+        )
+        .order_by(F('last_msg_at').desc(nulls_last=True), '-created_at')
+    )
+
+    chat_list = []
+    for c in complaints:
+        msgs = list(c.messages.all())
+        last_msg = msgs[-1] if msgs else None
+        preview = None
+        if last_msg:
+            try:
+                raw = decrypt_message(last_msg.body)
+                preview = raw[:80] + ('…' if len(raw) > 80 else '')
+            except Exception:
+                preview = None
+        chat_list.append({
+            'complaint': c,
+            'preview': preview,
+            'last_at': last_msg.created_at if last_msg else None,
+            'unread_count': c.unread_count,
+            'msg_count': len(msgs),
+        })
+
+    return render(request, 'admins/support_chats.html', {'chat_list': chat_list})
+
+
+@sales_admin_required
 def admin_complaint_detail(request, complaint_id):
     """Detailed view for specific complaint validation."""
     from admins.chat_crypto import decrypt_message
     complaint = get_object_or_404(Complaint, id=complaint_id)
+    # Mark unread customer messages as read when admin opens the thread
+    SupportMessage.objects.filter(
+        complaint=complaint, is_read=False, sender__role='customer',
+    ).update(is_read=True)
     raw_msgs = SupportMessage.objects.filter(complaint=complaint).select_related('sender')
     initial_messages = []
     for msg in raw_msgs:
@@ -1574,6 +1619,8 @@ def admin_complaint_messages(request, complaint_id):
             since_dt = parse_datetime(since_raw)
             if since_dt:
                 qs = qs.filter(created_at__gt=since_dt)
+        # Mark any fetched customer messages as read
+        qs.filter(is_read=False, sender__role='customer').update(is_read=True)
         msgs = []
         for msg in qs:
             try:

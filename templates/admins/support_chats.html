@@ -1,0 +1,129 @@
+{% extends 'admin_base.html' %}
+
+{% block page_title %}Support Chats{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>💬 Support Chats</h1>
+    <p>All customer complaint threads — unread messages highlighted</p>
+</div>
+
+<style>
+  .chat-inbox { display: flex; flex-direction: column; gap: 0; }
+  .chat-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.9rem 1.25rem;
+    border-bottom: 1px solid oklch(93% 0.006 60);
+    background: oklch(99.5% 0.004 60);
+    text-decoration: none;
+    color: inherit;
+    transition: background .12s;
+    cursor: pointer;
+  }
+  .chat-row:first-child { border-radius: 12px 12px 0 0; }
+  .chat-row:last-child  { border-bottom: none; border-radius: 0 0 12px 12px; }
+  .chat-row:only-child  { border-radius: 12px; }
+  .chat-row:hover { background: oklch(97% 0.012 60); }
+  .chat-row.has-unread { background: oklch(98% 0.025 65); }
+  .chat-row.has-unread:hover { background: oklch(96% 0.03 65); }
+
+  .chat-avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: oklch(52% 0.16 46);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.9rem;
+    flex-shrink: 0;
+  }
+  .chat-avatar.resolved { background: oklch(68% 0.08 145); }
+
+  .chat-body { flex: 1; min-width: 0; }
+  .chat-meta {
+    display: flex; align-items: center; gap: 0.5rem;
+    margin-bottom: 0.15rem;
+    flex-wrap: wrap;
+  }
+  .chat-username { font-weight: 700; font-size: 0.875rem; color: oklch(18% 0.05 50); }
+  .chat-order    { font-size: 0.75rem; color: oklch(45% 0.06 50); font-weight: 500; }
+
+  .chat-subject  { font-size: 0.82rem; font-weight: 600; color: oklch(25% 0.05 50); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0.15rem; }
+  .chat-preview  { font-size: 0.78rem; color: oklch(45% 0.04 50); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chat-preview.no-msg { font-style: italic; color: oklch(60% 0.03 50); }
+
+  .chat-right { flex-shrink: 0; text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem; }
+  .chat-time  { font-size: 0.72rem; color: oklch(55% 0.04 50); white-space: nowrap; }
+
+  .chat-unread-badge {
+    background: oklch(52% 0.16 46); color: #fff;
+    font-size: 0.65rem; font-weight: 700;
+    padding: 0.15rem 0.45rem; border-radius: 999px;
+    min-width: 1.3rem; text-align: center;
+    line-height: 1.4;
+  }
+
+  .status-pill {
+    display: inline-flex; align-items: center;
+    border-radius: 999px; padding: 0.15rem 0.55rem;
+    font-size: 0.68rem; font-weight: 700; border: 1px solid transparent;
+  }
+  .sp-pending  { background: #fffbeb; color: #92400e; border-color: #fcd34d; }
+  .sp-resolved { background: #f0fdf4; color: #166534; border-color: #86efac; }
+
+  .inbox-empty {
+    text-align: center; padding: 3rem 1.5rem;
+    color: oklch(55% 0.04 50); font-size: 0.9rem;
+    background: oklch(99.5% 0.004 60);
+    border-radius: 12px;
+    border: 1px solid oklch(93% 0.006 60);
+  }
+</style>
+
+{% if chat_list %}
+<div class="content-card p-0 overflow-hidden">
+  <div class="chat-inbox">
+    {% for item in chat_list %}
+    <a href="{% url 'admin_complaint_detail' item.complaint.id %}" class="chat-row {% if item.unread_count %}has-unread{% endif %}">
+      <div class="chat-avatar {% if item.complaint.status == 'resolved' %}resolved{% endif %}">
+        {{ item.complaint.customer.username|first|upper }}
+      </div>
+
+      <div class="chat-body">
+        <div class="chat-meta">
+          <span class="chat-username">{{ item.complaint.customer.username }}</span>
+          <span class="chat-order">Order #{{ item.complaint.order.id }}</span>
+          <span class="status-pill {% if item.complaint.status == 'pending' %}sp-pending{% else %}sp-resolved{% endif %}">
+            {% if item.complaint.status == 'pending' %}Pending{% else %}Resolved{% endif %}
+          </span>
+        </div>
+        <div class="chat-subject">{{ item.complaint.subject }}</div>
+        {% if item.preview %}
+          <div class="chat-preview">{{ item.preview }}</div>
+        {% elif item.msg_count == 0 %}
+          <div class="chat-preview no-msg">No messages yet</div>
+        {% endif %}
+      </div>
+
+      <div class="chat-right">
+        {% if item.last_at %}
+          <span class="chat-time">{{ item.last_at|date:"d M, H:i" }}</span>
+        {% else %}
+          <span class="chat-time">{{ item.complaint.created_at|date:"d M" }}</span>
+        {% endif %}
+        {% if item.unread_count %}
+          <span class="chat-unread-badge">{{ item.unread_count }}</span>
+        {% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<div class="inbox-empty">
+  <div style="font-size:2rem; margin-bottom:0.5rem;">💬</div>
+  <p class="fw-bold mb-1">No support chats yet</p>
+  <p style="font-size:0.85rem;">Chat threads will appear here once customers submit complaints.</p>
+</div>
+{% endif %}
+{% endblock %}

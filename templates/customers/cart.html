@@ -27,9 +27,18 @@
   color: var(--muted);
 }
 
+/* ── Card wrapper ───────────────────────────────────────── */
+.crt-card {
+  background: oklch(99.5% 0.006 60);
+  border-radius: 14px;
+  padding: 0 1.25rem;
+  margin-bottom: 1rem;
+  box-shadow: 6px 6px 0 0 #170400, 0 1px 6px oklch(9% 0.04 32 / 0.05);
+}
+
 /* ── Item list ──────────────────────────────────────────── */
 .crt-list {
-  border-top: 1px solid var(--border);
+  border-top: none;
 }
 
 .crt-item {
@@ -38,7 +47,7 @@
   align-items: center;
   gap: 0.875rem;
   padding: 1rem 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid oklch(88% 0.03 60);
 }
 
 /* Thumbnail */
@@ -170,8 +179,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 1.25rem 0;
-  border-top: 2px solid var(--border);
-  margin-top: 0.25rem;
+  border-top: 1.5px solid oklch(82% 0.04 60);
+  margin-top: 0;
 }
 
 .crt-total-label {
@@ -299,7 +308,8 @@
 
   {% if cart_items %}
 
-  <!-- Item list -->
+  <!-- Item list + total card -->
+  <div class="crt-card">
   <div class="crt-list">
     {% for item in cart_items %}
     <div class="crt-item">
@@ -362,6 +372,7 @@
     <span class="crt-total-label">Your total</span>
     <span class="crt-total-amount">RM {{ total_price }}</span>
   </div>
+  </div>{# end .crt-card #}
 
   <!-- Actions -->
   <div class="crt-foot">

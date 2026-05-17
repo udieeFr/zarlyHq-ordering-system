@@ -19,10 +19,11 @@
 
   .support-title {
     margin: 0;
-    font-size: 1.4rem;
-    font-weight: 800;
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 1.6rem;
+    font-weight: 400;
     letter-spacing: -0.02em;
-    color: var(--dark);
+    color: oklch(16% 0.04 52);
   }
 
   .support-subtitle {
@@ -55,11 +56,11 @@
   }
 
   .support-card {
-    background: #fff;
-    border: 1px solid var(--border);
+    background: oklch(98.5% 0.018 65);
+    border: 1px solid oklch(88% 0.045 64);
     border-radius: var(--radius);
     padding: 1rem 1.1rem;
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 2px 8px oklch(58% 0.1 58 / 0.08);
   }
 
   .support-card-header {
@@ -127,6 +128,31 @@
   .sap-remake { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
   .sap-dismissed { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
 
+  .support-resolution-note {
+    margin-top: 0.6rem;
+    padding: 0.65rem 0.85rem;
+    background: var(--brand-light);
+    border: 1px solid var(--brand-border);
+    border-radius: var(--radius-sm);
+  }
+
+  .support-resolution-label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #c2410c;
+    margin-bottom: 0.3rem;
+  }
+
+  .support-resolution-text {
+    font-size: 0.875rem;
+    color: var(--dark-2);
+    margin: 0;
+    line-height: 1.5;
+  }
+
   .support-evidence-link {
     color: var(--brand-dark);
     font-size: 0.82rem;
@@ -139,10 +165,10 @@
 
   .support-empty {
     text-align: center;
-    background: #fff;
-    border: 1px solid var(--border);
+    background: oklch(98.5% 0.018 65);
+    border: 1px solid oklch(88% 0.045 64);
     border-radius: var(--radius);
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 2px 8px oklch(58% 0.1 58 / 0.08);
     padding: 2rem 1.25rem;
   }
 
@@ -162,6 +188,164 @@
     cursor: pointer;
   }
 
+  .btn-chat-open {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 1px solid var(--brand-border);
+    background: var(--brand-light);
+    color: var(--brand-dark);
+    border-radius: var(--radius-sm);
+    padding: 0.3rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+
+  .btn-chat-open:hover {
+    background: var(--brand);
+    color: #fff;
+    border-color: var(--brand);
+  }
+
+  /* ── Chat Drawer ─────────────────────────────────────── */
+  .chat-drawer-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 1049;
+  }
+
+  .chat-drawer-overlay.open { display: block; }
+
+  .chat-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100dvh;
+    width: 380px;
+    max-width: 100vw;
+    background: #fff;
+    box-shadow: -4px 0 24px rgba(0,0,0,0.12);
+    z-index: 1050;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.28s cubic-bezier(.4,0,.2,1);
+  }
+
+  .chat-drawer.open { transform: translateX(0); }
+
+  .chat-drawer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 1rem 1.1rem;
+    background: oklch(16% 0.04 52);
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .chat-drawer-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .chat-drawer-close {
+    border: 0;
+    background: transparent;
+    color: rgba(255,255,255,0.7);
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 0 0.2rem;
+  }
+
+  .chat-drawer-close:hover { color: #fff; }
+
+  .chat-drawer-locked {
+    padding: 0.5rem 1rem;
+    background: #f1f5f9;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 0.78rem;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  .chat-drawer-thread {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.85rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .chat-drawer-bubble {
+    max-width: 78%;
+    border-radius: 1rem;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .bubble-mine   { background: var(--brand-light); border: 1px solid var(--brand-border); align-self: flex-end; }
+  .bubble-theirs { background: #f1f5f9; border: 1px solid #e2e8f0; align-self: flex-start; }
+
+  .bubble-sender {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--muted);
+    margin-bottom: 2px;
+  }
+
+  .chat-drawer-empty {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin: auto;
+  }
+
+  .chat-drawer-foot {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  .chat-drawer-input {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    outline: none;
+  }
+
+  .chat-drawer-input:focus { border-color: var(--brand); }
+
+  .chat-drawer-send {
+    border: 0;
+    background: var(--brand);
+    color: #fff;
+    border-radius: var(--radius-sm);
+    padding: 0 1rem;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+
+  .chat-drawer-send:hover { background: var(--brand-dark); }
+
   @media (max-width: 768px) {
     .support-header {
       flex-direction: column;
@@ -172,6 +356,8 @@
       width: 100%;
       text-align: center;
     }
+
+    .chat-drawer { width: 100vw; }
   }
 </style>
 <div class="support-page">
@@ -211,10 +397,28 @@
 
       <div class="support-subject">{{ c.subject }}</div>
       <div class="support-message">{{ c.message }}</div>
+      <div style="margin-bottom:0.5rem;">
+        <button type="button" class="btn-chat-open"
+          data-complaint-id="{{ c.id }}"
+          data-subject="{{ c.subject|escapejs }}"
+          data-locked="{% if c.status == 'resolved' %}true{% else %}false{% endif %}"
+          data-messages-url="{% url 'customer_complaint_messages' c.id %}"
+          onclick="openChatDrawer(this)">
+          💬 Chat
+        </button>
+      </div>
+
+      {% if c.evidence_image %}
+      <div class="support-evidence" style="margin-bottom:0.6rem;">
+        <a href="{{ c.evidence_image.url }}" target="_blank" class="support-evidence-link">
+          📎 View Evidence
+        </a>
+      </div>
+      {% endif %}
 
       {% if c.action_taken %}
       <div class="support-action-row">
-        <span class="support-action-label">Admin action:</span>
+        <span class="support-action-label">Outcome:</span>
         <span class="support-action-pill
           {% if c.action_taken == 'refund' %}sap-refund
           {% elif c.action_taken == 'remake' %}sap-remake
@@ -226,14 +430,12 @@
           {% endif %}
         </span>
       </div>
-      {% endif %}
-
-      {% if c.evidence_image %}
-      <div class="support-evidence">
-        <a href="{{ c.evidence_image.url }}" target="_blank" class="support-evidence-link">
-          📎 View Evidence
-        </a>
+      {% if c.resolution_note %}
+      <div class="support-resolution-note">
+        <span class="support-resolution-label">From Zarly team:</span>
+        <p class="support-resolution-text">{{ c.resolution_note }}</p>
       </div>
+      {% endif %}
       {% endif %}
     </div>
     {% endfor %}
@@ -297,6 +499,134 @@
     </div>
   </div>
 </div>
+
+<!-- ── Chat Drawer ─────────────────────────────────────── -->
+<div class="chat-drawer-overlay" id="chatOverlay" onclick="closeChatDrawer()"></div>
+
+<div class="chat-drawer" id="chatDrawer">
+  <div class="chat-drawer-head">
+    <span class="chat-drawer-title" id="drawerTitle">Support Chat</span>
+    <button class="chat-drawer-close" onclick="closeChatDrawer()">✕</button>
+  </div>
+  <div class="chat-drawer-locked" id="drawerLocked" style="display:none;">🔒 This complaint is resolved. Chat is read-only.</div>
+  <div class="chat-drawer-thread" id="drawerThread">
+    <p class="chat-drawer-empty" id="drawerEmpty">Loading…</p>
+  </div>
+  <div class="chat-drawer-foot" id="drawerFoot">
+    <input type="text" class="chat-drawer-input" id="drawerInput" placeholder="Type a message…" autocomplete="off">
+    <button class="chat-drawer-send" id="drawerSend">Send</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+  const CSRF      = csrfInput ? csrfInput.value : '';
+  const overlay = document.getElementById('chatOverlay');
+  const drawer  = document.getElementById('chatDrawer');
+  const title   = document.getElementById('drawerTitle');
+  const lockedBanner = document.getElementById('drawerLocked');
+  const thread  = document.getElementById('drawerThread');
+  const foot    = document.getElementById('drawerFoot');
+  const input   = document.getElementById('drawerInput');
+  const sendBtn = document.getElementById('drawerSend');
+
+  let messagesUrl = null;
+  let lastSeen    = null;
+  let pollTimer   = null;
+  let locked      = false;
+  let hasMessages = false;
+  let emptyEl     = null;   // refreshed each time the drawer is opened
+
+  function appendMessage(msg) {
+    if (emptyEl && emptyEl.parentNode) { emptyEl.remove(); emptyEl = null; }
+    hasMessages = true;
+    const wrap = document.createElement('div');
+    const cls  = msg.is_mine ? 'chat-drawer-bubble bubble-mine' : 'chat-drawer-bubble bubble-theirs';
+    wrap.innerHTML = `<div class="${cls}">
+      <div class="bubble-sender">${msg.is_mine ? 'You' : 'Support team'}</div>
+      <div>${msg.body}</div>
+    </div>`;
+    thread.appendChild(wrap);
+    lastSeen = msg.created_at;
+    thread.scrollTop = thread.scrollHeight;
+  }
+
+  function poll() {
+    if (!messagesUrl) return;
+    const url = lastSeen ? messagesUrl + '?since=' + encodeURIComponent(lastSeen) : messagesUrl;
+    fetch(url).then(r => r.json()).then(data => {
+      if (!hasMessages && data.messages.length === 0 && emptyEl) {
+        emptyEl.textContent = 'No messages yet. Start the conversation.';
+      }
+      data.messages.forEach(appendMessage);
+      if (data.locked) {
+        foot.style.display = 'none';
+        lockedBanner.style.display = '';
+      }
+    });
+  }
+
+  function startPolling() { pollTimer = setInterval(poll, 20000); }
+  function stopPolling()  { clearInterval(pollTimer); pollTimer = null; }
+
+  document.addEventListener('visibilitychange', () => document.hidden ? stopPolling() : (messagesUrl && startPolling()));
+
+  sendBtn.addEventListener('click', doSend);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') doSend(); });
+
+  function doSend() {
+    const body = input.value.trim();
+    if (!body || !messagesUrl || locked) return;
+    input.value = '';
+    fetch(messagesUrl, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'body=' + encodeURIComponent(body),
+    }).then(r => r.json()).then(data => { if (data.ok) poll(); });
+  }
+
+  window.openChatDrawer = function (btn) {
+    messagesUrl = btn.dataset.messagesUrl;
+    locked      = btn.dataset.locked === 'true';
+    title.textContent = btn.dataset.subject || 'Support Chat';
+
+    // reset thread and grab a fresh reference to the placeholder
+    thread.innerHTML = '<p class="chat-drawer-empty">Loading…</p>';
+    emptyEl     = thread.querySelector('.chat-drawer-empty');
+    hasMessages = false;
+    lastSeen    = null;
+
+    if (locked) {
+      foot.style.display = 'none';
+      lockedBanner.style.display = '';
+    } else {
+      foot.style.display = '';
+      lockedBanner.style.display = 'none';
+    }
+
+    overlay.classList.add('open');
+    drawer.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    stopPolling();
+    poll();
+    if (!locked) startPolling();
+
+    setTimeout(() => input.focus(), 300);
+  };
+
+  window.closeChatDrawer = function () {
+    drawer.classList.remove('open');
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+    stopPolling();
+    messagesUrl = null;
+  };
+
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeChatDrawer(); });
+})();
+</script>
 
 <script>
 function openComplaintModal(orderId) {

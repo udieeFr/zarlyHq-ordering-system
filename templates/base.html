@@ -113,16 +113,44 @@
     <nav class="navbar-custom">
         <div class="container navbar-content">
             <!-- Logo (visible on mobile when sidebar is hidden) -->
-            <a class="navbar-logo" href="/">
+            <a class="navbar-logo" href="{% url 'customer_home' %}">
                 <span class="logo-icon"></span>
-                <span>Zarly BigFood </span>
+                <span>Zarly BigFood</span>
             </a>
 
             <!-- Nav Links -->
             <div class="navbar-menu">
-                <a href="{% url 'product_list' %}" class="nav-link {% if url_name == 'product_list' %}active-nav{% endif %}">Menu</a>
+                <a href="{% url 'customer_home' %}" class="nav-link {% if url_name == 'customer_home' %}active-nav{% endif %}">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                  Home
+                </a>
+                <a href="{% url 'product_list' %}" class="nav-link {% if url_name == 'product_list' or url_name == 'menu' %}active-nav{% endif %}">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 00-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/>
+                  </svg>
+                  Menu
+                </a>
                 {% if request.user.is_authenticated and request.user.role == 'customer' %}
-                <a href="{% url 'customer_orders' %}" class="nav-link {% if url_name == 'customer_orders' %}active-nav{% endif %}">My Orders</a>
+                <a href="{% url 'customer_orders' %}" class="nav-link {% if url_name == 'customer_orders' %}active-nav{% endif %}">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/>
+                  </svg>
+                  My Orders
+                </a>
+                <a href="{% url 'favourites' %}" class="nav-link {% if url_name == 'favourites' %}active-nav{% endif %}">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+                  </svg>
+                  Favourites
+                </a>
+                <a href="{% url 'customer_support' %}" class="nav-link {% if url_name == 'customer_support' %}active-nav{% endif %}">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                  </svg>
+                  Support
+                </a>
                 {% endif %}
             </div>
 
@@ -145,10 +173,60 @@
                 {% endif %}
 
                 <!-- Cart -->
-                <div class="cart-badge">
-                    <a href="{% url 'cart' %}" class="cart-link" title="Cart">🛒</a>
+                <div class="cart-badge cart-nav-wrap">
+                    <a href="{% url 'cart' %}" class="cart-link" aria-label="View cart">🛒</a>
                     <span class="badge-count cart-badge-count"{% if not cart_count %} style="display:none"{% endif %}>{{ cart_count|default:0 }}</span>
+                    {% if cart_count %}
+                    <div class="cart-nav-tooltip">
+                      <span class="cnt-total">RM {{ cart_total }}</span>
+                      <span class="cnt-count">{{ cart_count }} item{{ cart_count|pluralize }}</span>
+                    </div>
+                    {% endif %}
                 </div>
+                <style>
+                  .cart-nav-wrap { position: relative; }
+                  .cart-nav-tooltip {
+                    position: absolute;
+                    top: calc(100% + 10px);
+                    right: 0;
+                    background: oklch(14% 0.045 52);
+                    border: 1px solid oklch(28% 0.04 52);
+                    border-radius: 10px;
+                    padding: 0.5rem 0.85rem;
+                    white-space: nowrap;
+                    pointer-events: none;
+                    opacity: 0;
+                    transform: translateY(-4px);
+                    transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+                    min-width: 130px;
+                    text-align: right;
+                    z-index: 2000;
+                  }
+                  .cart-nav-tooltip::before {
+                    content: '';
+                    position: absolute;
+                    bottom: 100%; right: 14px;
+                    border: 5px solid transparent;
+                    border-bottom-color: oklch(28% 0.04 52);
+                  }
+                  .cart-nav-wrap:hover .cart-nav-tooltip {
+                    opacity: 1;
+                    transform: translateY(0);
+                  }
+                  .cnt-total {
+                    display: block;
+                    font-size: 1rem;
+                    font-weight: 800;
+                    color: #ff9933;
+                    line-height: 1.2;
+                  }
+                  .cnt-count {
+                    display: block;
+                    font-size: 0.72rem;
+                    color: oklch(62% 0.02 54);
+                    margin-top: 0.15rem;
+                  }
+                </style>
 
                 <!-- Auth -->
                 {% if request.user.is_authenticated %}
@@ -348,5 +426,6 @@ function saveProfile() {
 </script>
 {% endif %}
 
+{% block extra_scripts %}{% endblock %}
 </body>
 </html>

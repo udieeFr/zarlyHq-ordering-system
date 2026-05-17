@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Complaint #{{ complaint.id }} — Zarly BigFood{% endblock %}
+
+{% block content %}
+<style>
+  .chat-thread { max-height: 420px; overflow-y: auto; padding: 0.5rem 0; }
+  .chat-bubble { max-width: 75%; border-radius: 1rem; padding: 0.55rem 0.85rem; font-size: 0.88rem; line-height: 1.5; }
+  .bubble-mine   { background: var(--brand-light); border: 1px solid var(--brand-border); margin-left: auto; }
+  .bubble-theirs { background: #f1f5f9; border: 1px solid #cbd5e1; }
+  .bubble-meta { font-size: 0.72rem; color: var(--muted); margin-bottom: 3px; }
+  .chat-input-row { display: flex; gap: 0.5rem; margin-top: 1rem; }
+  .chat-input-row input  { flex: 1; border-radius: var(--radius-sm); border: 1px solid var(--border); padding: 0.55rem 0.85rem; font-size: 0.9rem; outline: none; }
+  .chat-input-row input:focus { border-color: var(--brand); }
+  .chat-input-row button { border-radius: var(--radius-sm); background: var(--brand); border: none; color: #fff; font-weight: 700; padding: 0 1.1rem; cursor: pointer; }
+  .chat-input-row button:hover { background: var(--brand-dark); }
+</style>
+
+<div style="padding: 1.75rem 0 3rem;">
+    <div class="mb-3">
+        <a href="{% url 'customer_support' %}" style="color:var(--brand-dark); font-weight:600;">← Back to Support</a>
+    </div>
+
+    <h2 style="font-size:1.3rem; font-weight:800; margin-bottom:0.25rem;">Complaint #{{ complaint.id }}</h2>
+    <p style="color:var(--muted); font-size:0.875rem; margin-bottom:1.5rem;">Order #{{ order.id }} · {{ complaint.created_at|date:"N j, Y" }}</p>
+
+    <div style="display:grid; gap:1rem;">
+
+        <!-- Complaint summary -->
+        <div style="background:#fff; border:1px solid var(--border); border-radius:var(--radius); padding:1rem 1.1rem; box-shadow:var(--shadow-sm);">
+            <div style="font-weight:700; margin-bottom:0.3rem;">{{ complaint.subject }}</div>
+            <div style="color:var(--dark-3); font-size:0.88rem; margin-bottom:0.75rem;">{{ complaint.message }}</div>
+            {% if complaint.status == 'resolved' %}
+            <span style="background:var(--success-bg); color:#065f46; border:1px solid #a7f3d0; border-radius:999px; padding:0.2rem 0.65rem; font-size:0.75rem; font-weight:700;">✅ Resolved</span>
+            {% else %}
+            <span style="background:var(--warning-bg); color:#92400e; border:1px solid #fde68a; border-radius:999px; padding:0.2rem 0.65rem; font-size:0.75rem; font-weight:700;">⏳ Pending</span>
+            {% endif %}
+            {% if complaint.resolution_note %}
+            <div style="margin-top:0.75rem; padding:0.65rem 0.85rem; background:var(--brand-light); border:1px solid var(--brand-border); border-radius:var(--radius-sm);">
+                <span style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#c2410c; display:block; margin-bottom:0.25rem;">From Zarly team:</span>
+                <p style="font-size:0.875rem; margin:0;">{{ complaint.resolution_note }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Chat thread -->
+        <div style="background:#fff; border:1px solid var(--border); border-radius:var(--radius); padding:1rem 1.1rem; box-shadow:var(--shadow-sm);">
+            <div style="font-weight:700; font-size:0.95rem; margin-bottom:0.85rem; padding-bottom:0.65rem; border-bottom:1px solid var(--border);">💬 Support Chat</div>
+
+            {% if locked %}
+            <div style="font-size:0.8rem; color:var(--muted); margin-bottom:0.75rem;">🔒 This complaint is resolved. Chat is read-only.</div>
+            {% endif %}
+
+            <div class="chat-thread" id="chat-thread">
+                <p class="text-muted text-center" style="font-size:0.85rem; margin:1rem 0;" id="empty-msg">Loading…</p>
+            </div>
+
+            {% if not locked %}
+            <form class="chat-input-row" id="chat-form">
+                {% csrf_token %}
+                <input type="text" id="chat-input" placeholder="Type a message…" autocomplete="off">
+                <button type="submit">Send</button>
+            </form>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+
+<script>
+(function () {
+    const MESSAGES_URL = "{% url 'customer_complaint_messages' complaint.id %}";
+    const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+    const CSRF      = csrfInput ? csrfInput.value : '';
+    const thread   = document.getElementById('chat-thread');
+    const emptyMsg = document.getElementById('empty-msg');
+    const form     = document.getElementById('chat-form');
+    const input    = document.getElementById('chat-input');
+    const locked   = {{ locked|yesno:"true,false" }};
+    let lastSeen   = null;
+    let hasMessages = false;
+
+    function appendMessage(msg) {
+        if (!hasMessages && emptyMsg) emptyMsg.remove();
+        hasMessages = true;
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'display:flex; margin-bottom:0.5rem;' + (msg.is_mine ? 'justify-content:flex-end;' : '');
+        const cls = msg.is_mine ? 'chat-bubble bubble-mine' : 'chat-bubble bubble-theirs';
+        wrap.innerHTML = `<div class="${cls}">
+            <div class="bubble-meta">${msg.is_mine ? 'You' : 'Support team'}</div>
+            <div>${msg.body}</div>
+        </div>`;
+        thread.appendChild(wrap);
+        lastSeen = msg.created_at;
+        thread.scrollTop = thread.scrollHeight;
+    }
+
+    function poll() {
+        const url = lastSeen ? MESSAGES_URL + '?since=' + encodeURIComponent(lastSeen) : MESSAGES_URL;
+        fetch(url).then(r => r.json()).then(data => {
+            if (!hasMessages && data.messages.length === 0 && emptyMsg) {
+                emptyMsg.textContent = 'No messages yet. Start the conversation.';
+            }
+            data.messages.forEach(appendMessage);
+            if (data.locked && form) form.style.display = 'none';
+        });
+    }
+
+    if (form) {
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const body = input.value.trim();
+            if (!body) return;
+            input.value = '';
+            fetch(MESSAGES_URL, {
+                method: 'POST',
+                headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'body=' + encodeURIComponent(body),
+            }).then(r => r.json()).then(data => { if (data.ok) poll(); });
+        });
+    }
+
+    let pollTimer;
+    function startPolling() { pollTimer = setInterval(poll, 20000); }
+    function stopPolling()  { clearInterval(pollTimer); }
+    document.addEventListener('visibilitychange', () => document.hidden ? stopPolling() : startPolling());
+
+    if (!locked) startPolling();
+    poll();
+})();
+</script>
+{% endblock %}

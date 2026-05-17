@@ -9,7 +9,7 @@ class User(AbstractUser):
     )
     
     email = models.EmailField(unique=True)
-    role = models.CharField(max_length=50, choices=ROLE_CHOICES, default='customer', blank=True, null=True)
+    role = models.CharField(max_length=50, choices=ROLE_CHOICES, default='customer', blank=True, null=True, db_index=True)
     phone_number = models.CharField(max_length=20, blank=True, null=True)
 
     def __str__(self):
@@ -46,7 +46,7 @@ class Product(models.Model):
     weight_grams = models.IntegerField(default=0)
     stock = models.IntegerField(default=0)
     image = models.ImageField(upload_to='products/', null=True, blank=True)
-    is_available = models.BooleanField(default=True)
+    is_available = models.BooleanField(default=True, db_index=True)
     allergies = models.ManyToManyField(Allergy, blank=True)
 
     def __str__(self):
@@ -104,14 +104,19 @@ class CustomerProfile(models.Model):
     def recalculate(self):
         """Recompute totals from order history. Call after order approval/delivery."""
         from admins.models import Order
+        from django.db.models import Sum, Max, Count
         completed = Order.objects.filter(
             customer=self.user,
             status__in=['approved', 'delivered']
         )
-        self.total_orders = completed.count()
-        self.total_spent = sum((o.total_amount for o in completed), start=0)
-        latest = completed.order_by('-created_at').first()
-        self.last_order_at = latest.created_at if latest else None
+        agg = completed.aggregate(
+            total=Sum('total_amount'),
+            count=Count('id'),
+            latest=Max('created_at'),
+        )
+        self.total_orders = agg['count'] or 0
+        self.total_spent = agg['total'] or 0
+        self.last_order_at = agg['latest']
         if self.total_spent >= 5000:
             self.loyalty_tier = 'platinum'
         elif self.total_spent >= 2000:

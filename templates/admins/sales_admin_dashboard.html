@@ -4,89 +4,118 @@
 
 {% block content %}
 <style>
-  /* Metrics strip */
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&display=swap');
+
+  /* Page header — DM Serif like the landing hero */
+  .page-header h1 {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 1.9rem;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    color: oklch(16% 0.04 52);
+    margin-bottom: 0.2rem;
+  }
+
+  /* Metrics strip — dark hero panel from the landing page */
   .metric-strip {
-    background: oklch(99.5% 0.004 60);
-    border: 1px solid oklch(93% 0.006 60);
+    background: oklch(14% 0.045 52);
     border-radius: 1rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,.05);
     display: flex;
     overflow: hidden;
   }
   .metric-item {
-    flex: 1; padding: 1rem 1.25rem;
-    border-right: 1px solid oklch(93% 0.006 60);
+    flex: 1; padding: 1.1rem 1.4rem;
+    border-right: 1px solid oklch(28% 0.04 52);
     text-decoration: none; color: inherit;
   }
   .metric-item:last-child { border-right: none; }
   .metric-item.is-link { transition: background .15s; }
-  .metric-item.is-link:hover { background: oklch(97% 0.008 58); }
-  .metric-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #64748b; margin-bottom: 0.2rem; }
-  .metric-value { font-size: 1.6rem; font-weight: 900; color: #0f172a; line-height: 1.1; }
-  .metric-sub   { font-size: 0.68rem; color: #94a3b8; margin-top: 0.1rem; }
+  .metric-item.is-link:hover { background: oklch(20% 0.045 52); }
+  .metric-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .08em; color: oklch(58% 0.02 54); margin-bottom: 0.25rem;
+  }
+  .metric-value { font-size: 1.8rem; font-weight: 900; color: #ff9933; line-height: 1.1; }
+  .metric-sub   { font-size: 0.68rem; color: oklch(48% 0.02 54); margin-top: 0.1rem; }
 
-  /* Panels */
+  /* Panels — warm cream like the lp-sellers section */
   .dash-panel {
-    background: oklch(99.5% 0.004 60);
+    background: oklch(97% 0.016 62);
     border-radius: 1rem;
-    border: 1px solid oklch(93% 0.006 60);
-    box-shadow: 0 4px 24px rgba(15,23,42,.07), 0 1.5px 6px rgba(15,23,42,.04);
+    border: 1px solid oklch(91% 0.03 62);
+    box-shadow: 0 4px 24px oklch(70% 0.15 57 / 0.08);
     overflow: hidden;
     margin-bottom: 1.25rem;
   }
   .dash-panel-header {
     padding: 0.875rem 1.25rem;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid oklch(89% 0.03 62);
     display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;
   }
   .dash-panel-title {
-    font-size: 0.88rem; font-weight: 800; color: #0f172a;
+    font-size: 0.88rem; font-weight: 800; color: oklch(18% 0.04 52);
     letter-spacing: -.01em; margin: 0;
     display: flex; align-items: center; gap: 0.45rem;
   }
-  .dash-panel-title svg { color: #94a3b8; flex-shrink: 0; }
+  .dash-panel-title svg { color: oklch(58% 0.14 57); flex-shrink: 0; }
 
   /* Table */
   .dash-table { width: 100%; font-size: 0.82rem; border-collapse: collapse; }
   .dash-table th {
     font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .07em; color: #64748b;
-    padding: 0.55rem 1rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; white-space: nowrap;
+    letter-spacing: .07em; color: oklch(42% 0.06 52);
+    padding: 0.55rem 1rem; background: oklch(93% 0.022 62);
+    border-bottom: 1px solid oklch(88% 0.03 62); white-space: nowrap;
   }
-  .dash-table td { padding: 0.72rem 1rem; border-bottom: 1px solid #f1f5f9; color: #1e293b; vertical-align: middle; }
+  .dash-table td {
+    padding: 0.72rem 1rem; border-bottom: 1px solid oklch(91% 0.025 62);
+    color: oklch(22% 0.04 52); vertical-align: middle;
+    background: oklch(99.5% 0.006 60);
+  }
   .dash-table tr:last-child td { border-bottom: none; }
-  .dash-table tr:hover td { background: oklch(98.5% 0.004 60); }
-  .dash-table tr.is-highval td { background: oklch(98% 0.01 68); }
-  .dash-table tr.is-highval:hover td { background: oklch(96.5% 0.013 68); }
+  .dash-table tr:hover td { background: oklch(97% 0.022 62); }
+  .dash-table tr.is-highval td { background: oklch(97% 0.03 66); }
+  .dash-table tr.is-highval:hover td { background: oklch(94% 0.038 65); }
 
   /* Status pills */
   .spill {
-    display: inline-block; padding: .1rem .45rem; border-radius: 999px;
+    display: inline-block; padding: .15rem .5rem; border-radius: 999px;
     font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
   }
-  .spill-new  { background: #fef2f2; color: #991b1b; }
-  .spill-high { background: #fffbeb; color: #92400e; }
+  .spill-new  {
+    background: oklch(70% 0.18 55 / 0.15);
+    border: 1px solid oklch(70% 0.18 55 / 0.28);
+    color: #ff9933;
+  }
+  .spill-high {
+    background: oklch(14% 0.045 52);
+    color: oklch(78% 0.015 58);
+    border: 1px solid oklch(28% 0.04 52);
+  }
 
   /* Accepted orders */
   .acc-item {
     display: flex; justify-content: space-between; align-items: center;
     padding: .65rem .875rem; border-radius: 8px; margin-bottom: .15rem;
     transition: background .12s;
+    background: oklch(99.5% 0.006 60);
+    border: 1px solid oklch(91% 0.03 62);
+    margin-bottom: .5rem;
   }
-  .acc-item:hover { background: oklch(97% 0.006 60); }
+  .acc-item:hover { background: oklch(96% 0.022 62); }
 
-  /* Notifications */
+  /* Notifications — lp-badge style */
   .notif-bar {
-    background: oklch(98% 0.04 62);
-    border: 1px solid oklch(87% 0.09 62);
+    background: oklch(70% 0.18 55 / 0.1);
+    border: 1px solid oklch(70% 0.18 55 / 0.28);
     border-radius: .875rem;
     padding: .875rem 1.1rem;
     margin-bottom: 1.25rem;
     font-size: .82rem; color: oklch(32% 0.10 54);
   }
-  .notif-bar strong { display: block; font-weight: 800; margin-bottom: .35rem; }
+  .notif-bar strong { display: block; font-weight: 800; margin-bottom: .35rem; color: #ff9933; }
   .notif-bar li { list-style: none; padding: .18rem 0; }
-  .notif-bar li::before { content: '·'; margin-right: .4rem; font-weight: 900; }
+  .notif-bar li::before { content: '·'; margin-right: .4rem; font-weight: 900; color: #ff9933; }
 
   /* Payment proof hover */
   .proof-hover { display: inline-block; position: relative; }
@@ -94,15 +123,26 @@
     display: none;
     position: absolute; top: 110%; right: 0;
     width: 230px;
-    background: oklch(99.5% 0.004 60);
-    border: 1px solid oklch(93% 0.006 60);
+    background: oklch(99.5% 0.006 60);
+    border: 1px solid oklch(91% 0.03 62);
     border-radius: 12px; padding: .75rem;
-    box-shadow: 0 16px 40px rgba(15,23,42,.14);
+    box-shadow: 0 16px 40px oklch(70% 0.15 57 / 0.18);
     z-index: 50;
   }
   .proof-tooltip img { width: 100%; height: auto; border-radius: 8px; display: block; }
-  .proof-tooltip-note { margin-top: .4rem; font-size: .72rem; color: #64748b; text-align: center; }
+  .proof-tooltip-note { margin-top: .4rem; font-size: .72rem; color: oklch(58% 0.08 58); text-align: center; }
   .proof-hover:hover .proof-tooltip { display: block; }
+
+  /* Search input */
+  .dash-search-wrap .form-control {
+    background: oklch(99.5% 0.006 60);
+    border: 1px solid oklch(88% 0.03 62);
+    color: oklch(18% 0.04 52);
+  }
+  .dash-search-wrap .form-control:focus {
+    border-color: #ff9933;
+    box-shadow: 0 0 0 3px rgba(255,153,51,.15);
+  }
 </style>
 
 <div class="page-header">
@@ -136,7 +176,7 @@
       <div class="metric-sub">this week</div>
     </div>
   </div>
-  <form method="get" style="display:flex;gap:.5rem;align-items:center;flex-shrink:0;">
+  <form method="get" class="dash-search-wrap" style="display:flex;gap:.5rem;align-items:center;flex-shrink:0;">
     <input type="text" name="q" value="{{ search_query }}" class="form-control form-control-sm" placeholder="Order #, customer, phone" style="width:210px;">
     <button type="submit" class="btn btn-sm btn-primary">Search</button>
     {% if search_query %}<a href="{% url 'sales_admin_dashboard' %}" class="btn btn-sm btn-outline-secondary">Clear</a>{% endif %}
@@ -163,7 +203,7 @@
             Pending Requests
           </span>
           <div style="display:flex;gap:.5rem;align-items:center;">
-            <label style="display:flex;align-items:center;gap:.35rem;font-size:.78rem;color:#64748b;cursor:pointer;margin:0;">
+            <label style="display:flex;align-items:center;gap:.35rem;font-size:.78rem;color:oklch(48% 0.06 54);cursor:pointer;margin:0;">
               <input class="form-check-input" type="checkbox" id="select-all-orders" style="margin:0;">
               Select all
             </label>
@@ -190,11 +230,11 @@
                   <input class="form-check-input order-checkbox" type="checkbox" name="order_ids" value="{{ order.id }}">
                 </td>
                 <td>
-                  <span style="font-weight:700;color:#0f172a;">#{{ order.id }}</span><br>
-                  <span style="font-size:.75rem;color:#64748b;">{{ order.created_at|date:"d M H:i" }}</span>
+                  <span style="font-weight:700;color:oklch(16% 0.04 52);">#{{ order.id }}</span><br>
+                  <span style="font-size:.75rem;color:oklch(48% 0.06 54);">{{ order.created_at|date:"d M H:i" }}</span>
                 </td>
-                <td style="color:#334155;">{{ order.customer_label }}</td>
-                <td style="font-weight:700;color:#10b981;">RM {{ order.total_amount|floatformat:2 }}</td>
+                <td style="color:oklch(28% 0.04 52);">{{ order.customer_label }}</td>
+                <td style="font-weight:800;color:oklch(58% 0.2 54);">RM {{ order.total_amount|floatformat:2 }}</td>
                 <td>
                   {% if order.id in urgent_pending_ids %}<span class="spill spill-new">New</span> {% endif %}
                   {% if order.id in high_value_pending_ids %}<span class="spill spill-high">High value</span>{% endif %}
@@ -204,7 +244,7 @@
                 </td>
               </tr>
               {% empty %}
-              <tr><td colspan="6" style="text-align:center;color:#64748b;padding:2.5rem 1rem;">No pending orders.</td></tr>
+              <tr><td colspan="6" style="text-align:center;color:oklch(48% 0.06 54);padding:2.5rem 1rem;">No pending orders.</td></tr>
               {% endfor %}
             </tbody>
           </table>
@@ -227,7 +267,7 @@
             Awaiting Payment Verification
           </span>
           <div style="display:flex;gap:.5rem;align-items:center;">
-            <label style="display:flex;align-items:center;gap:.35rem;font-size:.78rem;color:#64748b;cursor:pointer;margin:0;">
+            <label style="display:flex;align-items:center;gap:.35rem;font-size:.78rem;color:oklch(48% 0.06 54);cursor:pointer;margin:0;">
               <input class="form-check-input" type="checkbox" id="select-all-payment-orders" style="margin:0;">
               Select all
             </label>
@@ -253,8 +293,8 @@
                   <input class="form-check-input payment-checkbox" type="checkbox" name="order_ids" value="{{ order.id }}">
                 </td>
                 <td>
-                  <span style="font-weight:700;color:#0f172a;">#{{ order.id }}</span><br>
-                  <span style="font-size:.75rem;color:#64748b;">{{ order.created_at|date:"d M H:i" }}</span>
+                  <span style="font-weight:700;color:oklch(16% 0.04 52);">#{{ order.id }}</span><br>
+                  <span style="font-size:.75rem;color:oklch(48% 0.06 54);">{{ order.created_at|date:"d M H:i" }}</span>
                 </td>
                 <td><span class="badge {{ order.payment_review_badge_class }}">{{ order.payment_review_badge }}</span></td>
                 <td style="font-size:.8rem;color:#475569;">{{ order.payment_review_status }}</td>
@@ -271,7 +311,7 @@
                 </td>
               </tr>
               {% empty %}
-              <tr><td colspan="5" style="text-align:center;color:#64748b;padding:2.5rem 1rem;">No orders awaiting payment.</td></tr>
+              <tr><td colspan="5" style="text-align:center;color:oklch(48% 0.06 54);padding:2.5rem 1rem;">No orders awaiting payment.</td></tr>
               {% endfor %}
             </tbody>
           </table>
@@ -299,8 +339,8 @@
         {% for order in accepted_orders %}
         <div class="acc-item">
           <div>
-            <span style="font-weight:700;font-size:.82rem;color:#0f172a;">Order #{{ order.id }}</span><br>
-            <span style="font-size:.75rem;color:#64748b;">RM {{ order.total_amount|floatformat:2 }} · {{ order.customer_label }}</span>
+            <span style="font-weight:700;font-size:.82rem;color:oklch(16% 0.04 52);">Order #{{ order.id }}</span><br>
+            <span style="font-size:.75rem;color:oklch(52% 0.08 58);"><span style="color:oklch(58% 0.2 54);font-weight:700;">RM {{ order.total_amount|floatformat:2 }}</span> · {{ order.customer_label }}</span>
           </div>
           <div style="display:flex;gap:.35rem;align-items:center;">
             <a href="{% url 'admin_order_detail' order.id %}" class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;padding:.22rem .6rem;">Details</a>
@@ -312,7 +352,7 @@
           </div>
         </div>
         {% empty %}
-        <p style="text-align:center;color:#64748b;font-size:.82rem;padding:2rem .875rem 1.5rem;">No recently accepted orders.</p>
+        <p style="text-align:center;color:oklch(48% 0.06 54);font-size:.82rem;padding:2rem .875rem 1.5rem;">No recently accepted orders.</p>
         {% endfor %}
       </div>
     </div>
@@ -332,7 +372,7 @@
           <strong>Confirm:</strong> <span id="order-count">No orders</span> selected for rejection.
         </p>
         <div class="mb-3">
-          <label for="rejection-reason-id" class="form-label" style="font-size:.82rem;font-weight:600;color:#374151;">Rejection reason</label>
+          <label for="rejection-reason-id" class="form-label" style="font-size:.82rem;font-weight:600;color:oklch(28% 0.05 52);">Rejection reason</label>
           <select class="form-select form-select-sm" id="rejection-reason-id" name="rejection_reason_id">
             <option value="">Select a reason or type custom below</option>
             {% for reason in rejection_reasons %}
@@ -341,7 +381,7 @@
           </select>
         </div>
         <div>
-          <label for="custom-reason-input" class="form-label" style="font-size:.82rem;font-weight:600;color:#374151;">Custom reason <span style="font-weight:400;color:#64748b;">(optional)</span></label>
+          <label for="custom-reason-input" class="form-label" style="font-size:.82rem;font-weight:600;color:oklch(28% 0.05 52);">Custom reason <span style="font-weight:400;color:oklch(48% 0.06 54);">(optional)</span></label>
           <textarea class="form-control form-control-sm" id="custom-reason-input" rows="3" placeholder="Type a custom reason..."></textarea>
         </div>
       </div>
@@ -366,7 +406,7 @@
           <strong>Confirm:</strong> <span id="payment-order-count">No orders</span> selected for rejection.
         </p>
         <div class="mb-3">
-          <label for="rejection-reason-payment-id" class="form-label" style="font-size:.82rem;font-weight:600;color:#374151;">Rejection reason</label>
+          <label for="rejection-reason-payment-id" class="form-label" style="font-size:.82rem;font-weight:600;color:oklch(28% 0.05 52);">Rejection reason</label>
           <select class="form-select form-select-sm" id="rejection-reason-payment-id" name="rejection_reason_id">
             <option value="">Select a reason or type custom below</option>
             {% for reason in rejection_reasons %}
@@ -375,7 +415,7 @@
           </select>
         </div>
         <div>
-          <label for="custom-reason-payment-input" class="form-label" style="font-size:.82rem;font-weight:600;color:#374151;">Custom reason <span style="font-weight:400;color:#64748b;">(optional)</span></label>
+          <label for="custom-reason-payment-input" class="form-label" style="font-size:.82rem;font-weight:600;color:oklch(28% 0.05 52);">Custom reason <span style="font-weight:400;color:oklch(48% 0.06 54);">(optional)</span></label>
           <textarea class="form-control form-control-sm" id="custom-reason-payment-input" rows="3" placeholder="Type a custom reason..."></textarea>
         </div>
       </div>

@@ -82,11 +82,22 @@
                             <option value="dismissed">❌ Dismiss Complaint</option>
                         </select>
                     </div>
+                    <div class="mb-4">
+                        <label class="form-label small fw-bold">Message to Customer <span class="text-muted fw-normal">(optional)</span></label>
+                        <textarea name="resolution_note" class="form-control" rows="3"
+                                  placeholder="Briefly explain the outcome — the customer will see this on their support page."></textarea>
+                    </div>
                     <button type="submit" class="btn btn-success w-100 py-3 fw-bold">✓ Confirm Resolution</button>
                 {% else %}
                     <div class="alert alert-success mb-0">
                         <strong>Resolution Outcome:</strong><br>
                         {{ complaint.get_action_taken_display }}<br>
+                        {% if complaint.resolution_note %}
+                        <div class="mt-2 pt-2 border-top" style="border-color: rgba(0,0,0,0.1) !important;">
+                            <small class="text-muted d-block mb-1">Message sent to customer:</small>
+                            <em style="font-size: 0.85rem;">{{ complaint.resolution_note }}</em>
+                        </div>
+                        {% endif %}
                         <small class="text-muted mt-2 d-block">Closed on {{ complaint.created_at|date:"d M Y" }}</small>
                     </div>
                 {% endif %}
@@ -94,4 +105,104 @@
         </div>
     </div>
 </div>
+
+<!-- ── Support Chat Panel ──────────────────────────────── -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="content-card">
+            <h5 class="fw-bold border-bottom pb-3 mb-3">💬 Support Chat</h5>
+
+            {% if complaint.status == 'resolved' %}
+            <div class="alert alert-secondary small mb-3">🔒 This complaint is resolved. Chat is read-only.</div>
+            {% endif %}
+
+            <div id="chat-thread" style="max-height:380px; overflow-y:auto; padding-right:4px; margin-bottom:1rem;">
+                {% for msg in initial_messages %}
+                <div class="d-flex {% if msg.is_mine %}justify-content-end{% endif %} mb-2">
+                    <div class="p-2 px-3 rounded-3 small"
+                         style="max-width:75%; {% if msg.is_mine %}background:#fff7ed; border:1px solid #fb923c;{% else %}background:#f1f5f9; border:1px solid #cbd5e1;{% endif %}">
+                        <div class="fw-semibold" style="font-size:0.72rem; color:#64748b; margin-bottom:2px;">
+                            {{ msg.sender }}{% if msg.is_mine %} (you){% endif %} · {{ msg.created_at }}
+                        </div>
+                        <div>{{ msg.body }}</div>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-muted small text-center" id="empty-msg">No messages yet. Start the conversation.</p>
+                {% endfor %}
+            </div>
+
+            {% if complaint.status != 'resolved' %}
+            <form id="chat-form" class="d-flex gap-2">
+                {% csrf_token %}
+                <input type="text" id="chat-input" class="form-control form-control-sm"
+                       placeholder="Type a message…" autocomplete="off">
+                <button type="submit" class="btn btn-sm btn-warning fw-bold px-3">Send</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const MESSAGES_URL = "{% url 'admin_complaint_messages' complaint.id %}";
+    const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+    const CSRF      = csrfInput ? csrfInput.value : '';
+    const thread = document.getElementById('chat-thread');
+    const form   = document.getElementById('chat-form');
+    const input  = document.getElementById('chat-input');
+    let lastSeen = null;
+
+    function appendMessage(msg) {
+        const emptyMsg = document.getElementById('empty-msg');
+        if (emptyMsg) emptyMsg.remove();
+        const wrap = document.createElement('div');
+        wrap.className = 'd-flex ' + (msg.is_mine ? 'justify-content-end' : '') + ' mb-2';
+        const style = msg.is_mine
+            ? 'background:#fff7ed;border:1px solid #fb923c;'
+            : 'background:#f1f5f9;border:1px solid #cbd5e1;';
+        wrap.innerHTML = `<div class="p-2 px-3 rounded-3 small" style="max-width:75%;${style}">
+            <div class="fw-semibold" style="font-size:0.72rem;color:#64748b;margin-bottom:2px;">
+                ${msg.sender}${msg.is_mine ? ' (you)' : ''}
+            </div>
+            <div>${msg.body}</div>
+        </div>`;
+        thread.appendChild(wrap);
+        lastSeen = msg.created_at;
+        thread.scrollTop = thread.scrollHeight;
+    }
+
+    function poll() {
+        const url = lastSeen ? MESSAGES_URL + '?since=' + encodeURIComponent(lastSeen) : MESSAGES_URL;
+        fetch(url).then(r => r.json()).then(data => {
+            data.messages.forEach(appendMessage);
+            if (data.locked && form) form.style.display = 'none';
+        });
+    }
+
+    if (form) {
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const body = input.value.trim();
+            if (!body) return;
+            input.value = '';
+            fetch(MESSAGES_URL, {
+                method: 'POST',
+                headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'body=' + encodeURIComponent(body),
+            }).then(r => r.json()).then(data => { if (data.ok) poll(); });
+        });
+    }
+
+    let pollTimer;
+    function startPolling() { pollTimer = setInterval(poll, 20000); }
+    function stopPolling()  { clearInterval(pollTimer); }
+    document.addEventListener('visibilitychange', () => document.hidden ? stopPolling() : startPolling());
+
+    thread.scrollTop = thread.scrollHeight;
+    startPolling();
+})();
+</script>
+
 {% endblock %}

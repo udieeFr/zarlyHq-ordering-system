@@ -1,81 +1,257 @@
 {% extends 'base.html' %}
+{% load static %}
+
+{% block page_title %}My Cart — Zarly BigFood{% endblock %}
+
 {% block content %}
-<main class="container">
-  <div class="cart-header">
-    <h1>🛒 My Cart</h1>
-  </div>
+<style>
+  /* ── Cart page ─────────────────────────────────────────── */
+  .cp-header {
+    background: oklch(96% 0.028 66);
+    border-radius: 1.1rem;
+    border: 1px solid oklch(88% 0.05 64);
+    padding: 1.25rem 1.75rem;
+    margin-bottom: 1.5rem;
+  }
+  .cp-header h1 {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 1.9rem; font-weight: 400;
+    letter-spacing: -0.02em;
+    color: oklch(16% 0.04 52); margin-bottom: 0.2rem;
+  }
+  .cp-header p { font-size: 0.85rem; color: oklch(42% 0.06 52); margin: 0; }
 
-  {% if cart_items %}
-  <div class="checkout-layout">
-    <section class="main-content">
-      <div class="card mb-3">
-        <h2 class="mb-2">Your Order</h2>
-        <div class="cart-list">
-          {% for item in cart_items %}
-          <div class="cart-item">
-            <div class="cart-item-info">
-              <div class="cart-item-title">{{ item.product.name }}</div>
-              <div class="cart-item-meta">RM {{ item.product.price }} each</div>
-            </div>
-            
-            <div class="cart-actions">
-              <form method="post" action="{% url 'update_cart' item.id %}" style="display:inline;">
-                {% csrf_token %}
-                <input type="hidden" name="quantity" value="{{ item.quantity|add:"-1" }}">
-                <button type="submit" class="qty-btn" {% if item.quantity <= 1 %}disabled{% endif %}>-</button>
-              </form>
-              
-              <span class="qty-display">{{ item.quantity }}</span>
-              
-              <form method="post" action="{% url 'update_cart' item.id %}" style="display:inline;">
-                {% csrf_token %}
-                <input type="hidden" name="quantity" value="{{ item.quantity|add:"1" }}">
-                <button type="submit" class="qty-btn">+</button>
-              </form>
-            </div>
-            
-            <div style="text-align: right; min-width: 80px;">
-              <div class="font-bold">RM {{ item.subtotal }}</div>
-              <form method="post" action="{% url 'remove_cart_item' item.id %}">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-sm btn-danger mt-2">🗑️ Remove</button>
-              </form>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-      
-      <div class="flex gap-2 flex-col md:flex-row">
-        <a href="{% url 'product_list' %}" class="btn btn-outline flex-1">← Continue Shopping</a>
-        <a href="{% url 'checkout' %}" class="btn btn-primary flex-1">Proceed to Checkout →</a>
-      </div>
-    </section>
+  /* Cart items panel */
+  .cp-panel {
+    background: oklch(98.5% 0.018 65);
+    border-radius: 1.1rem;
+    border: 1px solid oklch(88% 0.045 64);
+    box-shadow: 0 2px 8px oklch(58% 0.1 58 / 0.08);
+    overflow: hidden;
+    margin-bottom: 0.875rem;
+  }
+  .cp-panel-head {
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid oklch(88% 0.045 64);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .cp-panel-title {
+    font-size: 0.82rem; font-weight: 800;
+    color: oklch(18% 0.04 52); letter-spacing: -0.01em;
+  }
+  .cp-item-count {
+    font-size: 0.72rem; font-weight: 700;
+    color: oklch(55% 0.1 58);
+    background: oklch(91% 0.04 64);
+    padding: 0.18rem 0.6rem; border-radius: 999px;
+  }
+  .cp-item {
+    display: flex; align-items: center; gap: 1rem;
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid oklch(90% 0.03 64);
+  }
+  .cp-item:last-child { border-bottom: none; }
+  .cp-item-info { flex: 1; min-width: 0; }
+  .cp-item-name {
+    font-size: 0.88rem; font-weight: 700;
+    color: oklch(18% 0.04 52);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-bottom: 0.15rem;
+  }
+  .cp-item-unit { font-size: 0.74rem; color: oklch(48% 0.06 58); }
+  .cp-qty {
+    display: flex; align-items: center; gap: 0.375rem;
+    background: oklch(93% 0.025 64);
+    border-radius: 999px; padding: 0.2rem 0.3rem;
+  }
+  .cp-qty-btn {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: oklch(98.5% 0.018 65); border: 1px solid oklch(84% 0.045 64);
+    cursor: pointer; font-size: 0.95rem; font-weight: 700;
+    color: oklch(28% 0.06 52); display: flex; align-items: center; justify-content: center;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+    line-height: 1;
+  }
+  .cp-qty-btn:hover { background: #ff9933; border-color: #ff9933; color: oklch(13% 0.04 52); }
+  .cp-qty-btn:disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+  .cp-qty-val { width: 26px; text-align: center; font-weight: 700; font-size: 0.88rem; color: oklch(18% 0.04 52); }
+  .cp-item-right { text-align: right; flex-shrink: 0; }
+  .cp-item-price { font-size: 0.92rem; font-weight: 800; color: var(--brand); margin-bottom: 0.3rem; }
+  .cp-remove-btn {
+    background: none; border: none; cursor: pointer;
+    font-size: 0.72rem; color: oklch(52% 0.06 52);
+    padding: 0; text-decoration: underline; text-underline-offset: 2px;
+    transition: color 0.12s;
+  }
+  .cp-remove-btn:hover { color: #ef4444; }
+  .cp-continue-shop {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    font-size: 0.82rem; font-weight: 600;
+    color: oklch(42% 0.06 52); text-decoration: none;
+    transition: color 0.12s;
+  }
+  .cp-continue-shop:hover { color: oklch(18% 0.04 52); }
 
-    <aside>
-      <div class="cart-sidebar">
-        <h3 class="mb-2">Order Summary</h3>
-        {% for item in cart_items %}
-        <div class="summary-row">
-          <span>{{ item.product.name }} ({{ item.quantity }}x)</span>
-          <span>RM {{ item.subtotal }}</span>
-        </div>
-        {% endfor %}
-        <div class="summary-total">
-          <span>Subtotal</span>
-          <span>RM {{ total_price }}</span>
-        </div>
-        <p class="text-sm text-muted mt-2">Taxes calculated at checkout. Shipping not included.</p>
+  /* Summary sidebar */
+  .cp-summary {
+    background: oklch(14% 0.045 52);
+    border-radius: 1.1rem;
+    padding: 1.5rem;
+    position: sticky;
+    top: 90px;
+  }
+  .cp-summary-title {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 1.15rem; font-weight: 400;
+    color: oklch(92% 0.012 58); letter-spacing: -0.015em;
+    margin-bottom: 1rem;
+  }
+  .cp-sum-row {
+    display: flex; justify-content: space-between;
+    padding: 0.5rem 0;
+    font-size: 0.82rem;
+    color: oklch(58% 0.02 54);
+    border-bottom: 1px solid oklch(24% 0.04 52);
+  }
+  .cp-sum-row:last-of-type { border-bottom: none; }
+  .cp-sum-row span:last-child { color: oklch(85% 0.012 58); font-weight: 600; }
+  .cp-sum-total {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 1rem 0 1.25rem;
+    border-top: 1px solid oklch(28% 0.04 52);
+    margin-top: 0.5rem;
+  }
+  .cp-sum-total-label { font-size: 0.82rem; font-weight: 700; color: oklch(58% 0.02 54); }
+  .cp-sum-total-value { font-size: 1.25rem; font-weight: 800; color: #ff9933; }
+  .cp-sum-note {
+    font-size: 0.72rem; color: oklch(48% 0.02 54);
+    margin-bottom: 1.25rem; line-height: 1.5;
+  }
+  .cp-checkout-btn {
+    display: block; width: 100%;
+    background: #ff9933; color: oklch(13% 0.04 52);
+    font-weight: 700; font-size: 0.88rem;
+    padding: 0.7rem 1rem; border-radius: 8px;
+    text-align: center; text-decoration: none;
+    transition: background 0.15s, transform 0.12s;
+    border: none; cursor: pointer;
+  }
+  .cp-checkout-btn:hover { background: var(--brand-dark); color: oklch(13% 0.04 52); transform: translateY(-1px); }
+  .cp-continue-link {
+    display: block; text-align: center; margin-top: 0.75rem;
+    font-size: 0.78rem; font-weight: 600;
+    color: oklch(48% 0.02 54); text-decoration: none;
+    transition: color 0.12s;
+  }
+  .cp-continue-link:hover { color: oklch(72% 0.012 58); }
+
+  /* Empty state */
+  .cp-empty {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: oklch(96% 0.03 68);
+    border-radius: 1.1rem;
+    border: 2px dashed oklch(78% 0.08 62);
+  }
+  .cp-empty-icon { font-size: 2.8rem; opacity: 0.55; display: block; margin-bottom: 1rem; }
+  .cp-empty h2 {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 1.4rem; font-weight: 400;
+    color: oklch(18% 0.04 52); margin-bottom: 0.4rem;
+  }
+  .cp-empty p { font-size: 0.84rem; color: oklch(42% 0.06 52); margin-bottom: 1.5rem; }
+  .cp-browse-btn {
+    display: inline-block;
+    background: #ff9933; color: oklch(13% 0.04 52);
+    font-weight: 700; font-size: 0.85rem;
+    padding: 0.6rem 1.4rem; border-radius: 8px;
+    text-decoration: none; transition: background 0.15s;
+  }
+  .cp-browse-btn:hover { background: var(--brand-dark); color: oklch(13% 0.04 52); }
+</style>
+
+<div class="cp-header">
+  <h1>My Cart</h1>
+  <p>Review your items before checking out.</p>
+</div>
+
+{% if cart_items %}
+<div class="checkout-layout">
+
+  <!-- ── Cart items ──────────────────────────────────────── -->
+  <section>
+    <div class="cp-panel">
+      <div class="cp-panel-head">
+        <span class="cp-panel-title">Your Order</span>
+        <span class="cp-item-count">{{ cart_items|length }} item{{ cart_items|length|pluralize }}</span>
       </div>
-    </aside>
-  </div>
-  {% else %}
-  <div class="empty-state">
-    <span class="empty-state-icon">🛒</span>
-    <h2>Your cart is empty</h2>
-    <p class="mb-3">Browse our delicious menu and add items to your cart!</p>
-    <a href="{% url 'product_list' %}" class="btn btn-primary">Browse Menu</a>
-  </div>
-  {% endif %}
-</main>
+
+      {% for item in cart_items %}
+      <div class="cp-item">
+        <div class="cp-item-info">
+          <div class="cp-item-name">{{ item.product.name }}</div>
+          <div class="cp-item-unit">RM {{ item.product.price }} each</div>
+        </div>
+        <div class="cp-qty">
+          <form method="post" action="{% url 'update_cart' item.id %}" style="display:contents;">
+            {% csrf_token %}
+            <input type="hidden" name="quantity" value="{{ item.quantity|add:"-1" }}">
+            <button type="submit" class="cp-qty-btn" {% if item.quantity <= 1 %}disabled{% endif %}>−</button>
+          </form>
+          <span class="cp-qty-val">{{ item.quantity }}</span>
+          <form method="post" action="{% url 'update_cart' item.id %}" style="display:contents;">
+            {% csrf_token %}
+            <input type="hidden" name="quantity" value="{{ item.quantity|add:"1" }}">
+            <button type="submit" class="cp-qty-btn">+</button>
+          </form>
+        </div>
+        <div class="cp-item-right">
+          <div class="cp-item-price">RM {{ item.subtotal }}</div>
+          <form method="post" action="{% url 'remove_from_cart' item.id %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="cp-remove-btn">Remove</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <a href="{% url 'product_list' %}" class="cp-continue-shop">← Continue shopping</a>
+  </section>
+
+  <!-- ── Order summary ───────────────────────────────────── -->
+  <aside>
+    <div class="cp-summary">
+      <div class="cp-summary-title">Order Summary</div>
+
+      {% for item in cart_items %}
+      <div class="cp-sum-row">
+        <span>{{ item.product.name }} ({{ item.quantity }}×)</span>
+        <span>RM {{ item.subtotal }}</span>
+      </div>
+      {% endfor %}
+
+      <div class="cp-sum-total">
+        <span class="cp-sum-total-label">Subtotal</span>
+        <span class="cp-sum-total-value">RM {{ total_price }}</span>
+      </div>
+
+      <p class="cp-sum-note">Taxes and shipping calculated at checkout.</p>
+
+      <a href="{% url 'checkout' %}" class="cp-checkout-btn">Proceed to Checkout</a>
+      <a href="{% url 'product_list' %}" class="cp-continue-link">← Back to menu</a>
+    </div>
+  </aside>
+
+</div>
+
+{% else %}
+<div class="cp-empty">
+  <span class="cp-empty-icon">🛒</span>
+  <h2>Your cart is empty</h2>
+  <p>Browse our menu and add something delicious.</p>
+  <a href="{% url 'product_list' %}" class="cp-browse-btn">Browse Menu</a>
+</div>
+{% endif %}
+
 {% endblock %}

@@ -3,8 +3,24 @@
 <div class="col-6 col-md-4 col-lg-3">
   <div class="pcard">
     <div class="pcard-img-wrap">
-      <img src="{% if p.image %}{{ p.image.url }}{% else %}{% static 'images/products/promo1.jpg' %}{% endif %}"
-           alt="{{ p.name }}" loading="lazy">
+      {% if p.image %}
+        <img src="{{ p.image.url }}" alt="{{ p.name }}" loading="lazy">
+      {% else %}
+        <div class="pcard-img-ph">
+          <svg viewBox="0 0 48 48" width="44" height="44" fill="none"
+               stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+               xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <line x1="11" y1="8" x2="11" y2="40" stroke-width="2"/>
+            <line x1="8.5" y1="8" x2="8.5" y2="16" stroke-width="1.8"/>
+            <line x1="13.5" y1="8" x2="13.5" y2="16" stroke-width="1.8"/>
+            <path d="M8.5 16 Q11 20 13.5 16" stroke-width="1.8"/>
+            <circle cx="24" cy="26" r="13" stroke-width="2"/>
+            <circle cx="24" cy="26" r="8" stroke-width="1.5"/>
+            <line x1="37" y1="8" x2="37" y2="40" stroke-width="2"/>
+            <path d="M37 8 C41 10 41 18 37 20" stroke-width="1.8"/>
+          </svg>
+        </div>
+      {% endif %}
       {% if p.stock <= 0 %}
         <div class="pcard-soldout-overlay">
           <span class="pcard-soldout-label">SOLD OUT</span>

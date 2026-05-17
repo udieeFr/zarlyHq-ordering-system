@@ -103,6 +103,7 @@ def product_list(request):
     # 3. Sidebar and UI Data
     cart = request.session.get('cart', {})
     cart_count = sum(cart.values())
+    _, cart_total = get_cart_from_session(request)
 
     user_orders = []
     completed_orders = []
@@ -119,6 +120,7 @@ def product_list(request):
         'categories': Category.objects.all(),
         'allergies': Allergy.objects.all(),
         'cart_count': cart_count,
+        'cart_total': cart_total,
         'user_orders': user_orders,
         'completed_orders': completed_orders,
         'hide_soldout': hide_soldout,
@@ -180,7 +182,8 @@ def download_invoice(request, order_id):
         else:
             messages.error(request, "The invoice file could not be found.")
     except Exception as e:
-        messages.error(request, f"Error generating invoice: {str(e)}")
+        logger.error(f"Invoice generation error for order {order_id}: {e}")
+        messages.error(request, "Something went wrong generating the invoice. Please try again or contact support.")
 
     return redirect('product_list')
 
@@ -332,7 +335,7 @@ def add_to_cart(request):
             return redirect('product_list')
 
         product_id = request.POST.get('product_id')
-        quantity = int(request.POST.get('quantity', 1))
+        quantity = max(1, min(int(request.POST.get('quantity', 1)), 99))
 
         cart = request.session.get('cart', {})
 
@@ -376,7 +379,7 @@ def update_cart(request):
             return redirect('cart')
 
         product_id = request.POST.get('product_id')
-        quantity = int(request.POST.get('quantity', 0))
+        quantity = max(0, min(int(request.POST.get('quantity', 0)), 99))
 
         cart = request.session.get('cart', {})
 
@@ -429,6 +432,44 @@ def checkout(request):
         'last_order': last_order,
     })
 
+def _create_order_atomic(user, total_price, cart_items, **order_fields):
+    """
+    Creates the Order and OrderItems inside a single DB transaction.
+    Uses SELECT FOR UPDATE to lock product rows so concurrent requests
+    cannot both decrement the same stock value (prevents overselling).
+    Raises ValueError with a user-friendly message if any item is out of stock.
+    """
+    from django.db import transaction
+    with transaction.atomic():
+        order = Order.objects.create(
+            customer=user,
+            total_amount=total_price,
+            status='pending',
+            **order_fields,
+        )
+        product_ids = [item['product'].id for item in cart_items]
+        locked_products = {
+            p.id: p
+            for p in Product.objects.select_for_update().filter(id__in=product_ids)
+        }
+        for item in cart_items:
+            product = locked_products[item['product'].id]
+            if product.stock < item['quantity']:
+                raise ValueError(
+                    f"Sorry, '{product.name}' only has {product.stock} unit(s) left. "
+                    "Please update your cart and try again."
+                )
+            OrderItem.objects.create(
+                order=order,
+                product=product,
+                quantity=item['quantity'],
+                subtotal=item['subtotal'],
+            )
+            product.stock -= item['quantity']
+            product.save(update_fields=['stock'])
+        return order
+
+
 @login_required
 @ratelimit(key='user', rate='10/m', method='POST', block=False)
 def submit_order(request):
@@ -460,40 +501,38 @@ def submit_order(request):
         except Exception:
             longitude = None
 
-        street_address = request.POST.get('street_address', '').strip()
-        city = request.POST.get('city', '').strip()
-        state = request.POST.get('state', '').strip()
-        postcode = request.POST.get('postcode', '').strip()
-        formatted_address = request.POST.get('formatted_address', '').strip() or ', '.join(
-            part for part in [street_address, city, state, postcode] if part
-        )
+        # Bounds-check geographic coordinates (M7)
+        if latitude is not None and not (-90 <= latitude <= 90):
+            latitude = None
+        if longitude is not None and not (-180 <= longitude <= 180):
+            longitude = None
 
-        order = Order.objects.create(
-            customer=request.user,
-            total_amount=total_price,
-            status='pending',
-            full_name=request.POST.get('full_name'),
-            phone_number=request.POST.get('phone_number'),
-            street_address=street_address,
-            city=city,
-            state=state,
-            postcode=postcode,
-            latitude=latitude,
-            longitude=longitude,
-            formatted_address=formatted_address,
-            order_notes=request.POST.get('order_notes')
-        )
-        
-        # Create order items and update stock
-        for item in cart_items:
-            OrderItem.objects.create(
-                order=order,
-                product=item['product'],
-                quantity=item['quantity'],
-                subtotal=item['subtotal']
+        # Server-side length limits on free-text fields (M6)
+        street_address = request.POST.get('street_address', '').strip()[:255]
+        city = request.POST.get('city', '').strip()[:100]
+        state = request.POST.get('state', '').strip()[:100]
+        postcode = request.POST.get('postcode', '').strip()[:20]
+        formatted_address = (request.POST.get('formatted_address', '').strip() or ', '.join(
+            part for part in [street_address, city, state, postcode] if part
+        ))[:500]
+
+        try:
+            order = _create_order_atomic(
+                request.user, total_price, cart_items,
+                full_name=request.POST.get('full_name', '').strip()[:150],
+                phone_number=request.POST.get('phone_number', '').strip()[:20],
+                street_address=street_address,
+                city=city,
+                state=state,
+                postcode=postcode,
+                latitude=latitude,
+                longitude=longitude,
+                formatted_address=formatted_address,
+                order_notes=request.POST.get('order_notes', '').strip()[:500],
             )
-            item['product'].stock -= item['quantity']
-            item['product'].save()
+        except ValueError as e:
+            messages.error(request, str(e))
+            return redirect('checkout')
         
         from admins.models import OrderEvent
         OrderEvent.objects.create(order=order, status='pending', actor=request.user)
@@ -640,11 +679,11 @@ def order_success(request, order_id):
     
     return render(request, 'customers/order_success.html', context)
 
+@login_required
 def logout_view(request):
     """Log user out"""
-    if request.user.is_authenticated:
-        log_audit(request, 'logout', target=request.user,
-                  description=f"Logout: {request.user.username}", actor=request.user)
+    log_audit(request, 'logout', target=request.user,
+              description=f"Logout: {request.user.username}", actor=request.user)
     logout(request)
     messages.success(request, "You have been logged out.")
     return redirect('product_list')
@@ -1123,17 +1162,20 @@ def notifications_list(request):
 
 
 @login_required
+@ratelimit(key='user', rate='60/m', block=False)
 def notification_open(request, notification_id):
     """Mark a single notification as read and redirect to its link."""
     from admins.models import Notification
+    from django.utils.http import url_has_allowed_host_and_scheme
     notif = get_object_or_404(Notification, id=notification_id, recipient=request.user)
     notif.mark_read()
-    if notif.link:
+    if notif.link and url_has_allowed_host_and_scheme(notif.link, allowed_hosts={request.get_host()}):
         return redirect(notif.link)
     return redirect('notifications_list')
 
 
 @login_required
+@ratelimit(key='user', rate='10/m', block=False)
 def notifications_mark_all_read(request):
     """Mark all notifications for the current user as read."""
     from admins.models import Notification
@@ -1168,7 +1210,7 @@ def cancel_order(request, order_id):
         messages.error(request, f"Order #{order.id} can no longer be cancelled — it is already {order.get_status_display()}.")
         return redirect('order_success', order_id=order.id)
 
-    reason = request.POST.get('cancel_reason', '').strip() or 'No reason provided'
+    reason = (request.POST.get('cancel_reason', '').strip() or 'No reason provided')[:500]
 
     # Restore stock for each item
     for item in order.items.select_related('product').all():
@@ -1203,7 +1245,6 @@ def cancel_order(request, order_id):
     return redirect('customer_orders')
 
 
-@login_required
 @login_required
 def update_profile(request):
     if request.method != 'POST':
@@ -1273,6 +1314,7 @@ def reorder(request, order_id):
 
 
 @login_required
+@ratelimit(key='user', rate='10/h', method='POST', block=True)
 def customer_profile(request):
     from customers.models import CustomerProfile, User as UserModel
     from django.contrib.auth import update_session_auth_hash
@@ -1347,3 +1389,81 @@ def customer_profile(request):
         'amount_to_next': amount_to_next,
         'show_pw_form': show_pw_form,
     })
+
+
+def home(request):
+    from django.db.models import Sum
+    top_products = list(
+        Product.objects
+        .filter(is_available=True)
+        .annotate(total_sold=Sum('orderitem__quantity'))
+        .order_by('-total_sold')[:4]
+    )
+    if len(top_products) < 4:
+        seen = {p.id for p in top_products}
+        fill = list(
+            Product.objects.filter(is_available=True).exclude(id__in=seen)[:4 - len(top_products)]
+        )
+        top_products += fill
+    return render(request, 'customers/home.html', {'top_products': top_products})
+
+
+@login_required
+def customer_complaint_detail(request, complaint_id):
+    """Customer view of their own complaint with chat thread."""
+    from admins.models import Complaint
+    complaint = get_object_or_404(Complaint, id=complaint_id, customer=request.user)
+    return render(request, 'customers/complaint_detail.html', {
+        'complaint': complaint,
+        'order': complaint.order,
+        'locked': complaint.status == 'resolved',
+    })
+
+
+@login_required
+def customer_complaint_messages(request, complaint_id):
+    """Poll for or send support chat messages (customer side)."""
+    from admins.models import Complaint, SupportMessage
+    from admins.chat_crypto import encrypt_message, decrypt_message
+    from django.utils.dateparse import parse_datetime
+
+    complaint = get_object_or_404(Complaint, id=complaint_id, customer=request.user)
+
+    if request.method == 'GET':
+        since_raw = request.GET.get('since')
+        qs = SupportMessage.objects.filter(complaint=complaint).select_related('sender')
+        if since_raw:
+            since_dt = parse_datetime(since_raw)
+            if since_dt:
+                qs = qs.filter(created_at__gt=since_dt)
+        msgs = []
+        for msg in qs:
+            try:
+                body = decrypt_message(msg.body)
+            except Exception:
+                body = '[encrypted]'
+            msgs.append({
+                'id': msg.id,
+                'sender': msg.sender.username if msg.sender else 'deleted',
+                'body': body,
+                'created_at': msg.created_at.isoformat(),
+                'is_mine': msg.sender_id == request.user.id,
+            })
+        return JsonResponse({'messages': msgs, 'locked': complaint.status == 'resolved'})
+
+    if request.method == 'POST':
+        if complaint.status == 'resolved':
+            return JsonResponse({'error': 'Chat is locked'}, status=403)
+        body = request.POST.get('body', '').strip()
+        if not body:
+            return JsonResponse({'error': 'Message cannot be empty'}, status=400)
+        SupportMessage.objects.create(
+            complaint=complaint,
+            sender=request.user,
+            body=encrypt_message(body),
+        )
+        log_audit(request, 'support_message_sent', target=complaint,
+                  description=f'Customer sent support message on Complaint #{complaint.id}')
+        return JsonResponse({'ok': True})
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)

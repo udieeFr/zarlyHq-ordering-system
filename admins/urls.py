@@ -22,6 +22,7 @@ urlpatterns = [
     path('order/<int:order_id>/out-for-delivery/', views.mark_order_out_for_delivery, name='mark_order_out_for_delivery'),
     path('order/<int:order_id>/delivered/', views.mark_order_delivered, name='mark_order_delivered'),
     path('order/<int:order_id>/tracking/', views.update_order_tracking, name='update_order_tracking'),
+    path('order/<int:order_id>/internal-note/', views.save_internal_note, name='save_internal_note'),
     path('order/<int:order_id>/print-summary/', views.print_order_summary, name='print_order_summary'),
     path('prep-list/', views.print_prep_list, name='print_prep_list'),
     path('mark-prepared/', views.mark_orders_prepared, name='mark_orders_prepared'),
@@ -40,9 +41,11 @@ urlpatterns = [
     path('orders/create/', views.admin_create_order, name='admin_create_order'),
     
     # Complaints Management
+    path('support-chats/', views.admin_support_chats, name='admin_support_chats'),
     path('complaints/', views.admin_complaints_list, name='admin_complaints_list'),
     path('complaints/<int:complaint_id>/', views.admin_complaint_detail, name='admin_complaint_detail'),
     path('complaints/<int:complaint_id>/resolve/', views.resolve_complaint, name='resolve_complaint'),
+    path('complaints/<int:complaint_id>/messages/', views.admin_complaint_messages, name='admin_complaint_messages'),
 
     # Step-up authentication
     path('sudo/', views.sudo_confirm, name='sudo_confirm'),

@@ -12,8 +12,9 @@
 
   /* Section card */
   .co-card {
-    background: #fff; border-radius: 16px;
-    box-shadow: 0 4px 24px rgba(15,23,42,.08); padding: 1.75rem; margin-bottom: 1.25rem;
+    background: oklch(99.5% 0.006 60); border-radius: 16px;
+    box-shadow: 6px 6px 0 0 #170400, 0 1px 6px oklch(9% 0.04 32 / 0.05);
+    padding: 1.75rem; margin-bottom: 1.25rem;
   }
   .co-section-title {
     font-size: 1rem; font-weight: 800; color: var(--navy);
@@ -47,7 +48,7 @@
   .co-input {
     width: 100%; padding: .6rem .85rem; border: 1.5px solid #e5e7eb; border-radius: 10px;
     font-size: .88rem; color: var(--navy); outline: none; transition: border .15s;
-    background: #fff;
+    background: oklch(99.5% 0.006 60);
   }
   .co-input:focus { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(255,153,51,.12); }
   .co-row { display: grid; gap: .75rem; margin-bottom: .75rem; }
@@ -55,8 +56,8 @@
   .co-row-3 { grid-template-columns: 1fr 1fr 1fr; }
   @media(max-width:600px){ .co-row-2, .co-row-3 { grid-template-columns: 1fr; } }
 
-  /* Map */
-  #map { height: 340px; width: 100%; border-radius: 12px; border: 1.5px solid #e5e7eb; }
+  /* Map — z-index: 0 creates a stacking context that keeps Leaflet's layers below the navbar */
+  #map { height: 340px; width: 100%; border-radius: 12px; border: 1.5px solid #e5e7eb; position: relative; z-index: 0; }
   .map-actions { display: flex; gap: .6rem; margin-bottom: .75rem; flex-wrap: wrap; }
   .btn-locate {
     background: var(--navy); color: #fff; border: none;
@@ -91,8 +92,9 @@
 
   /* Summary card */
   .summary-card {
-    background: #fff; border-radius: 16px;
-    box-shadow: 0 4px 24px rgba(15,23,42,.08); padding: 1.5rem;
+    background: oklch(99.5% 0.006 60); border-radius: 16px;
+    box-shadow: 6px 6px 0 0 #170400, 0 1px 6px oklch(9% 0.04 32 / 0.05);
+    padding: 1.5rem;
     position: sticky; top: 80px;
   }
   .summary-title { font-size: 1rem; font-weight: 800; color: var(--navy); margin-bottom: 1rem; }

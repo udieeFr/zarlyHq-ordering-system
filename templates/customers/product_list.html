@@ -2,6 +2,9 @@
 {% load static %}
 
 {% block content %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&display=swap');
+</style>
 <div class="menu-page">
 
   <!-- ── Hero + Inline Filters ──────────────────────────── -->
@@ -26,37 +29,90 @@
       </div>
       <button type="button" id="filterReset" class="filter-reset-btn">Reset</button>
       <button type="button" id="toggleUnavailable" class="filter-reset-btn"
-        style="background:{% if hide_soldout %}#fef3c7{% else %}#f1f5f9{% endif %};color:{% if hide_soldout %}#92400e{% else %}#475569{% endif %};border:1.5px solid #e2e8f0;">
+        style="background:{% if hide_soldout %}#fef3c7{% else %}oklch(97% 0.022 64){% endif %};color:{% if hide_soldout %}#92400e{% else %}oklch(38% 0.06 52){% endif %};border:1.5px solid {% if hide_soldout %}#fbbf24{% else %}oklch(82% 0.055 62){% endif %};">
         {% if hide_soldout %}Show sold out{% else %}Hide sold out{% endif %}
       </button>
     </div>
   </div>
 
-  <!-- ── Category Cards ─────────────────────────────────── -->
-  <div class="categories-section">
-    <div class="categories-scroll">
-      <a href="{% url 'product_list' %}" class="cat-card pill {% if not request.GET.category %}pill-active{% endif %}">
-        <div class="cat-icon-wrap" style="font-size:0.8rem;font-weight:800;letter-spacing:0.03em;" aria-hidden="true">ALL</div>
-        <span class="cat-name">All Menu</span>
-      </a>
-      {% for cat in categories %}
-        <a href="?category={{ cat.id }}" class="cat-card pill {% if request.GET.category == cat.id|stringformat:"s" %}pill-active{% endif %}">
-          <div class="cat-icon-wrap" style="font-size:0.8rem;font-weight:800;letter-spacing:0.03em;" aria-hidden="true">{{ cat.name|slice:":1"|upper }}</div>
-          <span class="cat-name">{{ cat.name }}</span>
-        </a>
-      {% endfor %}
-    </div>
-  </div>
+  <!-- ── Browse panel ──────────────────────────────────── -->
+  <div class="menu-browse-panel">
 
-  <!-- ── Product Grid (full width) ────────────────────── -->
-  <div class="row g-3" id="product-grid">
-    {% include 'customers/partials/product_grid.html' %}
+    <!-- ── Category Cards ───────────────────────────────── -->
+    <div class="categories-section">
+      <div class="categories-scroll">
+        <a href="{% url 'product_list' %}" class="cat-card pill {% if not request.GET.category %}pill-active{% endif %}">
+          <div class="cat-icon-wrap" style="font-size:0.8rem;font-weight:800;letter-spacing:0.03em;" aria-hidden="true">ALL</div>
+          <span class="cat-name">All Menu</span>
+        </a>
+        {% for cat in categories %}
+          <a href="?category={{ cat.id }}" class="cat-card pill {% if request.GET.category == cat.id|stringformat:"s" %}pill-active{% endif %}">
+            <div class="cat-icon-wrap" style="font-size:0.8rem;font-weight:800;letter-spacing:0.03em;" aria-hidden="true">{{ cat.name|slice:":1"|upper }}</div>
+            <span class="cat-name">{{ cat.name }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- ── Product Grid ──────────────────────────────────── -->
+    <div class="row g-3" id="product-grid">
+      {% include 'customers/partials/product_grid.html' %}
+    </div>
+
   </div>
 
 </div>
 
 <!-- ── Sticky cart FAB ─────────────────────────────────── -->
+<style>
+  .cart-fab-tooltip {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    right: 0;
+    background: oklch(14% 0.045 52);
+    border: 1px solid oklch(28% 0.04 52);
+    border-radius: 10px;
+    padding: 0.55rem 0.85rem;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+    min-width: 140px;
+    text-align: right;
+  }
+  .cart-fab-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%; right: 18px;
+    border: 5px solid transparent;
+    border-top-color: oklch(28% 0.04 52);
+  }
+  .cart-fab:hover .cart-fab-tooltip {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .cft-total {
+    display: block;
+    font-size: 1rem;
+    font-weight: 800;
+    color: #ff9933;
+    line-height: 1.2;
+  }
+  .cft-count {
+    display: block;
+    font-size: 0.72rem;
+    color: oklch(62% 0.02 54);
+    margin-top: 0.15rem;
+  }
+</style>
 <a href="{% url 'cart' %}" class="cart-fab" aria-label="View your cart">
+  {% if cart_count %}
+  <div class="cart-fab-tooltip">
+    <span class="cft-total">RM {{ cart_total }}</span>
+    <span class="cft-count">{{ cart_count }} item{{ cart_count|pluralize }}</span>
+  </div>
+  {% endif %}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
        stroke-linecap="round" stroke-linejoin="round" width="20" height="20" aria-hidden="true">
     <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>

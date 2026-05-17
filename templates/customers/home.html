@@ -1,0 +1,519 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block page_title %}Zarly BigFood — Fresh Food, Easy Ordering{% endblock %}
+
+{% block content %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&display=swap');
+
+  /* ── Hero ───────────────────────────────────────────────────────── */
+  .lp-hero {
+    background: oklch(14% 0.045 52);
+    border-radius: 1.25rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 400px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+
+  .lp-hero-left {
+    padding: 3rem 2.5rem 3rem 2.75rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .lp-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: oklch(70% 0.18 55 / 0.15);
+    border: 1px solid oklch(70% 0.18 55 / 0.28);
+    color: #ff9933;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.28rem 0.7rem;
+    border-radius: 999px;
+    margin-bottom: 1.25rem;
+    width: fit-content;
+  }
+  .lp-badge::before {
+    content: '';
+    display: block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #ff9933;
+  }
+
+  .lp-hero-title {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: clamp(1.9rem, 3.5vw, 2.8rem);
+    font-weight: 400;
+    color: oklch(97% 0.012 58);
+    line-height: 1.15;
+    margin-bottom: 1rem;
+    letter-spacing: -0.015em;
+  }
+  .lp-hero-title em {
+    font-style: italic;
+    color: #ff9933;
+  }
+
+  .lp-hero-sub {
+    font-size: 0.88rem;
+    color: oklch(68% 0.02 54);
+    line-height: 1.65;
+    max-width: 36ch;
+    margin-bottom: 1.75rem;
+  }
+
+  .lp-hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .lp-btn-primary {
+    background: #ff9933;
+    color: oklch(13% 0.04 52);
+    font-weight: 700;
+    font-size: 0.84rem;
+    padding: 0.58rem 1.35rem;
+    border-radius: 8px;
+    text-decoration: none;
+    letter-spacing: 0.01em;
+    transition: background 0.15s, transform 0.1s;
+    display: inline-block;
+  }
+  .lp-btn-primary:hover {
+    background: oklch(70% 0.2 54);
+    color: oklch(13% 0.04 52);
+    transform: translateY(-1px);
+  }
+
+  .lp-btn-ghost {
+    color: oklch(72% 0.015 54);
+    font-size: 0.84rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .lp-btn-ghost:hover { color: oklch(95% 0.012 58); }
+
+  /* Hero image side */
+  .lp-hero-right {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .lp-hero-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /*
+    HERO IMAGE PLACEHOLDER
+    ─────────────────────────────────────────────────────────────────
+    Replace the entire <div class="lp-hero-placeholder"> block below with:
+
+      <img src="{% static 'images/your-hero-food.jpg' %}"
+           alt="Our signature dish"
+           class="lp-hero-img">
+
+    Recommended: overhead or 3/4-angle food shot, 800×600 px minimum,
+    warm lighting, JPG or WebP. Place the file in static/images/.
+    ─────────────────────────────────────────────────────────────────
+  */
+  .lp-hero-placeholder {
+    width: 100%;
+    height: 100%;
+    min-height: 320px;
+    background: oklch(19% 0.04 52);
+    border-left: 1px dashed oklch(32% 0.04 52);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+  }
+  .lp-hero-placeholder svg { opacity: 0.28; }
+  .lp-hero-placeholder span {
+    font-size: 0.72rem;
+    color: oklch(52% 0.02 54);
+    text-align: center;
+    max-width: 18ch;
+    line-height: 1.5;
+  }
+
+  /* ── Feature strip ──────────────────────────────────────────────── */
+  .lp-features {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    background: oklch(75% 0.195 57);
+    border-radius: 1rem;
+    overflow: hidden;
+    margin-bottom: 2rem;
+  }
+
+  .lp-feat {
+    padding: 1.35rem 1.25rem;
+    border-right: 1px solid oklch(65% 0.22 57 / 0.3);
+  }
+  .lp-feat:last-child { border-right: none; }
+
+  .lp-feat-icon {
+    width: 34px;
+    height: 34px;
+    background: oklch(99% 0.008 60);
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: oklch(52% 0.17 55);
+    margin-bottom: 0.7rem;
+  }
+
+  .lp-feat-title {
+    font-size: 0.8rem;
+    font-weight: 800;
+    color: oklch(13% 0.04 52);
+    margin-bottom: 0.22rem;
+  }
+  .lp-feat-desc {
+    font-size: 0.72rem;
+    color: oklch(22% 0.05 52 / 0.72);
+    line-height: 1.5;
+  }
+
+  /* ── Best sellers ───────────────────────────────────────────────── */
+  .lp-sellers {
+    background: oklch(97% 0.016 62);
+    border-radius: 1.1rem;
+    border: 1px solid oklch(91% 0.03 62);
+    padding: 1.5rem 1.5rem 1.75rem;
+    margin-bottom: 2rem;
+  }
+
+  .lp-section-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+  .lp-section-title {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 1.45rem;
+    font-weight: 400;
+    color: oklch(18% 0.04 52);
+    letter-spacing: -0.015em;
+  }
+  .lp-section-link {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: oklch(58% 0.2 54);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .lp-section-link:hover { color: oklch(48% 0.2 54); }
+
+  .lp-products {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.875rem;
+  }
+
+  .lp-card {
+    background: oklch(99.5% 0.006 60);
+    border-radius: 0.875rem;
+    border: 1px solid oklch(90% 0.02 62);
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    transition: box-shadow 0.15s, transform 0.12s;
+  }
+  .lp-card:hover {
+    box-shadow: 0 8px 28px oklch(70% 0.15 57 / 0.18);
+    transform: translateY(-2px);
+    color: inherit;
+  }
+
+  .lp-card-img {
+    aspect-ratio: 4/3;
+    background: oklch(93% 0.025 62);
+    overflow: hidden;
+    position: relative;
+  }
+  .lp-card-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /*
+    PRODUCT IMAGE PLACEHOLDERS
+    ─────────────────────────────────────────────────────────────────
+    Each product below shows this placeholder if no image is uploaded.
+    To add product images:
+      1. Go to /admin/customers/product/
+      2. Open a product and upload an image via the "Image" field.
+    ─────────────────────────────────────────────────────────────────
+  */
+  .lp-card-img-ph {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.4rem;
+    color: oklch(68% 0.12 58);
+  }
+
+  .lp-card-body { padding: 0.875rem; }
+  .lp-card-cat {
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: oklch(62% 0.08 58);
+    margin-bottom: 0.18rem;
+  }
+  .lp-card-name {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: oklch(18% 0.04 52);
+    margin-bottom: 0.3rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .lp-card-price {
+    font-size: 0.9rem;
+    font-weight: 800;
+    color: oklch(58% 0.2 54);
+  }
+
+  /* ── Sign-in CTA ────────────────────────────────────────────────── */
+  .lp-cta {
+    background: oklch(14% 0.045 52);
+    border-radius: 1.25rem;
+    padding: 2.5rem 2.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+  }
+  .lp-cta-title {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 1.4rem;
+    font-weight: 400;
+    color: oklch(97% 0.012 58);
+    margin-bottom: 0.35rem;
+    letter-spacing: -0.015em;
+  }
+  .lp-cta-sub {
+    font-size: 0.82rem;
+    color: oklch(68% 0.02 54);
+    max-width: 52ch;
+    line-height: 1.6;
+  }
+  .lp-cta-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  .lp-btn-cta {
+    background: #ff9933;
+    color: oklch(13% 0.04 52);
+    font-weight: 700;
+    font-size: 0.84rem;
+    padding: 0.55rem 1.25rem;
+    border-radius: 8px;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.15s;
+    display: inline-block;
+  }
+  .lp-btn-cta:hover { background: oklch(70% 0.2 54); color: oklch(13% 0.04 52); }
+
+  /* ── Responsive ─────────────────────────────────────────────────── */
+  @media (max-width: 768px) {
+    .lp-hero {
+      grid-template-columns: 1fr;
+      min-height: unset;
+    }
+    .lp-hero-right { display: none; }
+    .lp-hero-left { padding: 2rem 1.5rem 2.25rem; }
+    .lp-features {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .lp-feat:nth-child(2) { border-right: none; }
+    .lp-feat:nth-child(3),
+    .lp-feat:nth-child(4) { border-top: 1px solid oklch(65% 0.22 57 / 0.3); }
+    .lp-feat:nth-child(4) { border-right: none; }
+    .lp-sellers { padding: 1.25rem 1rem 1.5rem; }
+    .lp-products { grid-template-columns: repeat(2, 1fr); }
+    .lp-cta {
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 2rem 1.5rem;
+    }
+  }
+</style>
+
+<!-- ── Hero ──────────────────────────────────────────────────────── -->
+<section class="lp-hero">
+  <div class="lp-hero-left">
+    <div class="lp-badge">Fresh today</div>
+    <h1 class="lp-hero-title">
+      Made to order.<br><em>Ready when you are.</em>
+    </h1>
+    <p class="lp-hero-sub">
+      Real food, prepared fresh daily. Browse the menu and order
+      for pickup or delivery — easy, every time.
+    </p>
+    <div class="lp-hero-actions">
+      <a href="{% url 'product_list' %}" class="lp-btn-primary">See the Menu</a>
+      {% if not request.user.is_authenticated %}
+      <a href="{% url 'login' %}" class="lp-btn-ghost">Sign in</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="lp-hero-right">
+    <!--
+      ═══════════════════════════════════════════════════════════════
+      HERO IMAGE — swap this placeholder for your food photo.
+
+      Replace the entire <div class="lp-hero-placeholder"> block with:
+
+        <img src="{% static 'images/your-hero-food.jpg' %}"
+             alt="Our signature dish"
+             class="lp-hero-img">
+
+      Put the file in:  static/images/your-hero-food.jpg
+      Recommended size: 800 × 600 px, JPG or WebP, warm lighting.
+      ═══════════════════════════════════════════════════════════════
+    -->
+    <div class="lp-hero-placeholder">
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+      </svg>
+      <span>Your hero food photo here</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── Feature strip ─────────────────────────────────────────────── -->
+<div class="lp-features">
+  <div class="lp-feat">
+    <div class="lp-feat-icon">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s-8-4.5-8-11.8A8 8 0 0112 2a8 8 0 018 8.2c0 7.3-8 11.8-8 11.8z"/>
+        <circle cx="12" cy="10" r="3"/>
+      </svg>
+    </div>
+    <div class="lp-feat-title">Fresh Ingredients</div>
+    <div class="lp-feat-desc">Prepared same-day from quality ingredients, no shortcuts.</div>
+  </div>
+  <div class="lp-feat">
+    <div class="lp-feat-icon">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+      </svg>
+    </div>
+    <div class="lp-feat-title">Easy Ordering</div>
+    <div class="lp-feat-desc">Browse, pick, and checkout in a few taps.</div>
+  </div>
+  <div class="lp-feat">
+    <div class="lp-feat-icon">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
+        <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+      </svg>
+    </div>
+    <div class="lp-feat-title">Pickup or Delivery</div>
+    <div class="lp-feat-desc">Walk in or have your order sent to you.</div>
+  </div>
+  <div class="lp-feat">
+    <div class="lp-feat-icon">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+      </svg>
+    </div>
+    <div class="lp-feat-title">Loyalty Rewards</div>
+    <div class="lp-feat-desc">Earn tier upgrades from Bronze to Platinum as you order.</div>
+  </div>
+</div>
+
+<!-- ── Best sellers (top 4 most ordered) ─────────────────────────── -->
+<div class="lp-sellers">
+  <div class="lp-section-row">
+    <h2 class="lp-section-title">Our Best Sellers</h2>
+    <a href="{% url 'product_list' %}" class="lp-section-link">Full menu →</a>
+  </div>
+
+  <div class="lp-products">
+    {% for product in top_products %}
+    <a href="{% url 'product_list' %}" class="lp-card">
+      <div class="lp-card-img">
+        {% if product.image %}
+          <img src="{{ product.image.url }}" alt="{{ product.name }}">
+        {% else %}
+          <!--
+            No image for "{{ product.name }}" yet.
+            Upload one at: /admin/customers/product/{{ product.id }}/change/
+          -->
+          <div class="lp-card-img-ph">🍽</div>
+        {% endif %}
+      </div>
+      <div class="lp-card-body">
+        {% if product.category %}
+        <div class="lp-card-cat">{{ product.category.name }}</div>
+        {% endif %}
+        <div class="lp-card-name">{{ product.name }}</div>
+        <div class="lp-card-price">RM {{ product.price|floatformat:2 }}</div>
+      </div>
+    </a>
+    {% empty %}
+    <p style="color:oklch(55% 0.08 58);font-size:.85rem;grid-column:1/-1;">No products available yet.</p>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ── Sign-in CTA (unauthenticated visitors only) ───────────────── -->
+{% if not request.user.is_authenticated %}
+<section class="lp-cta">
+  <div>
+    <div class="lp-cta-title">Order smarter, <em style="font-style:italic;color:#ff9933;">earn as you go.</em></div>
+    <p class="lp-cta-sub">
+      Sign in to track your orders, save your delivery address,
+      and unlock loyalty tier rewards from Bronze to Platinum.
+    </p>
+  </div>
+  <div class="lp-cta-actions">
+    <a href="{% url 'login' %}" class="lp-btn-cta">Sign in to order</a>
+  </div>
+</section>
+{% endif %}
+
+{% endblock %}
