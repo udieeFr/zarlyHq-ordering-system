@@ -8,3 +8,5 @@ secure_keys/
 .env
 .md
 agent/
+.agent/
+.claude/

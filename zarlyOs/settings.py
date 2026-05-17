@@ -49,6 +49,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'zarlyOs.middleware.EagerNonceCSPMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -72,6 +73,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'admins.context_processors.unread_notifications',
                 'customers.context_processors.cart_context',
+                'csp.context_processors.nonce',
             ],
         },
     },
@@ -194,3 +196,25 @@ CSRF_COOKIE_HTTPONLY = True             # Block JS access to CSRF cookie
 # SECURE_HSTS_SECONDS = 31536000  # 1 year
 # SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 # SECURE_HSTS_PRELOAD = True
+
+# ============================================================================
+# CONTENT SECURITY POLICY
+# ============================================================================
+# script-src uses per-request nonces — inline scripts must carry
+# nonce="{{ request.csp_nonce }}" to execute. Injected scripts are blocked.
+CSP_DEFAULT_SRC  = ("'self'",)
+CSP_SCRIPT_SRC   = ("'self'", "https://cdn.jsdelivr.net", "https://unpkg.com")
+CSP_STYLE_SRC    = (
+    "'self'", "'unsafe-inline'",
+    "https://cdn.jsdelivr.net",
+    "https://unpkg.com",
+    "https://fonts.googleapis.com",
+)
+CSP_FONT_SRC     = ("'self'", "https://fonts.gstatic.com")
+CSP_IMG_SRC      = ("'self'", "data:", "blob:")
+CSP_CONNECT_SRC  = ("'self'",)
+CSP_FRAME_ANCESTORS = ("'none'",)
+CSP_OBJECT_SRC   = ("'none'",)
+CSP_BASE_URI     = ("'self'",)
+CSP_FORM_ACTION  = ("'self'",)
+CSP_INCLUDE_NONCE_IN = ["script-src"]
