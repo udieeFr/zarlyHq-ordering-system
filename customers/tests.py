@@ -140,18 +140,14 @@ class FileValidationTest(TestCase):
         self.assertIn('No file', error)
 
     def test_supported_formats(self):
-        """Test all supported image formats"""
-        supported_formats = ['PNG', 'JPEG', 'GIF']
-        extensions = ['png', 'jpg', 'gif']
-        
-        for format_type, ext in zip(supported_formats, extensions):
-            with self.subTest(format=format_type):
-                img_io = self._create_test_image(format_type)
+        """Test all supported image formats — gif and webp are no longer accepted."""
+        for fmt, ext in [('PNG', 'png'), ('JPEG', 'jpg')]:
+            with self.subTest(format=fmt):
+                img_io = self._create_test_image(fmt)
                 img_io.name = f'receipt.{ext}'
                 img_io.size = img_io.tell()
-                
-                is_valid, error = validate_payment_proof(img_io)
-                self.assertTrue(is_valid, f"{format_type} should be valid")
+                valid, error = validate_payment_proof(img_io)
+                self.assertTrue(valid, f"{fmt} should be valid")
                 self.assertIsNone(error)
 
     def test_case_insensitive_extension(self):
@@ -169,14 +165,54 @@ class FileValidationTest(TestCase):
         img_io = self._create_test_image()
         img_io.name = 'receipt.png'
         img_io.size = 3 * 1024 * 1024  # 3MB
-        
+
         # Should pass with 5MB limit
         is_valid, error = validate_payment_proof(img_io, max_size_mb=5)
         self.assertTrue(is_valid)
-        
+
         # Should fail with 2MB limit
         is_valid, error = validate_payment_proof(img_io, max_size_mb=2)
         self.assertFalse(is_valid)
+
+    def test_gif_extension_rejected(self):
+        img_io = self._create_test_image('GIF')
+        img_io.name = 'receipt.gif'
+        img_io.size = 0
+        valid, error = validate_payment_proof(img_io)
+        self.assertFalse(valid)
+        self.assertIn('Invalid file type', error)
+
+    def test_webp_extension_rejected(self):
+        img_io = BytesIO(b'RIFF\x00\x00\x00\x00WEBPVP8 ')
+        img_io.name = 'receipt.webp'
+        img_io.size = 0
+        valid, error = validate_payment_proof(img_io)
+        self.assertFalse(valid)
+        self.assertIn('Invalid file type', error)
+
+    def test_renamed_exe_jpg_rejected_by_magic_bytes(self):
+        img_io = BytesIO(b'MZ\x90\x00this is not a jpeg')
+        img_io.name = 'proof.jpg'
+        img_io.size = 0
+        valid, error = validate_payment_proof(img_io)
+        self.assertFalse(valid)
+        self.assertIn('does not match', error)
+
+    def test_renamed_exe_pdf_rejected_by_magic_bytes(self):
+        img_io = BytesIO(b'MZ\x90\x00this is not a pdf')
+        img_io.name = 'proof.pdf'
+        img_io.size = 0
+        valid, error = validate_payment_proof(img_io)
+        self.assertFalse(valid)
+        self.assertIn('does not match', error)
+
+    def test_valid_pdf_accepted(self):
+        pdf_io = BytesIO(b'%PDF-1.4 1 0 obj<</Type /Catalog>> endobj')
+        pdf_io.name = 'proof.pdf'
+        pdf_io.size = 0
+        valid, error = validate_payment_proof(pdf_io)
+        self.assertTrue(valid)
+        self.assertIsNone(error)
 
 
 class PaymentConfigTest(TestCase):

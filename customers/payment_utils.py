@@ -1,6 +1,7 @@
 """
 Payment utilities for handling QR code generation and payment configurations.
 """
+import os
 import qrcode
 import io
 import base64
@@ -8,21 +9,21 @@ from django.conf import settings
 from PIL import Image
 
 # ==============================================================================
-# PAYMENT CONFIGURATION
+# PAYMENT CONFIGURATION — values read from environment variables
 # ==============================================================================
 
 PAYMENT_CONFIG = {
     'duitnow': {
         'name': 'DuitNow',
-        'id': '0123456789',  # Replace with actual DuitNow ID
+        'id': os.environ.get('DUITNOW_MERCHANT_ID', ''),
         'reference': 'Zarly Order',
     },
     'bank_transfer': {
         'name': 'Bank Transfer',
-        'bank_name': 'Maybank',
-        'account_number': '123456789012',
-        'account_holder': 'Zarly Co. Sdn. Bhd.',
-        'swift_code': 'MBBEMYKL',
+        'bank_name': os.environ.get('BANK_NAME', 'Maybank'),
+        'account_number': os.environ.get('BANK_ACCOUNT_NUMBER', ''),
+        'account_holder': os.environ.get('BANK_ACCOUNT_HOLDER', 'Zarly Co. Sdn. Bhd.'),
+        'swift_code': os.environ.get('BANK_SWIFT_CODE', 'MBBEMYKL'),
         'reference': 'ORDER-{order_id}',
     }
 }
@@ -171,46 +172,61 @@ def get_all_payment_methods(order_id, amount):
     }
 
 
+_MAGIC_BYTES = {
+    'jpg':  b'\xFF\xD8\xFF',
+    'jpeg': b'\xFF\xD8\xFF',
+    'png':  b'\x89PNG\r\n\x1a\n',
+    'pdf':  b'%PDF',
+}
+
+
 def validate_payment_proof(file_obj, max_size_mb=5):
     """
     Validate payment proof image file.
-    
+
     Args:
         file_obj: Django UploadedFile object
         max_size_mb (int): Maximum file size in MB
-        
+
     Returns:
         tuple: (is_valid: bool, error_message: str or None)
     """
     if not file_obj:
         return False, "No file provided"
-    
+
     # Check file size (with fallback for BytesIO objects in testing)
     try:
         file_size = file_obj.size if hasattr(file_obj, 'size') else len(file_obj.getvalue())
-    except:
+    except Exception:
         file_size = 0
-    
+
     max_size_bytes = max_size_mb * 1024 * 1024
     if file_size > max_size_bytes:
         return False, f"File is too large. Maximum size is {max_size_mb}MB"
-    
-    # Check file type
-    allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf']
-    file_ext = file_obj.name.split('.')[-1].lower()
-    
+
+    # Check file extension against restricted allow-list
+    allowed_extensions = ['jpg', 'jpeg', 'png', 'pdf']
+    file_ext = file_obj.name.rsplit('.', 1)[-1].lower()
+
     if file_ext not in allowed_extensions:
         return False, f"Invalid file type. Allowed: {', '.join(allowed_extensions)}"
-    
-    # Validate image file integrity
+
+    # Verify magic bytes match the declared extension
+    expected_magic = _MAGIC_BYTES[file_ext]
+    header = file_obj.read(len(expected_magic))
+    file_obj.seek(0)
+    if header != expected_magic:
+        return False, "File content does not match its extension."
+
+    # Validate image integrity (skip Pillow for PDFs — it cannot open them)
     try:
-        if file_ext.lower() != 'pdf':
+        if file_ext != 'pdf':
             img = Image.open(file_obj)
             img.verify()
-            file_obj.seek(0)  # Reset file pointer after verify
+            file_obj.seek(0)
     except Exception as e:
         return False, f"File appears to be corrupted: {str(e)}"
-    
+
     return True, None
 
 
@@ -231,5 +247,5 @@ def get_payment_proof_context(order):
         'amount': order.total_amount,
         'payment_methods': payment_methods,
         'max_file_size_mb': 5,
-        'accepted_formats': 'image/jpeg, image/png, image/gif, image/webp, application/pdf',
+        'accepted_formats': 'image/jpeg, image/png, application/pdf',
     }
