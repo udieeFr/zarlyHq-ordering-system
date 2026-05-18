@@ -67,7 +67,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 (function () {
     const MESSAGES_URL = "{% url 'customer_complaint_messages' complaint.id %}";
     const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');

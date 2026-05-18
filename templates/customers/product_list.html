@@ -122,7 +122,7 @@
   <span class="cart-fab-badge cart-badge-count"{% if not cart_count %} style="display:none"{% endif %}>{{ cart_count|default:0 }}</span>
 </a>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 (function () {
   const grid = document.getElementById('product-grid');
   let currentCategory = '{{ request.GET.category|default:"" }}';

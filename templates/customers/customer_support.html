@@ -518,7 +518,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 (function () {
   const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
   const CSRF      = csrfInput ? csrfInput.value : '';
@@ -628,7 +628,7 @@
 })();
 </script>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 function openComplaintModal(orderId) {
   const sel = document.getElementById('complaintOrderSelect');
   if (sel && orderId) {

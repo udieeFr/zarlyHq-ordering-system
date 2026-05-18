@@ -343,7 +343,7 @@
 
 <!-- Saved address data for JS -->
 {% if last_order %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
   const SAVED = {
     lat:       {{ last_order.latitude|default:"null" }},
     lng:       {{ last_order.longitude|default:"null" }},
@@ -355,11 +355,11 @@
   };
 </script>
 {% else %}
-<script>const SAVED = null;</script>
+<script nonce="{{ request.csp_nonce }}">const SAVED = null;</script>
 {% endif %}
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-<script>
+<script nonce="{{ request.csp_nonce }}">
   // ── Map setup ──────────────────────────────────────────────
   const DEFAULT_LAT = SAVED?.lat || 3.1390;
   const DEFAULT_LNG = SAVED?.lng || 101.6869;

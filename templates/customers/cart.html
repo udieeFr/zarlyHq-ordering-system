@@ -406,7 +406,7 @@
 
 </div>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 function changeQty(productId, delta, maxStock) {
   var hidden   = document.getElementById('qty-' + productId);
   var display  = document.getElementById('display-' + productId);

@@ -251,7 +251,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
     // File preview functionality
     document.addEventListener('DOMContentLoaded', function() {
         const fileInput = document.getElementById('payment_proof');

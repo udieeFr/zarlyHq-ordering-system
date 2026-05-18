@@ -201,7 +201,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
     // File upload handling for payment proofs
     document.addEventListener('DOMContentLoaded', function() {
         const forms = document.querySelectorAll('.payment-proof-form');

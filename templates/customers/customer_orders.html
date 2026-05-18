@@ -440,7 +440,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 function openComplaint(orderId) {
   const sel = document.getElementById('complaintOrderSelect');
   if (sel) {
