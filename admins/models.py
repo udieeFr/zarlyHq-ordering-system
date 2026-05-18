@@ -107,6 +107,12 @@ class DigitalSignature(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
     signature_value = models.TextField(blank=True, default='')
 
+def upload_payment_proof_to(instance, filename):
+    ext = filename.rsplit('.', 1)[-1].lower()
+    date_str = instance.order.created_at.strftime('%Y%m%d')
+    return f'payment_proofs/{date_str}-ORDER{instance.order_id}.{ext}'
+
+
 class Payment(models.Model):
     """
     Tracks payment transactions (Stripe, manual proof, etc).
@@ -142,7 +148,7 @@ class Payment(models.Model):
     
     # Manual payment fields
     payment_reference = models.CharField(max_length=255, null=True, blank=True)  # Bank ref or transaction id
-    proof_image = models.ImageField(upload_to='payment_proofs/', null=True, blank=True)
+    proof_image = models.ImageField(upload_to=upload_payment_proof_to, null=True, blank=True)
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -196,18 +202,28 @@ class Complaint(models.Model):
     def __str__(self):
         return f"Complaint #{self.id} - Order #{self.order.id}"
 
+class _ImmutableQuerySet(models.QuerySet):
+    def delete(self, *args, **kwargs):
+        raise PermissionError("SupportMessage records are immutable and cannot be deleted.")
+
+
 class SupportMessage(models.Model):
-    complaint  = models.ForeignKey(Complaint, on_delete=models.CASCADE, related_name='messages')
+    complaint  = models.ForeignKey(Complaint, on_delete=models.PROTECT, related_name='messages')
     sender     = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     body       = models.TextField()  # Fernet-encrypted ciphertext
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     is_read    = models.BooleanField(default=False)
+
+    objects = _ImmutableQuerySet.as_manager()
 
     class Meta:
         ordering = ['created_at']
         indexes  = [
             models.Index(fields=['complaint', 'created_at']),
         ]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("SupportMessage records are immutable and cannot be deleted.")
 
 
 class PrepGroup(models.Model):
@@ -417,6 +433,10 @@ class AuditLog(models.Model):
         ('refund_processed', 'Manual Refund Processed'),
         ('order_cancelled', 'Order Cancelled by Customer'),
         ('support_message_sent', 'Support Message Sent'),
+        ('product_edited', 'Product Edited'),
+        ('product_deleted', 'Product Deleted'),
+        ('product_availability_toggled', 'Product Availability Toggled'),
+        ('payment_initiated', 'Payment Initiated'),
     )
 
     actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
@@ -645,3 +665,23 @@ class EmailLog(models.Model):
 
     def __str__(self):
         return f"EmailLog [{self.status}] → {self.customer.email} — {self.subject[:40]}"
+
+
+class PageView(models.Model):
+    """Tracks page visits for analytics — logged by PageViewMiddleware."""
+    path       = models.CharField(max_length=500, db_index=True)
+    user       = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name='page_views')
+    session_key = models.CharField(max_length=40, blank=True, db_index=True)
+    ip_address  = models.GenericIPAddressField(null=True, blank=True)
+    timestamp   = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        indexes  = [
+            models.Index(fields=['path', '-timestamp']),
+            models.Index(fields=['user', '-timestamp']),
+        ]
+
+    def __str__(self):
+        return f"PageView {self.path} — {self.timestamp:%Y-%m-%d %H:%M}"

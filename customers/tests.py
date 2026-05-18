@@ -1,5 +1,7 @@
 from django.test import TestCase
 from io import BytesIO
+from unittest.mock import MagicMock
+from datetime import datetime, timezone as dt_timezone
 from PIL import Image
 from customers.payment_utils import (
     get_duitnow_qr,
@@ -213,6 +215,40 @@ class FileValidationTest(TestCase):
         valid, error = validate_payment_proof(pdf_io)
         self.assertTrue(valid)
         self.assertIsNone(error)
+
+
+class UploadPaymentProofToTest(TestCase):
+    """Test the upload_to callable that names payment proof files."""
+
+    def _make_instance(self, order_id, created_at):
+        instance = MagicMock()
+        instance.order_id = order_id
+        instance.order.created_at = created_at
+        return instance
+
+    def test_jpg_generates_correct_path(self):
+        from admins.models import upload_payment_proof_to
+        dt = datetime(2026, 5, 18, tzinfo=dt_timezone.utc)
+        result = upload_payment_proof_to(self._make_instance(123, dt), 'screenshot.jpg')
+        self.assertEqual(result, 'payment_proofs/20260518-ORDER123.jpg')
+
+    def test_pdf_generates_correct_path(self):
+        from admins.models import upload_payment_proof_to
+        dt = datetime(2026, 1, 5, tzinfo=dt_timezone.utc)
+        result = upload_payment_proof_to(self._make_instance(7, dt), 'receipt.pdf')
+        self.assertEqual(result, 'payment_proofs/20260105-ORDER7.pdf')
+
+    def test_uppercase_extension_is_lowercased(self):
+        from admins.models import upload_payment_proof_to
+        dt = datetime(2026, 5, 18, tzinfo=dt_timezone.utc)
+        result = upload_payment_proof_to(self._make_instance(1, dt), 'PROOF.JPG')
+        self.assertEqual(result, 'payment_proofs/20260518-ORDER1.jpg')
+
+    def test_original_filename_body_is_discarded(self):
+        from admins.models import upload_payment_proof_to
+        dt = datetime(2026, 5, 18, tzinfo=dt_timezone.utc)
+        result = upload_payment_proof_to(self._make_instance(42, dt), 'some-long-customer-name.png')
+        self.assertEqual(result, 'payment_proofs/20260518-ORDER42.png')
 
 
 class PaymentConfigTest(TestCase):
