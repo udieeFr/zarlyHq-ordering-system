@@ -274,7 +274,7 @@
         </div>
     </nav>
 
-    <script>
+    <script nonce="{{ request.csp_nonce }}">
         document.addEventListener('DOMContentLoaded', function () {
             const btn  = document.getElementById('userMenuBtn');
             const menu = document.getElementById('userDropdownMenu');
@@ -303,7 +303,7 @@
                 </div>
             {% endfor %}
         {% endif %}
-        <script>
+        <script nonce="{{ request.csp_nonce }}">
           document.querySelectorAll('.auto-dismiss').forEach(function(el) {
             setTimeout(function() {
               el.style.transition = 'opacity .5s';
@@ -370,7 +370,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 function openProfileModal() {
   const m = document.getElementById('profileModal');
   m.style.display = 'flex';
