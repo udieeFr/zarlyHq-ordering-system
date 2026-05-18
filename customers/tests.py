@@ -3,6 +3,7 @@ from io import BytesIO
 from unittest.mock import MagicMock
 from datetime import datetime, timezone as dt_timezone
 from PIL import Image
+from admins.models import upload_payment_proof_to
 from customers.payment_utils import (
     get_duitnow_qr,
     get_bank_transfer_qr,
@@ -227,28 +228,29 @@ class UploadPaymentProofToTest(TestCase):
         return instance
 
     def test_jpg_generates_correct_path(self):
-        from admins.models import upload_payment_proof_to
         dt = datetime(2026, 5, 18, tzinfo=dt_timezone.utc)
         result = upload_payment_proof_to(self._make_instance(123, dt), 'screenshot.jpg')
         self.assertEqual(result, 'payment_proofs/20260518-ORDER123.jpg')
 
     def test_pdf_generates_correct_path(self):
-        from admins.models import upload_payment_proof_to
         dt = datetime(2026, 1, 5, tzinfo=dt_timezone.utc)
         result = upload_payment_proof_to(self._make_instance(7, dt), 'receipt.pdf')
         self.assertEqual(result, 'payment_proofs/20260105-ORDER7.pdf')
 
     def test_uppercase_extension_is_lowercased(self):
-        from admins.models import upload_payment_proof_to
         dt = datetime(2026, 5, 18, tzinfo=dt_timezone.utc)
         result = upload_payment_proof_to(self._make_instance(1, dt), 'PROOF.JPG')
         self.assertEqual(result, 'payment_proofs/20260518-ORDER1.jpg')
 
     def test_original_filename_body_is_discarded(self):
-        from admins.models import upload_payment_proof_to
         dt = datetime(2026, 5, 18, tzinfo=dt_timezone.utc)
         result = upload_payment_proof_to(self._make_instance(42, dt), 'some-long-customer-name.png')
         self.assertEqual(result, 'payment_proofs/20260518-ORDER42.png')
+
+    def test_filename_without_extension_falls_back_to_bin(self):
+        dt = datetime(2026, 5, 18, tzinfo=dt_timezone.utc)
+        result = upload_payment_proof_to(self._make_instance(1, dt), 'receipt')
+        self.assertEqual(result, 'payment_proofs/20260518-ORDER1.bin')
 
 
 class PaymentConfigTest(TestCase):

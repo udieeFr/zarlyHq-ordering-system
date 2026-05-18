@@ -107,8 +107,10 @@ class DigitalSignature(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
     signature_value = models.TextField(blank=True, default='')
 
+
 def upload_payment_proof_to(instance, filename):
-    ext = filename.rsplit('.', 1)[-1].lower()
+    parts = filename.rsplit('.', 1)
+    ext = parts[-1].lower() if len(parts) == 2 else 'bin'
     date_str = instance.order.created_at.strftime('%Y%m%d')
     return f'payment_proofs/{date_str}-ORDER{instance.order_id}.{ext}'
 
