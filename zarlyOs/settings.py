@@ -56,6 +56,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'admins.middleware.PageViewMiddleware',
 ]
 
 ROOT_URLCONF = 'zarlyOs.urls'
@@ -100,20 +101,20 @@ DATABASES = {
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
 
-# AUTH_PASSWORD_VALIDATORS = [
-#     {
-#         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-#     },
-#     {
-#         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-#     },
-#     {
-#         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-#     },
-#     {
-#         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-#     },
-# ]
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
 
 
 # Internationalization
@@ -212,7 +213,7 @@ CSP_STYLE_SRC    = (
 )
 CSP_FONT_SRC     = ("'self'", "https://fonts.gstatic.com")
 CSP_IMG_SRC      = ("'self'", "data:", "blob:")
-CSP_CONNECT_SRC  = ("'self'",)
+CSP_CONNECT_SRC  = ("'self'", "https://nominatim.openstreetmap.org", "https://unpkg.com")
 CSP_FRAME_ANCESTORS = ("'none'",)
 CSP_OBJECT_SRC   = ("'none'",)
 CSP_BASE_URI     = ("'self'",)

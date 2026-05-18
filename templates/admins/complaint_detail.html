@@ -162,12 +162,18 @@
         const style = msg.is_mine
             ? 'background:#fff7ed;border:1px solid #fb923c;'
             : 'background:#f1f5f9;border:1px solid #cbd5e1;';
-        wrap.innerHTML = `<div class="p-2 px-3 rounded-3 small" style="max-width:75%;${style}">
-            <div class="fw-semibold" style="font-size:0.72rem;color:#64748b;margin-bottom:2px;">
-                ${msg.sender}${msg.is_mine ? ' (you)' : ''}
-            </div>
-            <div>${msg.body}</div>
-        </div>`;
+        const bubble = document.createElement('div');
+        bubble.className = 'p-2 px-3 rounded-3 small';
+        bubble.style.cssText = 'max-width:75%;' + style;
+        const meta = document.createElement('div');
+        meta.className = 'fw-semibold';
+        meta.style.cssText = 'font-size:0.72rem;color:#64748b;margin-bottom:2px;';
+        meta.textContent = msg.sender + (msg.is_mine ? ' (you)' : '');
+        const body = document.createElement('div');
+        body.textContent = msg.body;
+        bubble.appendChild(meta);
+        bubble.appendChild(body);
+        wrap.appendChild(bubble);
         thread.appendChild(wrap);
         lastSeen = msg.created_at;
         thread.scrollTop = thread.scrollHeight;

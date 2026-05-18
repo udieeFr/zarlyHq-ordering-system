@@ -55,4 +55,10 @@ urlpatterns = [
     # Favourites
     path('favourites/', views.favourites_list, name='favourites'),
     path('favourites/toggle/', views.toggle_favourite, name='toggle_favourite'),
+
+    # Ratings & Reviews
+    path('order/<int:order_id>/rate/', views.rate_order, name='rate_order'),
+    path('product/<int:product_id>/review/', views.submit_product_review, name='submit_product_review'),
+
+
 ]

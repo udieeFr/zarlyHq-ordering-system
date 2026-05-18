@@ -126,3 +126,41 @@ class CustomerProfile(models.Model):
         else:
             self.loyalty_tier = 'bronze'
         self.save()
+
+
+class OrderRating(models.Model):
+    """Customer rates a delivered order (1–5 stars + optional comment)."""
+    order = models.OneToOneField(
+        'admins.Order', on_delete=models.CASCADE, related_name='rating'
+    )
+    customer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='order_ratings')
+    rating = models.PositiveSmallIntegerField()  # 1–5
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=['customer', '-created_at'])]
+
+    def __str__(self):
+        return f"Rating {self.rating}/5 for Order #{self.order_id} by {self.customer}"
+
+
+class ProductReview(models.Model):
+    """Customer reviews an individual product after a delivered order."""
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reviews')
+    customer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='product_reviews')
+    order = models.ForeignKey(
+        'admins.Order', on_delete=models.SET_NULL, null=True, related_name='product_reviews'
+    )
+    rating = models.PositiveSmallIntegerField()  # 1–5
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('product', 'customer', 'order')
+        indexes = [models.Index(fields=['product', '-created_at'])]
+
+    def __str__(self):
+        return f"Review {self.rating}/5 for {self.product} by {self.customer}"
+
+

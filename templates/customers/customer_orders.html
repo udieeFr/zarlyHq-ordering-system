@@ -128,6 +128,62 @@
     color: oklch(42% 0.05 52);
   }
   .subsec-progress .sub-count { background: oklch(91% 0.025 62); color: oklch(38% 0.05 52); }
+  .review-item-row { border-bottom: 1px solid oklch(88% 0.045 64); padding: .75rem 0; }
+  .review-item-row:last-child { border-bottom: none; }
+
+  /* ── Search + Filter bar ── */
+  .orders-filter-bar { display: flex; flex-direction: column; gap: .625rem; margin-bottom: 1.25rem; }
+  .orders-search-wrap { position: relative; }
+  .orders-search-icon { position: absolute; left: .875rem; top: 50%; transform: translateY(-50%); color: oklch(60% 0.03 54); pointer-events: none; }
+  .orders-search-input {
+    width: 100%;
+    background: oklch(98.5% 0.018 65);
+    border: 1.5px solid oklch(88% 0.045 64);
+    border-radius: var(--radius-sm, 8px);
+    padding: .65rem .875rem .65rem 2.5rem;
+    font-size: .875rem;
+    color: oklch(16% 0.04 52);
+    font-family: inherit;
+    transition: border-color .15s, box-shadow .15s;
+    outline: none;
+    box-sizing: border-box;
+  }
+  .orders-search-input:focus {
+    border-color: #ff9933;
+    box-shadow: 0 0 0 3px oklch(70% 0.15 55 / .14);
+  }
+  .orders-search-input::placeholder { color: oklch(64% 0.025 54); }
+
+  .orders-filter-pills { display: flex; gap: .375rem; flex-wrap: wrap; align-items: center; }
+  .filter-pill {
+    display: inline-flex; align-items: center; gap: .3rem;
+    border-radius: 999px;
+    padding: .3rem .7rem;
+    font-size: .73rem; font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+    border: 1.5px solid oklch(86% 0.035 62);
+    background: oklch(98.5% 0.018 65);
+    color: oklch(48% 0.04 52);
+    font-family: inherit; white-space: nowrap;
+  }
+  .filter-pill:hover { border-color: oklch(65% 0.05 52); color: oklch(28% 0.04 52); }
+  .filter-pill.active { background: oklch(19% 0.035 52); border-color: oklch(19% 0.035 52); color: oklch(93% 0.012 62); }
+  .filter-pill-count {
+    background: oklch(90% 0.03 62); border-radius: 999px;
+    padding: .05rem .4rem; font-size: .67rem; font-weight: 700; line-height: 1.5;
+  }
+  .filter-pill.active .filter-pill-count { background: oklch(36% 0.035 52); color: oklch(88% 0.015 62); }
+
+  .orders-no-results {
+    text-align: center; padding: 2.5rem 2rem;
+    color: oklch(55% 0.03 54);
+    background: oklch(97.5% 0.014 62);
+    border-radius: 12px;
+    border: 2px dashed oklch(86% 0.035 62);
+    margin-bottom: 2rem;
+    display: flex; flex-direction: column; align-items: center;
+  }
 </style>
 <div class="orders-page">
 
@@ -264,8 +320,8 @@
             {% endif %}
             {% if o.status == 'pending' %}
               <button type="button"
-                      onclick="openCancelModal('{{ o.id }}')"
-                      class="upcoming-track-btn"
+                      class="upcoming-track-btn js-cancel-btn"
+                      data-order-id="{{ o.id }}"
                       style="background:oklch(98.5% 0.018 65);color:#ef4444;border:1.5px solid #ef4444;margin-left:.35rem;">
                 CANCEL
               </button>
@@ -307,9 +363,28 @@
   </div>
 
   {% if previous_orders %}
-  <div class="previous-grid">
+  <!-- ── Search + Filter toolbar ──────────────────────── -->
+  <div class="orders-filter-bar">
+    <div class="orders-search-wrap">
+      <svg class="orders-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="ordersSearchInput" class="orders-search-input"
+             placeholder="Search by order number or item…" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="orders-filter-pills">
+      <button type="button" class="filter-pill active" data-filter="all">All <span class="filter-pill-count"></span></button>
+      <button type="button" class="filter-pill" data-filter="delivered">Delivered <span class="filter-pill-count"></span></button>
+      <button type="button" class="filter-pill" data-filter="approved">Completed <span class="filter-pill-count"></span></button>
+      <button type="button" class="filter-pill" data-filter="rejected">Rejected <span class="filter-pill-count"></span></button>
+      <button type="button" class="filter-pill" data-filter="cancelled">Cancelled <span class="filter-pill-count"></span></button>
+    </div>
+  </div>
+
+  <div class="previous-grid" id="previousGrid">
     {% for o in previous_orders %}
-    <div class="previous-card">
+    <div class="previous-card"
+         data-status="{{ o.status }}"
+         data-search="{{ o.id }} {% for item in o.items.all %}{{ item.product.name }} {% endfor %}{{ o.created_at|date:'d M Y' }}"
+         data-date="{{ o.created_at|date:'Y-m-d' }}">
       <!-- Header -->
       <div class="prev-card-header">
         <div class="prev-order-id">Order #{{ o.id }}</div>
@@ -354,18 +429,51 @@
 
       <!-- Actions -->
       <div class="prev-card-actions">
-        <a href="{% url 'order_success' o.id %}" class="btn-prev-details">DETAILS</a>
-        <a href="{% url 'reorder' o.id %}" class="btn-prev-details" style="background:#ff9933;color:#fff;border-color:#ff9933;" title="Add all items from this order back to your cart">REORDER</a>
+        <a href="{% url 'order_success' o.id %}" class="prev-action-btn prev-action-details">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          Details
+        </a>
+        <a href="{% url 'reorder' o.id %}" class="prev-action-btn prev-action-reorder" title="Add all items back to your cart">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          Reorder
+        </a>
         {% if o.status == 'approved' or o.status == 'delivered' %}
-          <button type="button" class="btn-prev-complaint"
-                  onclick="openComplaint('{{ o.id }}')">COMPLAINT</button>
+          <button type="button" class="prev-action-btn prev-action-complaint js-complaint-btn"
+                  data-order-id="{{ o.id }}">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+            Report
+          </button>
         {% else %}
-          <button type="button" class="btn-prev-complaint" disabled style="opacity:0.4;cursor:not-allowed;">COMPLAINT</button>
+          <button type="button" class="prev-action-btn prev-action-complaint" disabled>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+            Report
+          </button>
+        {% endif %}
+        {% if o.status == 'delivered' %}
+          <button type="button" class="prev-action-btn prev-action-review js-review-btn"
+                  data-order-id="{{ o.id }}"
+                  data-order-rated="{% if o.rating %}{{ o.rating.rating }}{% else %}0{% endif %}"
+                  data-items='[{% for item in o.items.all %}{"id":{{ item.product.id }},"name":"{{ item.product.name|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]'>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            {% if o.rating %}Reviewed{% else %}Review{% endif %}
+          </button>
+        {% else %}
+          <button type="button" class="prev-action-btn prev-action-review" disabled style="opacity:.35;cursor:not-allowed;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            Review
+          </button>
         {% endif %}
       </div>
     </div>
     {% endfor %}
   </div>
+
+  <div id="ordersNoResults" class="orders-no-results" style="display:none;">
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.35;margin-bottom:.75rem;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <p class="fw-bold mb-1" style="font-size:.95rem;">No orders match</p>
+    <p style="font-size:.82rem;">Try a different number or item name</p>
+  </div>
+
   {% else %}
   <div class="orders-empty">
     <span class="orders-empty-icon">📋</span>
@@ -432,29 +540,243 @@
         <input type="text" name="cancel_reason" class="form-control" placeholder="e.g. Changed my mind…">
       </div>
       <div style="display:flex;gap:.75rem;">
-        <button type="button" class="btn btn-outline-secondary flex-fill"
-                onclick="document.getElementById('cancelOrderModal').style.display='none'">Keep Order</button>
+        <button type="button" class="btn btn-outline-secondary flex-fill js-cancel-close">Keep Order</button>
         <button type="submit" class="btn btn-danger flex-fill fw-bold">Yes, Cancel</button>
       </div>
     </form>
   </div>
 </div>
 
+
+<!-- ── Review Items Modal ────────────────────────────── -->
+<div class="modal fade" id="reviewModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content border-0 shadow rounded-4">
+      <div class="modal-header border-0" style="background:#7c3aed;">
+        <h5 class="modal-title fw-bold text-white">Review Items</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4" id="reviewModalBody"></div>
+    </div>
+  </div>
+</div>
+
 <script nonce="{{ request.csp_nonce }}">
-function openComplaint(orderId) {
-  const sel = document.getElementById('complaintOrderSelect');
-  if (sel) {
-    for (let i = 0; i < sel.options.length; i++) {
-      if (sel.options[i].value === String(orderId)) { sel.selectedIndex = i; break; }
+(function () {
+  // ── CSRF helper ────────────────────────────────────────
+  function getCsrf() {
+    const m = document.cookie.match(/csrftoken=([^;]+)/);
+    if (m) return m[1];
+    const el = document.querySelector('[name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
+  }
+
+  // ── Cancel modal ───────────────────────────────────────
+  function openCancelModal(orderId) {
+    document.getElementById('cancelOrderNum').textContent = '#' + orderId;
+    document.getElementById('cancelOrderForm').action = '/menu/order/' + orderId + '/cancel/';
+    document.getElementById('cancelOrderModal').style.display = 'flex';
+  }
+
+  // ── Complaint modal ────────────────────────────────────
+  function openComplaint(orderId) {
+    const sel = document.getElementById('complaintOrderSelect');
+    if (sel) {
+      for (let i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === String(orderId)) { sel.selectedIndex = i; break; }
+      }
+    }
+    new bootstrap.Modal(document.getElementById('compModal')).show();
+  }
+
+  // ── Order rating (embedded in review modal) ───────────
+  function buildOrderRatingSection(orderId) {
+    var section = document.createElement('div');
+    section.style.cssText = 'background:oklch(98% 0.012 62);border-radius:10px;padding:.875rem 1rem 1rem;margin-bottom:.875rem;border:1px solid oklch(90% 0.03 64);';
+    section.dataset.orderRatingId = orderId;
+    section.innerHTML =
+      '<div style="font-size:.8rem;font-weight:700;color:oklch(38% 0.04 52);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem;">Overall experience</div>' +
+      '<div id="orderStarRow" style="display:flex;gap:.25rem;margin-bottom:.5rem;">' +
+        [1,2,3,4,5].map(function(i){ return '<button type="button" class="order-star" data-val="' + i + '" style="background:none;border:none;font-size:1.75rem;color:#d1d5db;cursor:pointer;padding:0;line-height:1;">★</button>'; }).join('') +
+      '</div>' +
+      '<div class="order-rate-result" style="font-size:.78rem;min-height:1.1rem;"></div>';
+
+    var orderStars = section.querySelectorAll('.order-star');
+    orderStars.forEach(function (s) {
+      s.addEventListener('click', function () {
+        section.dataset.selectedRating = s.dataset.val;
+        orderStars.forEach(function (rs) { rs.style.color = parseInt(rs.dataset.val) <= parseInt(s.dataset.val) ? '#f59e0b' : '#d1d5db'; });
+        var resultEl = section.querySelector('.order-rate-result');
+        resultEl.style.color = '';
+        resultEl.textContent = '';
+        fetch('/menu/order/' + orderId + '/rate/', { method: 'POST', body: new URLSearchParams({ rating: s.dataset.val, csrfmiddlewaretoken: getCsrf() }) })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.ok) { resultEl.style.color = '#16a34a'; resultEl.textContent = 'Thanks for rating!'; }
+            else { resultEl.style.color = '#ef4444'; resultEl.textContent = data.error || 'Could not save rating.'; }
+          });
+      });
+      s.addEventListener('mouseenter', function () {
+        orderStars.forEach(function (rs) { rs.style.color = parseInt(rs.dataset.val) <= parseInt(s.dataset.val) ? '#f59e0b' : '#d1d5db'; });
+      });
+      s.addEventListener('mouseleave', function () {
+        var sel = parseInt(section.dataset.selectedRating || 0);
+        orderStars.forEach(function (rs) { rs.style.color = parseInt(rs.dataset.val) <= sel ? '#f59e0b' : '#d1d5db'; });
+      });
+    });
+    return section;
+  }
+
+  // ── Product review modal ───────────────────────────────
+  function openReviewModal(orderId, items, orderRated) {
+    const body = document.getElementById('reviewModalBody');
+    body.innerHTML = '';
+    if (!orderRated) { body.appendChild(buildOrderRatingSection(orderId)); }
+    items.forEach(function (item) {
+      const row = document.createElement('div');
+      row.className = 'review-item-row';
+      row.dataset.productId = item.id;
+      row.innerHTML =
+        '<div class="fw-semibold mb-1" style="font-size:.9rem;">' + item.name + '</div>' +
+        '<div class="mb-2">' +
+          [1,2,3,4,5].map(function(i){ return '<button type="button" class="review-star" data-val="' + i + '" data-pid="' + item.id + '" style="background:none;border:none;font-size:1.5rem;color:#d1d5db;cursor:pointer;padding:0 .1rem;">★</button>'; }).join('') +
+        '</div>' +
+        '<div class="d-flex gap-2 align-items-center">' +
+          '<textarea class="form-control form-control-sm review-comment" rows="2" placeholder="Comment (optional)" style="resize:none;flex:1;font-size:.8rem;"></textarea>' +
+          '<button type="button" class="btn btn-sm fw-bold text-white review-submit-btn" data-pid="' + item.id + '" style="background:#7c3aed;white-space:nowrap;">Submit</button>' +
+        '</div>' +
+        '<div class="review-result mt-1" style="font-size:.8rem;"></div>';
+      body.appendChild(row);
+
+      const starsInRow = row.querySelectorAll('.review-star');
+      starsInRow.forEach(function (s) {
+        s.addEventListener('click', function () {
+          row.dataset.selectedRating = s.dataset.val;
+          starsInRow.forEach(function (rs) { rs.style.color = parseInt(rs.dataset.val) <= parseInt(s.dataset.val) ? '#f59e0b' : '#d1d5db'; });
+        });
+        s.addEventListener('mouseenter', function () {
+          starsInRow.forEach(function (rs) { rs.style.color = parseInt(rs.dataset.val) <= parseInt(s.dataset.val) ? '#f59e0b' : '#d1d5db'; });
+        });
+        s.addEventListener('mouseleave', function () {
+          var sel = parseInt(row.dataset.selectedRating || 0);
+          starsInRow.forEach(function (rs) { rs.style.color = parseInt(rs.dataset.val) <= sel ? '#f59e0b' : '#d1d5db'; });
+        });
+      });
+
+      row.querySelector('.review-submit-btn').addEventListener('click', function () {
+        var pid = this.dataset.pid;
+        var rating = parseInt(row.dataset.selectedRating || 0);
+        var resultEl = row.querySelector('.review-result');
+        if (!rating) { resultEl.style.color = '#ef4444'; resultEl.textContent = 'Please select a star rating.'; return; }
+        var comment = row.querySelector('.review-comment').value;
+        var btn = this;
+        btn.disabled = true;
+        fetch('/menu/product/' + pid + '/review/', { method: 'POST', body: new URLSearchParams({ rating: rating, comment: comment, csrfmiddlewaretoken: getCsrf() }) })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.ok) {
+              resultEl.style.color = '#16a34a';
+              resultEl.textContent = '★ Review submitted!';
+              btn.style.display = 'none';
+            } else {
+              resultEl.style.color = '#ef4444';
+              resultEl.textContent = data.error || 'Could not submit review.';
+              btn.disabled = false;
+            }
+          })
+          .catch(function () { resultEl.style.color = '#ef4444'; resultEl.textContent = 'Network error.'; btn.disabled = false; });
+      });
+    });
+    new bootstrap.Modal(document.getElementById('reviewModal')).show();
+  }
+
+  // ── Search + Filter ────────────────────────────────────
+  var allCards = Array.from(document.querySelectorAll('.previous-card'));
+  var activeFilter = 'all';
+  var searchQuery = '';
+
+  // Populate filter pill counts from DOM data
+  (function () {
+    var counts = { all: allCards.length };
+    allCards.forEach(function (c) {
+      var s = c.dataset.status;
+      counts[s] = (counts[s] || 0) + 1;
+    });
+    document.querySelectorAll('.filter-pill').forEach(function (pill) {
+      var f = pill.dataset.filter;
+      var countEl = pill.querySelector('.filter-pill-count');
+      var n = counts[f] || 0;
+      if (countEl) countEl.textContent = n;
+      // Hide pill entirely if no orders in that status
+      if (f !== 'all' && n === 0) pill.style.display = 'none';
+    });
+  })();
+
+  function applyFilters() {
+    var q = searchQuery.toLowerCase();
+    var visible = 0;
+    allCards.forEach(function (card) {
+      var statusOk = activeFilter === 'all' || card.dataset.status === activeFilter;
+      var searchOk = !q || (card.dataset.search || '').toLowerCase().includes(q);
+      var show = statusOk && searchOk;
+      card.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    var noResults = document.getElementById('ordersNoResults');
+    var grid = document.getElementById('previousGrid');
+    if (noResults && grid) {
+      var empty = visible === 0;
+      noResults.style.display = empty ? '' : 'none';
+      grid.style.display = empty ? 'none' : '';
     }
   }
-  new bootstrap.Modal(document.getElementById('compModal')).show();
-}
 
-function openCancelModal(orderId) {
-  document.getElementById('cancelOrderNum').textContent = '#' + orderId;
-  document.getElementById('cancelOrderForm').action = '/menu/order/' + orderId + '/cancel/';
-  document.getElementById('cancelOrderModal').style.display = 'flex';
-}
+  var searchTimer;
+  var searchInput = document.getElementById('ordersSearchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      var val = this.value;
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(function () { searchQuery = val; applyFilters(); }, 160);
+    });
+    // Clear on Escape
+    searchInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { this.value = ''; searchQuery = ''; applyFilters(); }
+    });
+  }
+
+  document.querySelectorAll('.filter-pill').forEach(function (pill) {
+    pill.addEventListener('click', function () {
+      activeFilter = this.dataset.filter;
+      document.querySelectorAll('.filter-pill').forEach(function (p) { p.classList.remove('active'); });
+      this.classList.add('active');
+      applyFilters();
+    });
+  });
+
+  // ── Event delegation (no inline onclick needed) ────────
+  document.addEventListener('click', function (e) {
+    var cancelBtn = e.target.closest('.js-cancel-btn');
+    if (cancelBtn) { openCancelModal(cancelBtn.dataset.orderId); return; }
+
+    var complaintBtn = e.target.closest('.js-complaint-btn');
+    if (complaintBtn) { openComplaint(complaintBtn.dataset.orderId); return; }
+
+    var cancelClose = e.target.closest('.js-cancel-close');
+    if (cancelClose) { document.getElementById('cancelOrderModal').style.display = 'none'; return; }
+
+    var reviewBtn = e.target.closest('.js-review-btn');
+    if (reviewBtn) {
+      try {
+        openReviewModal(
+          reviewBtn.dataset.orderId,
+          JSON.parse(reviewBtn.dataset.items),
+          parseInt(reviewBtn.dataset.orderRated || 0)
+        );
+      } catch (err) { console.error('Review modal error:', err); }
+      return;
+    }
+  });
+})();
 </script>
 {% endblock %}

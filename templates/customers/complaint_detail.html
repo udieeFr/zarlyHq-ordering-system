@@ -85,11 +85,16 @@
         hasMessages = true;
         const wrap = document.createElement('div');
         wrap.style.cssText = 'display:flex; margin-bottom:0.5rem;' + (msg.is_mine ? 'justify-content:flex-end;' : '');
-        const cls = msg.is_mine ? 'chat-bubble bubble-mine' : 'chat-bubble bubble-theirs';
-        wrap.innerHTML = `<div class="${cls}">
-            <div class="bubble-meta">${msg.is_mine ? 'You' : 'Support team'}</div>
-            <div>${msg.body}</div>
-        </div>`;
+        const bubble = document.createElement('div');
+        bubble.className = msg.is_mine ? 'chat-bubble bubble-mine' : 'chat-bubble bubble-theirs';
+        const meta = document.createElement('div');
+        meta.className = 'bubble-meta';
+        meta.textContent = msg.is_mine ? 'You' : 'Support team';
+        const body = document.createElement('div');
+        body.textContent = msg.body;
+        bubble.appendChild(meta);
+        bubble.appendChild(body);
+        wrap.appendChild(bubble);
         thread.appendChild(wrap);
         lastSeen = msg.created_at;
         thread.scrollTop = thread.scrollHeight;

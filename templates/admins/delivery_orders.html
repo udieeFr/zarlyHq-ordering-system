@@ -12,20 +12,139 @@
 
     .sortable-header .sort-indicator {
         margin-left: 0.35rem;
-        font-size: 0.78rem;
-        opacity: 0.6;
+        font-size: 0.75rem;
+        opacity: 0.3;
+        transition: opacity 0.1s;
     }
+
+    .sortable-header:hover .sort-indicator { opacity: 0.6; }
 
     .sortable-header.sort-asc .sort-indicator,
     .sortable-header.sort-desc .sort-indicator {
         opacity: 1;
+    }
+
+    /* ── Status badges ──────────────────────────────────── */
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.18rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.25px;
+        white-space: nowrap;
+    }
+    .status-ready {
+        background: oklch(94% 0.07 75);
+        color: oklch(33% 0.12 62);
+    }
+    .status-out {
+        background: oklch(93% 0.09 52);
+        color: oklch(33% 0.18 46);
+    }
+    .status-delivered {
+        background: oklch(94% 0.04 150);
+        color: oklch(32% 0.08 148);
+    }
+
+    /* ── Action buttons ─────────────────────────────────── */
+    .btn-brand-action {
+        display: inline-block;
+        background: var(--accent);
+        color: oklch(99% 0.008 65);
+        border: none;
+        padding: 0.25rem 0.8rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+        font-family: inherit;
+        line-height: 1.5;
+        margin-bottom: 0.25rem;
+        transition: background 0.15s ease-out, transform 0.12s ease-out;
+    }
+    .btn-brand-action:hover {
+        background: var(--accent-hover);
+        color: oklch(99% 0.008 65);
+        transform: translateY(-1px);
+    }
+    .btn-brand-action[disabled] {
+        opacity: 0.4;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .btn-deliver-action {
+        display: inline-block;
+        background: oklch(44% 0.14 148);
+        color: oklch(98% 0.01 148);
+        border: none;
+        padding: 0.25rem 0.8rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+        font-family: inherit;
+        line-height: 1.5;
+        margin-bottom: 0.25rem;
+        transition: background 0.15s ease-out, transform 0.12s ease-out;
+    }
+    .btn-deliver-action:hover {
+        background: oklch(36% 0.12 148);
+        color: oklch(98% 0.01 148);
+        transform: translateY(-1px);
+    }
+
+    /* ── UNPAID row: left-border accent, no background tint ── */
+    .row-unpaid > td:first-child {
+        position: relative;
+        padding-left: calc(0.5rem + 4px);
+    }
+    .row-unpaid > td:first-child::before {
+        content: '';
+        position: absolute;
+        left: 0; top: 0; bottom: 0;
+        width: 3px;
+        background: var(--accent);
+        border-radius: 0 2px 2px 0;
+    }
+
+    .badge-unpaid {
+        display: inline-block;
+        background: oklch(93% 0.09 52);
+        color: oklch(28% 0.16 46);
+        font-size: 0.61rem;
+        font-weight: 800;
+        padding: 0.1rem 0.4rem;
+        border-radius: 4px;
+        letter-spacing: 0.4px;
+        vertical-align: middle;
+        margin-left: 0.25rem;
+    }
+
+    /* ── Delivered table: archive visual weight ──────────── */
+    .delivered-table thead th {
+        font-weight: 500;
+        font-size: 0.82rem;
+        color: oklch(56% 0.025 60);
+        border-bottom-color: oklch(92% 0.01 60);
+    }
+    .delivered-table tbody td {
+        color: oklch(44% 0.018 60);
+        font-size: 0.875rem;
+    }
+    .delivered-table tbody a {
+        color: oklch(44% 0.03 60);
     }
 </style>
 
 <!-- Page Header -->
 <div class="page-header">
     <h1>Delivery Orders</h1>
-    <p>Orders that are ready for delivery, out for delivery, or already delivered.</p>
+    <p>Track what's on the move and confirm what's been received.</p>
 </div>
 
 <!-- Navigation -->
@@ -74,6 +193,21 @@
         </div>
     </form>
 </div>
+<script nonce="{{ request.csp_nonce }}">
+(function () {
+    var form = document.querySelector('.content-card form[method="get"]');
+    if (!form) return;
+    var delay;
+    function submit() { form.submit(); }
+    function debounced() { clearTimeout(delay); delay = setTimeout(submit, 450); }
+    form.querySelectorAll('select').forEach(function (el) {
+        el.addEventListener('change', submit);
+    });
+    form.querySelectorAll('input[type="text"], input[type="number"]').forEach(function (el) {
+        el.addEventListener('input', debounced);
+    });
+})();
+</script>
 
 <!-- Delivery Orders In Process Table -->
 <div class="content-card mb-4">
@@ -97,10 +231,10 @@
             </thead>
             <tbody>
                 {% for order in in_delivery_orders %}
-                <tr {% if order.id in unpaid_ids %}style="background:#fffbeb;"{% endif %}>
+                <tr{% if order.id in unpaid_ids %} class="row-unpaid"{% endif %}>
                     <td data-sort="{{ order.id }}">
                         <a href="{% url 'admin_order_detail' order.id %}">#{{ order.id }}</a>
-                        {% if order.id in unpaid_ids %}<span class="badge ms-1" style="background:#f59e0b;color:#000;font-size:.65rem;">UNPAID</span>{% endif %}
+                        {% if order.id in unpaid_ids %}<span class="badge-unpaid">UNPAID</span>{% endif %}
                     </td>
                     <td>{{ order.customer_label }}<br>{{ order.full_name }}</td>
                     <td>{{ order.phone_number }}</td>
@@ -113,19 +247,27 @@
                             </div>
                         </form>
                     </td>
-                    <td>{{ order.get_status_display }}</td>
+                    <td>
+                        {% if order.status == 'ready_for_delivery' %}
+                        <span class="status-badge status-ready">{{ order.get_status_display }}</span>
+                        {% elif order.status == 'out_for_delivery' %}
+                        <span class="status-badge status-out">{{ order.get_status_display }}</span>
+                        {% else %}
+                        <span class="status-badge status-delivered">{{ order.get_status_display }}</span>
+                        {% endif %}
+                    </td>
                     <td data-sort="{{ order.total_amount }}">{{ order.total_amount|floatformat:2 }}</td>
                     <td data-sort="{% if order.delivery_assigned_at %}{{ order.delivery_assigned_at|date:'U' }}{% else %}0{% endif %}">{% if order.delivery_assigned_at %}{{ order.delivery_assigned_at|date:'M d, Y H:i' }}{% else %}-{% endif %}</td>
                     <td>
                         {% if order.status == 'ready_for_delivery' %}
                             {% if order.tracking_number %}
-                            <a href="{% url 'mark_order_out_for_delivery' order.id %}" class="btn btn-sm btn-warning mb-1">Out for Delivery</a>
+                            <a href="{% url 'mark_order_out_for_delivery' order.id %}" class="btn-brand-action">Out for Delivery</a>
                             {% else %}
-                            <button class="btn btn-sm btn-warning mb-1" disabled title="Enter a tracking number first">Out for Delivery</button>
+                            <button class="btn-brand-action" disabled title="Enter a tracking number first">Out for Delivery</button>
                             <small class="d-block text-danger" style="font-size:0.7rem;">Tracking # required</small>
                             {% endif %}
                         {% else %}
-                        <a href="{% url 'mark_order_delivered' order.id %}" class="btn btn-sm btn-success mb-1">Delivered</a>
+                        <a href="{% url 'mark_order_delivered' order.id %}" class="btn-deliver-action">Mark Delivered</a>
                         {% endif %}
                     </td>
                 </tr>
@@ -142,11 +284,11 @@
 <!-- Delivered Orders Table -->
 <div class="content-card">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="fw-bold mb-0">Delivered Orders ({{ delivered_orders|length }})</h5>
+        <h5 class="fw-bold mb-0" style="color:oklch(52% 0.03 60);font-weight:600;">Delivered Orders ({{ delivered_orders|length }})</h5>
     </div>
 
     <div class="table-responsive">
-        <table class="table table-hover align-middle sortable-table">
+        <table class="table table-hover align-middle sortable-table delivered-table">
             <thead>
                 <tr>
                     <th class="sortable-header" data-sort-type="number">Order #<span class="sort-indicator">↕</span></th>
@@ -161,10 +303,10 @@
             </thead>
             <tbody>
                 {% for order in delivered_orders %}
-                <tr {% if order.id in unpaid_ids %}style="background:#fffbeb;"{% endif %}>
+                <tr{% if order.id in unpaid_ids %} class="row-unpaid"{% endif %}>
                     <td data-sort="{{ order.id }}">
                         <a href="{% url 'admin_order_detail' order.id %}">#{{ order.id }}</a>
-                        {% if order.id in unpaid_ids %}<span class="badge ms-1" style="background:#f59e0b;color:#000;font-size:.65rem;">UNPAID</span>{% endif %}
+                        {% if order.id in unpaid_ids %}<span class="badge-unpaid">UNPAID</span>{% endif %}
                     </td>
                     <td>{{ order.customer_label }}<br>{{ order.full_name }}</td>
                     <td>{{ order.phone_number }}</td>
@@ -172,7 +314,9 @@
                         {% if order.courier_name %}<strong>{{ order.courier_name }}</strong><br>{% endif %}
                         {% if order.tracking_number %}{{ order.tracking_number }}{% else %}<span class="text-muted">No tracking</span>{% endif %}
                     </td>
-                    <td>{{ order.get_status_display }}</td>
+                    <td>
+                        <span class="status-badge status-delivered">{{ order.get_status_display }}</span>
+                    </td>
                     <td data-sort="{{ order.total_amount }}">{{ order.total_amount|floatformat:2 }}</td>
                     <td data-sort="{% if order.delivery_assigned_at %}{{ order.delivery_assigned_at|date:'U' }}{% else %}0{% endif %}">{% if order.delivery_assigned_at %}{{ order.delivery_assigned_at|date:'M d, Y H:i' }}{% else %}-{% endif %}</td>
                     <td><span class="text-muted">Completed</span></td>

@@ -1778,49 +1778,89 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
 .prev-card-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.625rem;
+  gap: 0.5rem;
   margin-top: auto;
+  padding-top: 0.875rem;
+  border-top: 1px solid oklch(90% 0.03 64);
 }
 
-.btn-prev-details {
-  background: var(--danger);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-xs);
-  padding: 0.625rem 0.5rem;
-  font-weight: 700;
-  font-size: 0.78rem;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-  text-align: center;
-  text-decoration: none;
+/* ── Shared action button base ── */
+.prev-action-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-family: inherit;
-  transition: var(--transition);
-}
-.btn-prev-details:hover { background: #b91c1c; color: #fff; transform: translateY(-1px); }
-
-.btn-prev-complaint {
-  background: transparent;
-  color: var(--danger);
-  border: 1.5px solid var(--danger);
-  border-radius: var(--radius-xs);
-  padding: 0.625rem 0.5rem;
-  font-weight: 700;
-  font-size: 0.78rem;
-  letter-spacing: 0.04em;
+  gap: 0.35rem;
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.625rem;
+  font-size: 0.775rem;
+  font-weight: 600;
   cursor: pointer;
-  text-align: center;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: inherit;
   transition: var(--transition);
+  border: 1.5px solid transparent;
+  text-decoration: none;
+  font-family: inherit;
+  line-height: 1;
+  white-space: nowrap;
 }
-.btn-prev-complaint:hover { background: var(--danger-bg); }
+.prev-action-btn:focus-visible {
+  outline: 2px solid #ff9933;
+  outline-offset: 2px;
+}
+
+/* Details — dark authority, calm primary */
+.prev-action-details {
+  background: oklch(19% 0.035 52);
+  color: oklch(93% 0.012 62);
+  border-color: oklch(19% 0.035 52);
+}
+.prev-action-details:hover {
+  background: oklch(26% 0.04 52);
+  border-color: oklch(26% 0.04 52);
+  color: oklch(97% 0.006 60);
+  transform: translateY(-1px);
+}
+
+/* Reorder — brand orange, warm commerce */
+.prev-action-reorder {
+  background: #ff9933;
+  color: oklch(14% 0.045 52);
+  border-color: #ff9933;
+}
+.prev-action-reorder:hover {
+  background: oklch(70% 0.155 55);
+  border-color: oklch(70% 0.155 55);
+  color: oklch(14% 0.045 52);
+  transform: translateY(-1px);
+}
+
+/* Complaint — warm rose ghost, available but understated */
+.prev-action-complaint {
+  background: oklch(98% 0.008 20);
+  color: oklch(43% 0.1 22);
+  border-color: oklch(84% 0.04 22);
+}
+.prev-action-complaint:hover {
+  background: oklch(95% 0.016 22);
+  border-color: oklch(68% 0.07 22);
+  color: oklch(36% 0.1 22);
+}
+.prev-action-complaint:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Review — soft violet, friendly engagement */
+.prev-action-review {
+  background: oklch(97% 0.01 290);
+  color: oklch(42% 0.14 290);
+  border-color: oklch(83% 0.06 290);
+}
+.prev-action-review:hover {
+  background: oklch(94% 0.018 290);
+  border-color: oklch(66% 0.1 290);
+  color: oklch(36% 0.15 290);
+}
 
 .status-completed { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
 .status-delivered { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
@@ -1915,13 +1955,13 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid oklch(91% 0.018 62);
-  box-shadow: 0 2px 8px oklch(58% 0.1 58 / 0.08);
+  box-shadow: 4px 4px 0 0 #170400, 0 1px 4px oklch(9% 0.04 32 / 0.05);
   transition: box-shadow 0.18s ease-out, transform 0.18s ease-out;
   display: flex;
   flex-direction: column;
 }
 .pcard:hover {
-  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.09);
+  box-shadow: 6px 6px 0 0 #170400, 0 2px 8px oklch(9% 0.04 32 / 0.08);
   transform: translateY(-2px);
 }
 

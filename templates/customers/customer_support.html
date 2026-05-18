@@ -542,11 +542,16 @@
     if (emptyEl && emptyEl.parentNode) { emptyEl.remove(); emptyEl = null; }
     hasMessages = true;
     const wrap = document.createElement('div');
-    const cls  = msg.is_mine ? 'chat-drawer-bubble bubble-mine' : 'chat-drawer-bubble bubble-theirs';
-    wrap.innerHTML = `<div class="${cls}">
-      <div class="bubble-sender">${msg.is_mine ? 'You' : 'Support team'}</div>
-      <div>${msg.body}</div>
-    </div>`;
+    const bubble = document.createElement('div');
+    bubble.className = msg.is_mine ? 'chat-drawer-bubble bubble-mine' : 'chat-drawer-bubble bubble-theirs';
+    const sender = document.createElement('div');
+    sender.className = 'bubble-sender';
+    sender.textContent = msg.is_mine ? 'You' : 'Support team';
+    const body = document.createElement('div');
+    body.textContent = msg.body;
+    bubble.appendChild(sender);
+    bubble.appendChild(body);
+    wrap.appendChild(bubble);
     thread.appendChild(wrap);
     lastSeen = msg.created_at;
     thread.scrollTop = thread.scrollHeight;

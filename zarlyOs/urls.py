@@ -16,11 +16,29 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from admins.views import unified_login, logout_view, dashboard_home, admin_login, customer_login, custom_login
 from customers.views import stripe_webhook, home as customer_home_view
-from django.conf import settings               # <--- Add this
+from django.conf import settings
 from django.conf.urls.static import static
+
+
+def error_400(request, exception=None):
+    return render(request, 'error_pages/400.html', status=400)
+
+def error_403(request, exception=None):
+    return render(request, 'error_pages/403.html', status=403)
+
+def error_404(request, exception=None):
+    return render(request, 'error_pages/404.html', status=404)
+
+def error_500(request):
+    return render(request, 'error_pages/500.html', status=500)
+
+handler400 = error_400
+handler403 = error_403
+handler404 = error_404
+handler500 = error_500
 
 def home_redirect(request):
     """Redirect based on user role after accessing root"""

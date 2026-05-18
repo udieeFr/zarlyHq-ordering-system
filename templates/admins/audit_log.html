@@ -137,7 +137,7 @@
         <input type="number" name="days" value="{{ days_filter }}" class="form-control form-control-sm" placeholder="7">
       </div>
       <div class="col-md-1">
-        <label class="form-label" style="font-size:0.78rem;font-weight:600;color:#64748b;margin-bottom:0.3rem;">Limit</label>
+        <label class="form-label" style="font-size:0.78rem;font-weight:600;color:#64748b;margin-bottom:0.3rem;">Per page</label>
         <input type="number" name="count" value="{{ count_limit }}" class="form-control form-control-sm" min="1" max="1000">
       </div>
       <div class="col-md-1">
@@ -150,7 +150,7 @@
 <!-- Log table -->
 <div class="log-panel">
   <div class="log-panel-header">
-    <span class="log-panel-title">Audit Entries <span style="font-weight:500;color:#64748b;">({{ logs|length }})</span></span>
+    <span class="log-panel-title">Audit Entries <span style="font-weight:500;color:#64748b;">({{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }})</span></span>
   </div>
   <div class="table-responsive">
     <table class="log-table">
@@ -207,4 +207,28 @@
     </table>
   </div>
 </div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-top:1rem;">
+  <span style="font-size:0.8rem;color:#64748b;">
+    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+    &nbsp;·&nbsp; {{ page_obj.paginator.count }} total entries
+  </span>
+  <div style="display:flex;gap:0.4rem;align-items:center;">
+    {% if page_obj.has_previous %}
+      <a href="?q={{ search_query }}&action={{ action_filter }}&actor={{ actor_filter }}&target_model={{ target_filter }}&days={{ days_filter }}&count={{ count_limit }}&page=1"
+         class="btn btn-sm btn-outline-secondary">« First</a>
+      <a href="?q={{ search_query }}&action={{ action_filter }}&actor={{ actor_filter }}&target_model={{ target_filter }}&days={{ days_filter }}&count={{ count_limit }}&page={{ page_obj.previous_page_number }}"
+         class="btn btn-sm btn-outline-secondary">‹ Prev</a>
+    {% endif %}
+    <span class="btn btn-sm btn-primary" style="pointer-events:none;">{{ page_obj.number }}</span>
+    {% if page_obj.has_next %}
+      <a href="?q={{ search_query }}&action={{ action_filter }}&actor={{ actor_filter }}&target_model={{ target_filter }}&days={{ days_filter }}&count={{ count_limit }}&page={{ page_obj.next_page_number }}"
+         class="btn btn-sm btn-outline-secondary">Next ›</a>
+      <a href="?q={{ search_query }}&action={{ action_filter }}&actor={{ actor_filter }}&target_model={{ target_filter }}&days={{ days_filter }}&count={{ count_limit }}&page={{ page_obj.paginator.num_pages }}"
+         class="btn btn-sm btn-outline-secondary">Last »</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 {% endblock %}

@@ -2,334 +2,527 @@
 {% block page_title %}Order #{{ order.id }}{% endblock %}
 
 {% block content %}
+<style>
+/* ── Order Detail ─────────────────────────────────────── */
 
-<!-- Header -->
-<div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-4">
+/* Pull the wrap out of admin-content padding so command bar bleeds edge-to-edge */
+.od-wrap { margin: -2rem -1.5rem; display: flex; flex-direction: column; }
+
+/* ── Command bar ── */
+.od-bar {
+  position: sticky; top: 0; z-index: 100;
+  background: oklch(14% 0.045 52);
+  border-bottom: 1px solid oklch(22% 0.04 52);
+  display: flex; align-items: center; gap: .875rem;
+  padding: 0 1.5rem;
+  height: 52px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.od-back {
+  color: oklch(50% 0.025 54); font-size: .75rem; text-decoration: none;
+  flex-shrink: 0; white-space: nowrap;
+  display: flex; align-items: center; gap: .3rem;
+}
+.od-back:hover { color: oklch(72% 0.02 54); }
+.od-back svg { flex-shrink: 0; }
+
+.od-divider { width: 1px; height: 18px; background: oklch(28% 0.04 52); flex-shrink: 0; }
+
+.od-num {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 1.05rem; color: oklch(93% 0.012 62);
+  letter-spacing: -.01em; flex-shrink: 0; white-space: nowrap;
+}
+
+.od-pills { display: flex; align-items: center; gap: .35rem; flex: 1; min-width: 0; overflow: hidden; }
+
+.od-spill { flex: 1; }
+
+.od-status {
+  padding: .2rem .6rem; border-radius: 999px;
+  font-size: .7rem; font-weight: 700; letter-spacing: .02em;
+  white-space: nowrap; flex-shrink: 0;
+}
+.s-pending     { background: oklch(93% 0.13 83); color: oklch(36% 0.13 65); }
+.s-pendingpay  { background: oklch(90% 0.07 245); color: oklch(35% 0.1 240); }
+.s-approved    { background: oklch(90% 0.1 148); color: oklch(28% 0.1 148); }
+.s-prepared    { background: oklch(90% 0.09 275); color: oklch(35% 0.1 275); }
+.s-delivery    { background: oklch(92% 0.09 310); color: oklch(36% 0.1 310); }
+.s-delivered   { background: oklch(90% 0.1 148); color: oklch(28% 0.1 148); }
+.s-rejected    { background: oklch(91% 0.09 22); color: oklch(34% 0.1 18); }
+
+.od-badge {
+  padding: .2rem .5rem; border-radius: 999px;
+  font-size: .68rem; font-weight: 700; white-space: nowrap; flex-shrink: 0;
+}
+.b-priority { background: oklch(87% 0.14 57); color: oklch(33% 0.13 52); }
+.b-walkin   { background: oklch(88% 0.1 148); color: oklch(28% 0.1 148); }
+
+.od-meta { font-size: .7rem; color: oklch(44% 0.025 54); white-space: nowrap; flex-shrink: 0; }
+.od-amount { font-size: 1.05rem; font-weight: 800; color: #ff9933; white-space: nowrap; flex-shrink: 0; letter-spacing: -.02em; }
+
+.od-actions { display: flex; gap: .4rem; align-items: center; flex-shrink: 0; }
+
+.od-btn {
+  display: inline-flex; align-items: center; gap: .3rem;
+  border-radius: 6px; padding: .3rem .75rem;
+  font-size: .75rem; font-weight: 700; cursor: pointer;
+  border: none; font-family: inherit; text-decoration: none; white-space: nowrap;
+  transition: opacity .15s, background .15s;
+  height: 30px;
+}
+.b-approve { background: #10b981; color: #fff; }
+.b-approve:hover { background: #059669; color: #fff; }
+.b-warn    { background: #f59e0b; color: oklch(12% 0.04 52); }
+.b-warn:hover { background: oklch(70% 0.155 55); color: oklch(12% 0.04 52); }
+.b-ghost   { background: oklch(24% 0.04 52); color: oklch(72% 0.02 54); border: 1px solid oklch(32% 0.04 52); }
+.b-ghost:hover { background: oklch(30% 0.04 52); color: oklch(88% 0.015 60); }
+
+/* ── Reject slide panel ── */
+.od-reject-panel {
+  display: none;
+  background: oklch(99% 0.005 22);
+  border-bottom: 1px solid oklch(86% 0.04 22);
+  padding: .875rem 1.5rem;
+}
+.od-reject-panel.open { display: block; }
+.od-reject-panel form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: .625rem;
+  align-items: end;
+}
+@media (max-width: 680px) { .od-reject-panel form { grid-template-columns: 1fr; } }
+
+/* ── Body grid ── */
+.od-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding: 1.125rem 1.5rem;
+  align-items: start;
+}
+@media (max-width: 880px) { .od-body { grid-template-columns: 1fr; } }
+
+/* ── Cards ── */
+.od-card {
+  background: oklch(99.5% 0.006 60);
+  border: 1px solid oklch(88% 0.045 64);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.od-card + .od-card { margin-top: .75rem; }
+
+.od-card-head {
+  display: flex; align-items: center; gap: .55rem;
+  padding: .6rem .875rem;
+  border-bottom: 1px solid oklch(92% 0.03 62);
+  background: oklch(98.2% 0.014 62);
+  min-height: 40px;
+}
+.od-card-icon {
+  width: 24px; height: 24px; border-radius: 5px;
+  background: oklch(91% 0.035 62);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .75rem; flex-shrink: 0;
+}
+.od-card-title { font-size: .8rem; font-weight: 700; color: oklch(22% 0.04 52); flex: 1; }
+.od-card-body  { padding: .75rem .875rem; }
+
+/* ── Field grid ── */
+.od-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem .75rem; }
+.od-field-full { grid-column: 1 / -1; }
+.od-label { font-size: .64rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: oklch(58% 0.03 54); margin-bottom: .12rem; }
+.od-value { font-size: .82rem; font-weight: 600; color: oklch(18% 0.04 52); line-height: 1.35; }
+.od-value-light { font-weight: 400; }
+.od-sub { font-size: .7rem; color: oklch(57% 0.03 54); margin-top: .2rem; }
+
+/* ── Pill badge ── */
+.od-pill {
+  padding: .15rem .5rem; border-radius: 999px;
+  font-size: .68rem; font-weight: 700; letter-spacing: .01em;
+}
+
+/* ── Items table ── */
+.od-tbl { width: 100%; border-collapse: collapse; font-size: .81rem; }
+.od-tbl th {
+  font-size: .64rem; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: oklch(58% 0.03 54);
+  padding: 0 0 .45rem; border-bottom: 1px solid oklch(90% 0.03 62);
+}
+.od-tbl th:nth-child(2) { text-align: center; }
+.od-tbl th:last-child   { text-align: right; }
+.od-tbl td {
+  padding: .4rem 0;
+  border-bottom: 1px solid oklch(94% 0.02 62);
+  color: oklch(22% 0.04 52);
+}
+.od-tbl td:nth-child(2) { text-align: center; }
+.od-tbl td:last-child   { text-align: right; font-weight: 600; }
+.od-tbl tbody tr:last-child td { border-bottom: none; }
+.od-qty { display: inline-block; background: oklch(92% 0.03 62); border-radius: 4px; padding: .08rem .38rem; font-size: .74rem; font-weight: 700; }
+.od-tbl tfoot td {
+  padding-top: .55rem; border-top: 1.5px solid oklch(88% 0.045 64);
+  border-bottom: none; font-size: .88rem; font-weight: 700;
+}
+
+/* ── Payment proof ── */
+.od-proof {
+  width: 100%; max-height: 130px; object-fit: cover;
+  border-radius: 7px; cursor: zoom-in;
+  border: 1px solid oklch(88% 0.045 64);
+  display: block; margin-top: .5rem;
+}
+
+/* ── Staff notes ── */
+.od-ta {
+  width: 100%; resize: none; font-size: .79rem; box-sizing: border-box;
+  border: 1.5px solid oklch(86% 0.04 62); border-radius: 6px;
+  padding: .45rem .6rem; font-family: inherit; color: oklch(20% 0.04 52);
+  background: oklch(99.5% 0.006 60); transition: border-color .15s;
+  line-height: 1.5;
+}
+.od-ta:focus { outline: none; border-color: #ff9933; box-shadow: 0 0 0 3px oklch(70% 0.15 55 / .13); }
+</style>
+
+<div class="od-wrap">
+
+  <!-- ════ Command bar ════════════════════════════════════ -->
+  <div class="od-bar">
+    <a href="{% url 'sales_admin_dashboard' %}" class="od-back">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Dashboard
+    </a>
+    <div class="od-divider"></div>
+    <span class="od-num">Order #{{ order.id }}</span>
+    <div class="od-pills">
+      <span class="od-status
+        {% if order.status == 'pending' %}s-pending
+        {% elif order.status == 'pending_payment' %}s-pendingpay
+        {% elif order.status == 'approved' %}s-approved
+        {% elif order.status == 'prepared' %}s-prepared
+        {% elif order.status == 'ready_for_delivery' or order.status == 'out_for_delivery' %}s-delivery
+        {% elif order.status == 'delivered' %}s-delivered
+        {% elif order.status == 'rejected' %}s-rejected
+        {% endif %}">
+        {% if order.status == 'pending' %}🟡 Pending Review
+        {% elif order.status == 'pending_payment' %}💳 Awaiting Payment
+        {% elif order.status == 'approved' %}✅ Approved
+        {% elif order.status == 'prepared' %}👨‍🍳 Prepared
+        {% elif order.status == 'ready_for_delivery' %}📦 Ready for Delivery
+        {% elif order.status == 'out_for_delivery' %}🚚 Out for Delivery
+        {% elif order.status == 'delivered' %}✅ Delivered
+        {% elif order.status == 'rejected' %}❌ Rejected
+        {% endif %}
+      </span>
+      {% if order.is_priority %}<span class="od-badge b-priority">⚡ Priority</span>{% endif %}
+      {% if order.is_walk_in %}<span class="od-badge b-walkin">🏪 Walk-in</span>{% endif %}
+    </div>
+    <span class="od-meta">{{ order.created_at|date:"d M Y, H:i" }}</span>
+    <div class="od-divider"></div>
+    <span class="od-amount">RM {{ order.total_amount }}</span>
+    <div class="od-actions">
+      {% if order.status == 'pending' %}
+        {% if has_payment %}
+        <a href="{% url 'approve_order' order.id %}" class="od-btn b-approve">✅ Approve</a>
+        {% else %}
+        <a href="{% url 'approve_order' order.id %}" class="od-btn b-warn">→ Payment</a>
+        {% endif %}
+        <button type="button" class="od-btn b-ghost" id="rejectToggle">Reject</button>
+      {% elif order.status == 'pending_payment' %}
+        <button type="button" class="od-btn b-warn" id="forceApproveBtn">Approve Unpaid</button>
+        <form id="forceApproveForm" method="post" action="{% url 'force_approve_unpaid' order.id %}" style="display:none;">{% csrf_token %}</form>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ════ Reject panel ════════════════════════════════════ -->
+  {% if order.status == 'pending' %}
+  <div class="od-reject-panel" id="rejectPanel">
+    <form method="post" action="{% url 'reject_order' order.id %}">
+      {% csrf_token %}
+      <div>
+        <div class="od-label" style="margin-bottom:.3rem;">Rejection reason</div>
+        <select name="rejection_reason_id" class="form-select form-select-sm">
+          <option value="">— Select a reason —</option>
+          {% for reason in rejection_reasons %}
+          <option value="{{ reason.id }}" title="{{ reason.internal_note }}">
+            {{ reason.reason_text }}{% if reason.category != 'other' %} ({{ reason.get_category_display }}){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <div class="od-label" style="margin-bottom:.3rem;">Custom reason <span style="font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></div>
+        <textarea name="custom_reason" class="form-control form-control-sm" rows="1" placeholder="Overrides selection above" style="resize:none;"></textarea>
+      </div>
+      <button type="submit" class="btn btn-outline-danger btn-sm fw-bold px-4" style="height:31px;white-space:nowrap;">Reject Order</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- ════ Body ════════════════════════════════════════════ -->
+  <div class="od-body">
+
+    <!-- ── Left column ── -->
     <div>
-        <div class="d-flex align-items-center gap-2 mb-1">
-            <a href="{% url 'sales_admin_dashboard' %}" class="text-muted small text-decoration-none">← Dashboard</a>
+
+      <!-- Customer -->
+      <div class="od-card">
+        <div class="od-card-head">
+          <div class="od-card-icon">👤</div>
+          <span class="od-card-title">Customer</span>
+          {% with c=order.customer.approved_orders.count %}
+          {% if c > 0 %}
+          <span class="od-pill" style="background:#e0f2fe;color:#0369a1;">Returning · {{ c }} order{{ c|pluralize }}</span>
+          {% else %}
+          <span class="od-pill" style="background:#f1f5f9;color:#64748b;">New Customer</span>
+          {% endif %}
+          {% endwith %}
         </div>
-        <h1 class="fw-bold mb-2" style="font-size:1.9rem;letter-spacing:-.02em;">Order #{{ order.id }}</h1>
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-            <span class="px-3 py-1 rounded-pill fw-semibold small"
-                style="{% if order.status == 'pending' %}background:#fef9c3;color:#854d0e;
-                       {% elif order.status == 'pending_payment' %}background:#dbeafe;color:#1e40af;
-                       {% elif order.status == 'approved' %}background:#d1fae5;color:#065f46;
-                       {% elif order.status == 'prepared' %}background:#e0e7ff;color:#3730a3;
-                       {% elif order.status == 'ready_for_delivery' or order.status == 'out_for_delivery' %}background:#fce7f3;color:#9d174d;
-                       {% elif order.status == 'delivered' %}background:#d1fae5;color:#065f46;
-                       {% elif order.status == 'rejected' %}background:#fee2e2;color:#991b1b;
-                       {% else %}background:#f1f5f9;color:#475569;{% endif %}">
-                {% if order.status == 'pending' %}🟡 Pending Review
-                {% elif order.status == 'pending_payment' %}💳 Awaiting Payment
-                {% elif order.status == 'approved' %}✅ Approved
-                {% elif order.status == 'prepared' %}👨‍🍳 Prepared
-                {% elif order.status == 'ready_for_delivery' %}📦 Ready for Delivery
-                {% elif order.status == 'out_for_delivery' %}🚚 Out for Delivery
-                {% elif order.status == 'delivered' %}✅ Delivered
-                {% elif order.status == 'rejected' %}❌ Rejected
-                {% endif %}
-            </span>
-            {% if order.is_priority %}
-            <span class="px-3 py-1 rounded-pill fw-semibold small" style="background:#fff7ed;color:#c2410c;">⚡ Priority</span>
+        <div class="od-card-body">
+          <div class="od-grid">
+            <div>
+              <div class="od-label">Full Name</div>
+              <div class="od-value">{{ order.full_name }}</div>
+            </div>
+            <div>
+              <div class="od-label">Phone</div>
+              <div class="od-value">{{ order.phone_number }}</div>
+            </div>
+            <div class="od-field-full">
+              <div class="od-label">Delivery Address</div>
+              <div class="od-value od-value-light">{{ order.address_summary }}</div>
+              {% if order.latitude and order.longitude %}
+              <div class="od-sub">📍 {{ order.latitude }}, {{ order.longitude }}</div>
+              {% endif %}
+            </div>
+            {% if order.order_notes %}
+            <div class="od-field-full">
+              <div class="od-label">Order Notes</div>
+              <div style="background:oklch(97% 0.016 62);border:1px solid oklch(88% 0.045 64);border-radius:6px;padding:.375rem .6rem;font-size:.8rem;line-height:1.5;color:oklch(22% 0.04 52);">{{ order.order_notes }}</div>
+            </div>
             {% endif %}
-            {% if order.is_walk_in %}
-            <span class="px-3 py-1 rounded-pill fw-semibold small" style="background:#f0fdf4;color:#166534;">🏪 Walk-in</span>
-            {% endif %}
+          </div>
         </div>
+      </div>
+
+      <!-- Order Items -->
+      <div class="od-card">
+        <div class="od-card-head">
+          <div class="od-card-icon">📦</div>
+          <span class="od-card-title">Order Items</span>
+          <span class="od-pill" style="background:#f1f5f9;color:#64748b;">{{ order.items.count }} item{{ order.items.count|pluralize }}</span>
+        </div>
+        <div class="od-card-body">
+          <table class="od-tbl">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Qty</th>
+                <th>Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in order.items.all %}
+              <tr>
+                <td class="fw-medium">{{ item.product.name }}</td>
+                <td><span class="od-qty">×{{ item.quantity }}</span></td>
+                <td>RM {{ item.subtotal }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="2" style="text-align:right;padding-right:.5rem;color:oklch(42% 0.04 52);">Total Amount</td>
+                <td style="color:oklch(13% 0.04 52);font-size:.95rem;">RM {{ order.total_amount }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
     </div>
-    <div class="text-end">
-        <div class="fw-black" style="font-size:2rem;color:#0f172a;letter-spacing:-.03em;">RM {{ order.total_amount }}</div>
-        <div class="text-muted small">Placed {{ order.created_at|date:"d M Y, H:i" }}</div>
-        {% if order.approved_at %}
-        <div class="text-muted small">Approved {{ order.approved_at|date:"d M Y, H:i" }}</div>
-        {% endif %}
+
+    <!-- ── Right column ── -->
+    <div>
+
+      <!-- Payment -->
+      <div class="od-card" style="{% if has_payment %}border-color:oklch(82% 0.08 148);{% endif %}">
+        <div class="od-card-head" style="{% if has_payment %}background:oklch(95% 0.055 148);{% endif %}">
+          <div class="od-card-icon" style="{% if has_payment %}background:oklch(88% 0.1 148);{% endif %}">💳</div>
+          <span class="od-card-title" style="{% if has_payment %}color:oklch(26% 0.1 148);{% endif %}">Payment</span>
+          {% if has_payment %}
+          <span class="od-pill" style="background:oklch(88% 0.1 148);color:oklch(26% 0.1 148);">✓ Confirmed</span>
+          {% else %}
+          <span class="od-pill" style="background:oklch(92% 0.06 22);color:oklch(36% 0.1 18);">Unconfirmed</span>
+          {% endif %}
+        </div>
+        <div class="od-card-body">
+          {% if stripe_payment %}
+          <div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .65rem;border-radius:7px;margin-bottom:.625rem;font-size:.8rem;
+                background:{% if stripe_payment.status == 'succeeded' %}oklch(92% 0.08 148){% elif stripe_payment.status == 'processing' %}oklch(93% 0.11 83){% else %}oklch(93% 0.03 62){% endif %};
+                color:{% if stripe_payment.status == 'succeeded' %}oklch(28% 0.1 148){% elif stripe_payment.status == 'processing' %}oklch(36% 0.12 65){% else %}oklch(44% 0.04 52){% endif %};">
+            <span>{% if stripe_payment.status == 'succeeded' %}✅{% elif stripe_payment.status == 'processing' %}⏳{% elif stripe_payment.status == 'pending' %}🧾{% else %}❌{% endif %}</span>
+            <span class="fw-semibold">Stripe · RM {{ stripe_payment.amount|floatformat:2 }}</span>
+            <span style="opacity:.75;font-size:.74rem;">{{ stripe_payment.get_status_display }}</span>
+          </div>
+          {% endif %}
+          {% if order.payment_proof and not stripe_payment %}
+          <div>
+            <div class="od-label">Bank Transfer / DuitNow Proof</div>
+            <img src="{{ order.payment_proof.url }}" class="od-proof" onclick="window.open(this.src)" alt="Payment proof">
+          </div>
+          {% endif %}
+          {% if not stripe_payment and not order.payment_proof %}
+          <div style="text-align:center;color:oklch(57% 0.03 54);font-size:.79rem;padding:.25rem 0;">
+            {% if order.status == 'pending_payment' %}📄 Awaiting customer payment proof{% else %}No payment record{% endif %}
+          </div>
+          {% endif %}
+          {% if order.approved_at %}
+          <div class="od-sub" style="margin-top:.375rem;">Approved {{ order.approved_at|date:"d M Y, H:i" }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Signature / Invoice -->
+      {% if order.digital_signature %}
+      <div class="od-card" style="border-color:oklch(82% 0.1 148);">
+        <div class="od-card-head" style="background:oklch(95% 0.06 148);">
+          <div class="od-card-icon" style="background:oklch(88% 0.1 148);">🔏</div>
+          <span class="od-card-title" style="color:oklch(26% 0.1 148);">Digitally Signed</span>
+        </div>
+        <div class="od-card-body">
+          <div class="od-label">Signature Hash</div>
+          <div style="font-family:monospace;font-size:.68rem;color:oklch(48% 0.04 52);margin-bottom:.625rem;word-break:break-all;">{{ order.digital_signature.signature_hash|truncatechars:36 }}</div>
+          <div style="display:flex;flex-direction:column;gap:.375rem;">
+            <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-sm fw-semibold w-100" style="background:oklch(88% 0.1 148);color:oklch(26% 0.1 148);border:none;" download>📄 Download Signed Receipt</a>
+            <a href="{% url 'print_order_summary' order.id %}" class="btn btn-outline-secondary btn-sm w-100" target="_blank">🖨️ View Invoice</a>
+          </div>
+        </div>
+      </div>
+      {% elif order.status in 'approved,pending_payment,prepared,ready_for_delivery,out_for_delivery,delivered' %}
+      <div class="od-card">
+        <div class="od-card-body" style="text-align:center;padding:.625rem .875rem;">
+          <div style="font-size:.75rem;color:oklch(57% 0.03 54);margin-bottom:.45rem;">No digital signature on file.</div>
+          <a href="{% url 'print_order_summary' order.id %}" class="btn btn-outline-secondary btn-sm w-100" target="_blank">🖨️ View / Print Invoice</a>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Rejection details -->
+      {% if order.status == 'rejected' and order.rejection_record %}
+      <div class="od-card" style="border-color:oklch(82% 0.08 22);">
+        <div class="od-card-head" style="background:oklch(96% 0.04 22);">
+          <div class="od-card-icon" style="background:oklch(90% 0.08 22);">❌</div>
+          <span class="od-card-title" style="color:oklch(32% 0.1 18);">Rejection Details</span>
+          <span class="od-pill" style="background:oklch(90% 0.06 22);color:oklch(40% 0.08 20);font-size:.67rem;">{{ order.rejection_record.rejected_at|date:"d M, H:i" }}</span>
+        </div>
+        <div class="od-card-body">
+          <div class="od-grid">
+            <div>
+              <div class="od-label">Reason</div>
+              <div class="od-value" style="font-size:.8rem;">{{ order.rejection_record.get_rejection_reason_display }}</div>
+            </div>
+            <div>
+              <div class="od-label">Rejected by</div>
+              <div class="od-value" style="font-size:.8rem;">{{ order.rejection_record.rejected_by.get_full_name|default:order.rejection_record.rejected_by.username }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Pending-payment notice (admin awareness only, action is in bar) -->
+      {% if order.status == 'pending_payment' %}
+      <div class="od-card" style="border-color:#fcd34d;">
+        <div class="od-card-body" style="background:#fffbeb;border-radius:9px;">
+          <div style="display:flex;align-items:flex-start;gap:.5rem;">
+            <span>⚠️</span>
+            <div>
+              <div class="fw-bold" style="font-size:.8rem;color:#92400e;margin-bottom:.25rem;">Payment Not Yet Received</div>
+              <div style="font-size:.76rem;color:#78350f;line-height:1.5;">Use <strong>Approve Unpaid</strong> in the toolbar to move this order forward. Staff must collect payment on delivery.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Staff Notes -->
+      <div class="od-card">
+        <div class="od-card-head">
+          <div class="od-card-icon">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="oklch(52% 0.04 52)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <span class="od-card-title">Staff Notes</span>
+          <span class="od-pill" style="background:#f1f5f9;color:#64748b;font-size:.64rem;letter-spacing:.04em;">INTERNAL ONLY</span>
+        </div>
+        <div class="od-card-body">
+          <textarea id="staffNoteInput" class="od-ta" rows="3"
+                    placeholder="Visible to staff only. Not shown to customer.">{{ order.internal_note|default:'' }}</textarea>
+          <div style="display:flex;align-items:center;margin-top:.5rem;">
+            <span id="staffNoteSaved" style="display:none;font-size:.73rem;font-weight:700;color:#10b981;">Saved</span>
+            <span id="staffNoteError" style="display:none;font-size:.73rem;font-weight:700;color:#ef4444;">Failed to save</span>
+            <button id="staffNoteSaveBtn" class="btn btn-sm ms-auto fw-bold"
+                    style="background:oklch(19% 0.035 52);color:oklch(93% 0.012 62);font-size:.74rem;padding:.3rem .85rem;">Save Note</button>
+          </div>
+        </div>
+      </div>
+
     </div>
+  </div>
 </div>
 
-<div class="row g-4">
+<script nonce="{{ request.csp_nonce }}">
+(function () {
+  // Reject panel toggle
+  var rejectToggle = document.getElementById('rejectToggle');
+  var rejectPanel  = document.getElementById('rejectPanel');
+  if (rejectToggle && rejectPanel) {
+    rejectToggle.addEventListener('click', function () {
+      var open = rejectPanel.classList.toggle('open');
+      this.textContent = open ? 'Cancel' : 'Reject';
+    });
+  }
 
-    <!-- ── LEFT COLUMN ── -->
-    <div class="col-lg-7">
+  // Force-approve unpaid
+  var forceBtn  = document.getElementById('forceApproveBtn');
+  var forceForm = document.getElementById('forceApproveForm');
+  if (forceBtn && forceForm) {
+    forceBtn.addEventListener('click', function () {
+      if (confirm('Approve Order #{{ order.id }} without confirmed payment?\n\nIt will appear in Approved Orders tagged UNPAID. Staff must collect on delivery.')) {
+        forceForm.submit();
+      }
+    });
+  }
 
-        <!-- Customer card -->
-        <div class="content-card mb-4">
-            <div class="d-flex align-items-center justify-content-between border-bottom pb-3 mb-3">
-                <div class="d-flex align-items-center gap-2">
-                    <div style="width:32px;height:32px;background:#f1f5f9;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.9rem;">👤</div>
-                    <h6 class="fw-bold mb-0">Customer</h6>
-                </div>
-                {% with c=order.customer.approved_orders.count %}
-                {% if c > 0 %}
-                <span class="badge rounded-pill" style="background:#e0f2fe;color:#0369a1;">Returning · {{ c }} order{{ c|pluralize }}</span>
-                {% else %}
-                <span class="badge rounded-pill bg-light text-secondary border">New Customer</span>
-                {% endif %}
-                {% endwith %}
-            </div>
+  // Staff notes
+  var btn = document.getElementById('staffNoteSaveBtn');
+  var ta  = document.getElementById('staffNoteInput');
+  var ok  = document.getElementById('staffNoteSaved');
+  var err = document.getElementById('staffNoteError');
+  var timer;
+  if (btn) {
+    btn.addEventListener('click', function () {
+      btn.disabled = true; btn.textContent = 'Saving…';
+      ok.style.display = err.style.display = 'none';
+      fetch("{% url 'save_internal_note' order.id %}", {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ note: ta.value })
+      })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        btn.textContent = 'Save Note'; btn.disabled = false;
+        if (d.ok) { ok.style.display = 'inline'; clearTimeout(timer); timer = setTimeout(function () { ok.style.display = 'none'; }, 3000); }
+        else { err.style.display = 'inline'; }
+      })
+      .catch(function () { btn.textContent = 'Save Note'; btn.disabled = false; err.style.display = 'inline'; });
+    });
+  }
+})();
+</script>
 
-            <div class="row g-3 small">
-                <div class="col-sm-6">
-                    <div class="text-muted mb-1 fw-medium" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Full Name</div>
-                    <div class="fw-semibold">{{ order.full_name }}</div>
-                </div>
-                <div class="col-sm-6">
-                    <div class="text-muted mb-1 fw-medium" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Phone</div>
-                    <div class="fw-semibold">{{ order.phone_number }}</div>
-                </div>
-                <div class="col-12">
-                    <div class="text-muted mb-1 fw-medium" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Delivery Address</div>
-                    <div>{{ order.address_summary }}</div>
-                    {% if order.latitude and order.longitude %}
-                    <div class="mt-1" style="color:#94a3b8;font-size:.75rem;">📍 {{ order.latitude }}, {{ order.longitude }}</div>
-                    {% endif %}
-                </div>
-                {% if order.order_notes %}
-                <div class="col-12">
-                    <div class="text-muted mb-1 fw-medium" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Order Notes</div>
-                    <div class="px-3 py-2 rounded-3" style="background:#f8fafc;border:1px solid #e2e8f0;line-height:1.5;">{{ order.order_notes }}</div>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Order items card -->
-        <div class="content-card">
-            <div class="d-flex align-items-center gap-2 border-bottom pb-3 mb-3">
-                <div style="width:32px;height:32px;background:#f1f5f9;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.9rem;">📦</div>
-                <h6 class="fw-bold mb-0">Order Items</h6>
-                <span class="badge bg-light text-secondary border ms-auto">{{ order.items.count }} item{{ order.items.count|pluralize }}</span>
-            </div>
-            <table class="table table-sm mb-0" style="border-collapse:separate;border-spacing:0;">
-                <thead>
-                    <tr>
-                        <th class="ps-0 pb-2 text-muted fw-medium border-0" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Product</th>
-                        <th class="text-center pb-2 text-muted fw-medium border-0" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Qty</th>
-                        <th class="text-end pe-0 pb-2 text-muted fw-medium border-0" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Subtotal</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in order.items.all %}
-                    <tr style="border-bottom:1px solid #f1f5f9;">
-                        <td class="ps-0 py-2 fw-medium">{{ item.product.name }}</td>
-                        <td class="text-center py-2">
-                            <span class="px-2 py-1 rounded" style="background:#f1f5f9;font-size:.8rem;font-weight:600;">×{{ item.quantity }}</span>
-                        </td>
-                        <td class="text-end pe-0 py-2 fw-semibold">RM {{ item.subtotal }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-                <tfoot>
-                    <tr>
-                        <td colspan="2" class="text-end ps-0 pt-3 pb-0 fw-bold border-0" style="font-size:.9rem;">Total Amount</td>
-                        <td class="text-end pe-0 pt-3 pb-0 border-0 fw-black" style="font-size:1.25rem;color:#0f172a;">RM {{ order.total_amount }}</td>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>
-
-    </div>
-
-    <!-- ── RIGHT COLUMN ── -->
-    <div class="col-lg-5">
-
-        <!-- Payment card -->
-        <div class="content-card mb-4" style="background:linear-gradient(145deg,#f0f9ff 0%,#e0f2fe 100%);">
-            <div class="d-flex align-items-center gap-2 border-bottom pb-3 mb-3" style="border-color:#bae6fd !important;">
-                <div style="width:32px;height:32px;background:#bae6fd;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.9rem;">💳</div>
-                <h6 class="fw-bold mb-0" style="color:#0369a1;">Payment</h6>
-                {% if has_payment %}
-                <span class="badge ms-auto" style="background:#d1fae5;color:#065f46;">Confirmed</span>
-                {% else %}
-                <span class="badge ms-auto" style="background:#fee2e2;color:#991b1b;">Not Confirmed</span>
-                {% endif %}
-            </div>
-
-            {% if stripe_payment %}
-            <div class="rounded-3 p-3 mb-3 small"
-                style="background:{% if stripe_payment.status == 'succeeded' %}#d1fae5{% elif stripe_payment.status == 'processing' %}#fef3c7{% else %}#f1f5f9{% endif %};
-                       border-left:4px solid {% if stripe_payment.status == 'succeeded' %}#10b981{% elif stripe_payment.status == 'processing' %}#f59e0b{% else %}#94a3b8{% endif %};">
-                <div class="fw-semibold mb-1">
-                    {% if stripe_payment.status == 'succeeded' %}✅ Stripe Payment Confirmed
-                    {% elif stripe_payment.status == 'processing' %}⏳ Stripe Processing
-                    {% elif stripe_payment.status == 'pending' %}🧾 Checkout Started
-                    {% elif stripe_payment.status == 'failed' %}❌ Payment Failed
-                    {% else %}💳 Stripe Payment{% endif %}
-                </div>
-                <div class="text-muted">RM {{ stripe_payment.amount|floatformat:2 }} · {{ stripe_payment.get_status_display }}</div>
-                {% if stripe_payment.status == 'pending' %}
-                <div class="text-muted mt-2" style="font-size:.75rem;">Awaiting webhook confirmation — no manual proof needed.</div>
-                {% endif %}
-            </div>
-            {% endif %}
-
-            {% if order.payment_proof and not stripe_payment %}
-            <div class="mb-3">
-                <div class="small text-muted fw-semibold mb-2">📸 Bank Transfer / DuitNow Proof</div>
-                <img src="{{ order.payment_proof.url }}" class="img-fluid rounded-3 border" style="max-height:220px;width:100%;object-fit:cover;cursor:zoom-in;" onclick="window.open(this.src)">
-            </div>
-            {% endif %}
-
-            {% if not stripe_payment and not order.payment_proof %}
-            <div class="text-center py-2 small text-muted">
-                {% if order.status == 'pending_payment' %}📄 Waiting for customer to upload payment proof.
-                {% else %}No payment record.{% endif %}
-            </div>
-            {% endif %}
-
-            {% if order.status == 'pending' %}
-                {% if has_payment %}
-                <a href="{% url 'approve_order' order.id %}" class="btn btn-success w-100 fw-bold mt-1">✅ Approve Order</a>
-                {% else %}
-                <a href="{% url 'approve_order' order.id %}" class="btn btn-warning w-100 fw-semibold mt-1 mb-2">Approve → Awaiting Payment List</a>
-                <p class="text-muted small text-center mb-0">{% if stripe_payment %}⏳ Awaiting Stripe webhook.{% else %}📄 No payment yet.{% endif %}</p>
-                {% endif %}
-            {% endif %}
-        </div>
-
-        <!-- Signature / Invoice card -->
-        {% if order.digital_signature %}
-        <div class="content-card mb-4" style="border:2px solid #10b981;background:linear-gradient(145deg,#f0fdf4,#dcfce7);">
-            <div class="text-center py-2">
-                <div style="font-size:2rem;line-height:1;margin-bottom:.5rem;">🔏</div>
-                <div class="fw-bold mb-1" style="color:#065f46;">Digitally Signed</div>
-                <div class="small text-muted mb-3">Hash: <code style="font-size:.7rem;">{{ order.digital_signature.signature_hash|truncatechars:24 }}</code></div>
-                <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-success w-100 mb-2 fw-semibold" download>📄 Download Signed Receipt</a>
-                <a href="{% url 'print_order_summary' order.id %}" class="btn btn-outline-secondary w-100 btn-sm" target="_blank">🖨️ View Invoice</a>
-            </div>
-        </div>
-        {% elif order.status in 'approved,pending_payment,prepared,ready_for_delivery,out_for_delivery,delivered' %}
-        <div class="content-card mb-4">
-            <div class="text-center py-1">
-                <div class="small text-muted mb-2">No digital signature on file.</div>
-                <a href="{% url 'print_order_summary' order.id %}" class="btn btn-outline-secondary w-100 btn-sm" target="_blank">🖨️ View / Print Invoice</a>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Unpaid → force approve -->
-        {% if order.status == 'pending_payment' %}
-        <div class="content-card mb-4" style="border:1px solid #fcd34d;background:#fffbeb;">
-            <div class="d-flex align-items-center gap-2 mb-2">
-                <span style="font-size:1rem;">⚠️</span>
-                <span class="fw-bold small" style="color:#92400e;">Payment Not Yet Received</span>
-            </div>
-            <p class="small text-muted mb-3">Approve anyway — order moves to the Approved list tagged <strong>UNPAID</strong>. Staff must collect payment on delivery.</p>
-            <form method="post" action="{% url 'force_approve_unpaid' order.id %}">
-                {% csrf_token %}
-                <button type="submit" class="btn w-100 fw-semibold"
-                        style="background:#f59e0b;color:#000;border:none;"
-                        onclick="return confirm('Approve Order #{{ order.id }} without confirmed payment?\n\nIt will appear in the Approved Orders list tagged UNPAID.')">
-                    ✅ Approve — Collect on Delivery
-                </button>
-            </form>
-        </div>
-        {% endif %}
-
-        <!-- Rejected details -->
-        {% if order.status == 'rejected' and order.rejection_record %}
-        <div class="content-card mb-4" style="border:1px solid #fca5a5;background:#fff5f5;">
-            <div class="d-flex align-items-center gap-2 mb-3">
-                <div style="width:32px;height:32px;background:#fee2e2;border-radius:8px;display:flex;align-items:center;justify-content:center;">❌</div>
-                <h6 class="fw-bold mb-0" style="color:#991b1b;">Rejection Details</h6>
-            </div>
-            <div class="small">
-                <div class="d-flex justify-content-between mb-2">
-                    <span class="text-muted">Date</span>
-                    <span class="fw-semibold">{{ order.rejection_record.rejected_at|date:"d M Y, H:i" }}</span>
-                </div>
-                <div class="d-flex justify-content-between mb-2">
-                    <span class="text-muted">Reason</span>
-                    <span class="fw-semibold text-end" style="max-width:60%;">{{ order.rejection_record.get_rejection_reason_display }}</span>
-                </div>
-                <div class="d-flex justify-content-between">
-                    <span class="text-muted">Rejected by</span>
-                    <span class="fw-semibold">{{ order.rejection_record.rejected_by.get_full_name|default:order.rejection_record.rejected_by.username }}</span>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Internal Staff Notes -->
-        <div class="content-card mb-4" style="border:1px solid #e2e8f0;background:#fafafa;">
-            <div class="d-flex align-items-center gap-2 border-bottom pb-3 mb-3" style="border-color:#e2e8f0 !important;">
-                <div style="width:32px;height:32px;background:#f1f5f9;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.85rem;">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                </div>
-                <h6 class="fw-bold mb-0">Staff Notes</h6>
-                <span class="badge ms-auto" style="background:#f1f5f9;color:#64748b;font-size:.65rem;letter-spacing:.04em;font-weight:600;">INTERNAL ONLY</span>
-            </div>
-            <textarea id="staffNoteInput" class="form-control form-control-sm mb-2" rows="3"
-                      placeholder="Visible to staff only. Not shown to the customer."
-                      style="resize:vertical;font-size:.82rem;background:#fff;">{{ order.internal_note|default:'' }}</textarea>
-            <div class="d-flex align-items-center">
-                <span id="staffNoteSaved" class="small fw-semibold" style="display:none;color:#10b981;">Saved</span>
-                <span id="staffNoteError" class="small fw-semibold" style="display:none;color:#ef4444;">Failed to save</span>
-                <button id="staffNoteSaveBtn" class="btn btn-sm ms-auto fw-semibold"
-                        style="background:#0f172a;color:#fff;font-size:.78rem;padding:.3rem .9rem;">Save Note</button>
-            </div>
-        </div>
-        <script nonce="{{ request.csp_nonce }}">
-        (function() {
-            const btn = document.getElementById('staffNoteSaveBtn');
-            const ta  = document.getElementById('staffNoteInput');
-            const ok  = document.getElementById('staffNoteSaved');
-            const err = document.getElementById('staffNoteError');
-            let timer;
-            btn.addEventListener('click', function() {
-                btn.disabled = true;
-                btn.textContent = 'Saving…';
-                ok.style.display = err.style.display = 'none';
-                fetch("{% url 'save_internal_note' order.id %}", {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: new URLSearchParams({ note: ta.value })
-                })
-                .then(r => r.json())
-                .then(d => {
-                    btn.textContent = 'Save Note';
-                    btn.disabled = false;
-                    if (d.ok) {
-                        ok.style.display = 'inline';
-                        clearTimeout(timer);
-                        timer = setTimeout(() => { ok.style.display = 'none'; }, 3000);
-                    } else { err.style.display = 'inline'; }
-                })
-                .catch(() => { btn.textContent = 'Save Note'; btn.disabled = false; err.style.display = 'inline'; });
-            });
-        })();
-        </script>
-
-        <!-- Reject form -->
-        {% if order.status == 'pending' %}
-        <div class="content-card">
-            <div class="d-flex align-items-center gap-2 mb-3">
-                <div style="width:32px;height:32px;background:#fee2e2;border-radius:8px;display:flex;align-items:center;justify-content:center;">❌</div>
-                <h6 class="fw-bold mb-0">Reject Order</h6>
-            </div>
-            <form method="post" action="{% url 'reject_order' order.id %}">
-                {% csrf_token %}
-                <div class="mb-3">
-                    <label class="form-label small fw-semibold">Rejection Reason</label>
-                    <select name="rejection_reason_id" class="form-select form-select-sm">
-                        <option value="">— Select a reason —</option>
-                        {% for reason in rejection_reasons %}
-                        <option value="{{ reason.id }}" title="{{ reason.internal_note }}">
-                            {{ reason.reason_text }}{% if reason.category != 'other' %} ({{ reason.get_category_display }}){% endif %}
-                        </option>
-                        {% endfor %}
-                    </select>
-                    <div class="text-muted mt-1" style="font-size:.72rem;">Hover to see internal notes</div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-semibold">Custom Reason <span class="fw-normal text-muted">(optional)</span></label>
-                    <textarea name="custom_reason" class="form-control form-control-sm" rows="2" placeholder="Overrides selected reason above"></textarea>
-                </div>
-                <button type="submit" class="btn btn-outline-danger w-100 btn-sm fw-semibold">Reject Order</button>
-            </form>
-        </div>
-        {% endif %}
-
-    </div>
-</div>
 {% endblock %}

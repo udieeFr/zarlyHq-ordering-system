@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>500 — Server Error · Zarly BigFood</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: oklch(98.5% 0.008 60);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 20px;
+      border: 1px solid oklch(92% 0.01 60);
+      box-shadow: 0 8px 40px rgba(15,23,42,.08);
+      padding: 3rem 2.5rem;
+      text-align: center;
+      max-width: 440px;
+      width: 100%;
+    }
+    .error-code {
+      font-size: 6rem;
+      font-weight: 900;
+      line-height: 1;
+      background: linear-gradient(135deg, #f97316, #ea580c);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.04em;
+      margin-bottom: 0.5rem;
+    }
+    .error-name {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: oklch(18% 0.05 50);
+      margin-bottom: 0.75rem;
+      letter-spacing: -0.02em;
+    }
+    .error-desc {
+      font-size: 0.9rem;
+      color: oklch(48% 0.04 50);
+      line-height: 1.6;
+      margin-bottom: 2rem;
+    }
+    .divider {
+      width: 40px;
+      height: 3px;
+      background: linear-gradient(90deg, #f97316, #ea580c);
+      border-radius: 99px;
+      margin: 1.25rem auto;
+    }
+    .btn-home {
+      display: inline-block;
+      background: linear-gradient(135deg, #f97316, #ea580c);
+      color: #fff;
+      text-decoration: none;
+      padding: 0.7rem 2rem;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 0.92rem;
+      transition: opacity .15s, transform .15s;
+    }
+    .btn-home:hover { opacity: .88; transform: translateY(-1px); }
+    .brand {
+      font-size: 0.72rem;
+      color: oklch(65% 0.03 50);
+      margin-top: 2rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="error-code">500</div>
+    <div class="error-name">Internal Server Error</div>
+    <div class="divider"></div>
+    <p class="error-desc">
+      Something went wrong on our end. Our team has been notified.
+      Please try again in a moment.
+    </p>
+    <a href="/" class="btn-home">Go Back Home</a>
+    <div class="brand">Zarly BigFood</div>
+  </div>
+</body>
+</html>
