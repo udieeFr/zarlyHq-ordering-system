@@ -111,3 +111,23 @@ Every `AuditLog` row computes a SHA-256 of its own content chained with the prev
 ## 4. Digital Signature on Orders (Implemented — prior session)
 
 `DigitalSignature` model stores a SHA-256 hash + signed PDF path per order. Created when order reaches `delivered` status. Supports receipt verification by customers.
+
+---
+
+## 5. Content Security Policy — Nonce-Based (Implemented — 2026-05-18)
+
+### What Was Built
+- `django-csp==3.8` installed; `EagerNonceCSPMiddleware` (subclass of `CSPMiddleware`) added to `MIDDLEWARE` via `zarlyOs/middleware.py`
+- `CSP_*` settings in `zarlyOs/settings.py` configure all directives
+- `CSP_INCLUDE_NONCE_IN = ["script-src"]` enables per-request nonce generation
+- 38 inline `<script>` blocks across 35 templates updated with `nonce="{{ request.csp_nonce }}"`
+- `'unsafe-inline'` absent from `script-src` — injected scripts are blocked
+- External origins whitelisted: `cdn.jsdelivr.net`, `unpkg.com`, `fonts.googleapis.com`, `fonts.gstatic.com`
+- 13 automated tests in `tests/test_csp.py`
+
+### Security Design
+- Nonces are cryptographically random, per-request — attacker cannot predict them
+- `EagerNonceCSPMiddleware` forces nonce evaluation on every request so the header always carries a nonce (workaround for django-csp 3.x lazy evaluation)
+- `style-src` uses `'unsafe-inline'` (pragmatic — hundreds of `style=` attributes; CSS injection is lower risk)
+- `frame-ancestors 'none'` redundant with `X-Frame-Options: DENY` but explicit in CSP
+- `form-action 'self'` prevents form hijacking; Stripe redirect is server-side only
