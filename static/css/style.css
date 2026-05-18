@@ -1209,7 +1209,8 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
   left: 0;
   width: var(--sidebar-w);
   height: 100vh;
-  background: linear-gradient(175deg, #ff9933 0%, #d4651a 55%, #b84e10 100%);
+  background: oklch(95% 0.055 62);
+  border-right: 2.5px solid #ff9933;
   display: flex;
   flex-direction: column;
   z-index: 1200;
@@ -1220,7 +1221,7 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
 }
 .left-sidebar::-webkit-scrollbar { width: 6px; }
 .left-sidebar::-webkit-scrollbar-track { background: transparent; }
-.left-sidebar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 3px; }
+.left-sidebar::-webkit-scrollbar-thumb { background: oklch(75% 0.12 58); border-radius: 3px; }
 
 /* Keep sidebar links clickable even when page content layers are complex */
 .left-sidebar,
@@ -1235,7 +1236,7 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
   justify-content: center;
   padding: 1rem 1rem 0.75rem;
   flex-shrink: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid oklch(86% 0.07 62);
   margin-bottom: 0.5rem;
 }
 
@@ -1243,8 +1244,8 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.22);
-  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: oklch(14% 0.045 52);
+  border: 2px solid #ff9933;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1255,6 +1256,8 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
   width: 22px;
   height: 22px;
 }
+.lsb-logo-icon circle { fill: rgb(255 153 51 / 0.2); }
+.lsb-logo-icon path  { stroke: #ff9933; }
 
 /* ── Nav items ────────────── */
 .lsb-nav {
@@ -1271,7 +1274,7 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
   align-items: center;
   gap: 0.6rem;
   padding: 0.5rem 0.8rem;
-  color: rgba(255, 255, 255, 0.8);
+  color: oklch(32% 0.06 52);
   text-decoration: none;
   font-size: 0.8rem;
   font-weight: 500;
@@ -1290,14 +1293,14 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
 }
 
 .lsb-link:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+  background: oklch(87% 0.09 58);
+  color: oklch(16% 0.04 52);
   padding-left: 1rem;
 }
 
 .lsb-link.lsb-active {
-  background: rgba(255, 255, 255, 0.28);
-  color: #fff;
+  background: oklch(14% 0.045 52);
+  color: oklch(97% 0.012 58);
 }
 
 .lsb-icon {
@@ -1320,8 +1323,8 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
 .lsb-badge-wrap { position: relative; }
 
 .lsb-badge {
-  background: #fff;
-  color: var(--brand-dark);
+  background: oklch(14% 0.045 52);
+  color: #ff9933;
   font-size: 0.65rem;
   font-weight: 800;
   min-width: 18px;
@@ -1351,9 +1354,9 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
 /* ── User footer ──────────── */
 .lsb-footer {
   padding: 0.75rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid oklch(86% 0.07 62);
   flex-shrink: 0;
-  background: rgba(0, 0, 0, 0.1);
+  background: oklch(92% 0.065 62);
 }
 
 .lsb-user {
@@ -1366,14 +1369,14 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.25);
-  border: 2px solid rgba(255, 255, 255, 0.4);
+  background: oklch(14% 0.045 52);
+  border: 2px solid #ff9933;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
   font-size: 0.75rem;
-  color: #fff;
+  color: oklch(97% 0.012 58);
   flex-shrink: 0;
 }
 
@@ -1387,7 +1390,7 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
 .lsb-user-name {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #fff;
+  color: oklch(18% 0.04 52);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1397,7 +1400,7 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
 
 .lsb-user-role {
   font-size: 0.65rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: oklch(48% 0.06 52);
   font-weight: 500;
   letter-spacing: 0.3px;
   line-height: 1.2;
@@ -1406,9 +1409,9 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
 .lsb-signin-btn {
   display: block;
   text-align: center;
-  background: rgba(255, 255, 255, 0.2);
-  border: 1.5px solid rgba(255, 255, 255, 0.38);
-  color: #fff;
+  background: oklch(14% 0.045 52);
+  border: 1.5px solid #ff9933;
+  color: oklch(97% 0.012 58);
   padding: 0.4rem;
   border-radius: 4px;
   font-size: 0.75rem;
@@ -1418,8 +1421,7 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
   letter-spacing: 0.2px;
   line-height: 1.2;
 }
-.lsb-signin-btn:hover { background: rgba(255, 255, 255, 0.32); color: #fff; }
-.lsb-signin-btn:hover { background: rgba(255,255,255,0.32); color: #fff; }
+.lsb-signin-btn:hover { background: oklch(20% 0.045 52); color: oklch(97% 0.012 58); }
 
 /* ── Main wrapper offset ──── */
 .main-wrapper {
