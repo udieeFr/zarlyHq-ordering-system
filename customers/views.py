@@ -249,7 +249,10 @@ def upload_payment_proof(request, order_id):
                 payment.amount = order.total_amount
                 payment.currency = settings.STRIPE_CURRENCY
                 if payment.proof_image:
-                    payment.proof_image.delete(save=False)
+                    try:
+                        payment.proof_image.delete(save=False)
+                    except Exception as del_err:
+                        logger.warning(f"Could not delete old proof for Order #{order.id}: {del_err}")
                 payment.proof_image = proof_file
                 payment.save()
             

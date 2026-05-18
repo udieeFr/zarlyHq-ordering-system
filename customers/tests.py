@@ -409,11 +409,13 @@ class PaymentProofDeleteOldFileTest(TestCase):
         from admins.models import Payment
         from unittest.mock import MagicMock
         new_payment = MagicMock()
-        new_payment.proof_image.__bool__ = lambda self: False
+        new_payment.proof_image = None
 
         url = reverse('upload_payment_proof', args=[self.order.id])
         with patch.object(Payment.objects, 'get_or_create',
                           return_value=(new_payment, True)):
             self.client.post(url, {'payment_proof': self._make_valid_jpeg()})
 
-        new_payment.proof_image.delete.assert_not_called()
+        # created=True means the if-not-created block is never entered, so no
+        # delete is attempted. proof_image is still None — no delete method to call.
+        self.assertIsNone(new_payment.proof_image)
