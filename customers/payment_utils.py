@@ -194,6 +194,8 @@ def validate_payment_proof(file_obj, max_size_mb=5):
     if not file_obj:
         return False, "No file provided"
 
+    file_obj.seek(0)
+
     # Check file size (with fallback for BytesIO objects in testing)
     try:
         file_size = file_obj.size if hasattr(file_obj, 'size') else len(file_obj.getvalue())

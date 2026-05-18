@@ -34,11 +34,11 @@
                     <h6 class="fw-bold mb-3 border-bottom pb-2 text-muted">Delivery Details</h6>
                     <p class="mb-1"><strong>Receiver:</strong> {{ order.full_name }}</p>
                     <p class="mb-1"><strong>Contact:</strong> {{ order.phone_number }}</p>
-                        <p class="mb-1"><strong>Street Address:</strong> {{ order.street_address }}</p>
-                        <p class="mb-1"><strong>City:</strong> {{ order.city }}</p>
-                        <p class="mb-1"><strong>State:</strong> {{ order.state }}</p>
-                        <p class="mb-1"><strong>Postcode:</strong> {{ order.postcode }}</p>
-                        <p class="mb-0"><strong>Location:</strong> {{ order.latitude }}, {{ order.longitude }}</p>
+                    <p class="mb-1"><strong>Street Address:</strong> {{ order.street_address }}</p>
+                    <p class="mb-1"><strong>City:</strong> {{ order.city }}</p>
+                    <p class="mb-1"><strong>State:</strong> {{ order.state }}</p>
+                    <p class="mb-1"><strong>Postcode:</strong> {{ order.postcode }}</p>
+                    <p class="mb-0"><strong>Location:</strong> {{ order.latitude }}, {{ order.longitude }}</p>
                 {% if order.status == 'pending' or order.status == 'pending_payment' or order.status == 'awaiting_payment' %}
                     <hr class="my-4">
                     
@@ -162,11 +162,11 @@
                                         name="payment_proof" 
                                         id="payment_proof"
                                         class="form-control"
-                                        accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
+                                        accept="image/jpeg,image/png,application/pdf"
                                         required
                                     >
                                     <small class="text-muted d-block mt-2">
-                                        ✓ Supported: JPG, PNG, GIF, WebP, PDF<br>
+                                        ✓ Supported: JPG, PNG, PDF<br>
                                         ✓ Max size: 5MB<br>
                                         📸 Clear screenshot recommended
                                     </small>
@@ -300,6 +300,53 @@
         }
     });
 </script>
+
+{% if order.status == 'delivered' %}
+<div class="container" style="max-width:640px;">
+  {% if order.rating %}
+  <div class="alert alert-success d-flex align-items-center gap-2 mb-3">
+    <span style="font-size:1.4rem;">★</span>
+    <span>You rated this order <strong>{{ order.rating.rating }}/5</strong>.
+      {% if order.rating.comment %}"{{ order.rating.comment }}"{% endif %}
+    </span>
+  </div>
+  {% else %}
+  <div class="card border-0 shadow-sm mb-3" style="border-radius:14px;background:#fffbf5;border:1.5px solid #fed7aa !important;">
+    <div class="card-body p-3">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <span class="fw-bold" style="color:#92400e;">How was your order? Leave a rating!</span>
+        <div class="d-flex gap-1" id="detailStarRow">
+          {% for i in "12345" %}
+          <button type="button" class="detail-star" data-val="{{ i }}"
+                  style="background:none;border:none;font-size:1.6rem;color:#d1d5db;cursor:pointer;padding:0;">★</button>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+<script nonce="{{ request.csp_nonce }}">
+(function(){
+  let selected = 0;
+  const stars = document.querySelectorAll('.detail-star');
+  if (!stars.length) return;
+  function paint(v){ stars.forEach(s => s.style.color = parseInt(s.dataset.val) <= v ? '#f59e0b' : '#d1d5db'); }
+  stars.forEach(s => {
+    s.addEventListener('click', () => {
+      selected = parseInt(s.dataset.val);
+      paint(selected);
+      const csrf = document.querySelector('[name=csrfmiddlewaretoken]') || {};
+      const body = new URLSearchParams({ rating: selected, csrfmiddlewaretoken: csrf.value || '' });
+      fetch('/menu/order/{{ order.id }}/rate/', { method: 'POST', body })
+        .then(r => r.json()).then(d => { if(d.ok) location.reload(); else alert(d.error||'Error'); });
+    });
+    s.addEventListener('mouseenter', () => paint(parseInt(s.dataset.val)));
+    s.addEventListener('mouseleave', () => paint(selected));
+  });
+})();
+</script>
+{% endif %}
 
 {% if order.status == 'pending' %}
 <!-- Cancel order modal -->
