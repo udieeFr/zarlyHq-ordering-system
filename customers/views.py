@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from customers.auth_utils import customer_required
 from django.contrib.auth import logout
 from django.contrib import messages
 from django.http import HttpResponse, JsonResponse  # Required for PDF downloads
@@ -7,7 +8,7 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
-from .models import Product, Category, Allergy, Favourite
+from .models import Product, Category, Allergy, Favourite, OrderRating, ProductReview
 from admins.models import Order, OrderItem, Complaint, Payment, DigitalSignature
 from admins.utils import generate_invoice_pdf  # The PDF generation engine
 from admins.notifications import log_audit, notify, notify_admins
@@ -132,7 +133,7 @@ def product_list(request):
 
     return render(request, 'customers/product_list.html', context)
 
-@login_required
+@customer_required
 def favourites_list(request):
     fav_ids = set(Favourite.objects.filter(customer=request.user).values_list('product_id', flat=True))
     products = Product.objects.filter(id__in=fav_ids, is_available=True).order_by('name')
@@ -144,7 +145,7 @@ def favourites_list(request):
     })
 
 
-@login_required
+@customer_required
 def toggle_favourite(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
@@ -158,7 +159,7 @@ def toggle_favourite(request):
     return JsonResponse({'is_favourite': is_fav})
 
 
-@login_required
+@customer_required
 def download_invoice(request, order_id):
     """
     Generates and downloads an unsigned PDF invoice for 'pending_payment' orders.
@@ -187,7 +188,7 @@ def download_invoice(request, order_id):
 
     return redirect('product_list')
 
-@login_required
+@customer_required
 @ratelimit(key='user', rate='10/h', method='POST', block=False)
 def upload_payment_proof(request, order_id):
     """
@@ -247,6 +248,8 @@ def upload_payment_proof(request, order_id):
                 payment.status = 'pending'
                 payment.amount = order.total_amount
                 payment.currency = settings.STRIPE_CURRENCY
+                if payment.proof_image:
+                    payment.proof_image.delete(save=False)
                 payment.proof_image = proof_file
                 payment.save()
             
@@ -275,7 +278,7 @@ def upload_payment_proof(request, order_id):
     return redirect('order_success', order_id=order.id)
 
 
-@login_required
+@customer_required
 def payment_page(request, order_id):
     """
     Simple payment landing page that lets the customer choose between Stripe
@@ -294,7 +297,7 @@ def payment_page(request, order_id):
     return render(request, 'customers/payment_page.html', context)
 
 
-@login_required
+@customer_required
 @require_http_methods(['POST'])
 def start_stripe_payment(request, order_id):
     """
@@ -317,9 +320,13 @@ def start_stripe_payment(request, order_id):
         messages.error(request, 'Could not open Stripe checkout. Please try again.')
         return redirect('payment_page', order_id=order.id)
 
+    log_audit(request, 'payment_initiated', target=order,
+              description=f'Stripe checkout session started for Order #{order.id}',
+              metadata={'amount': str(order.total_amount), 'stripe_session_id': session_id})
+
     return redirect(checkout_url)
 
-@login_required
+@customer_required
 @ratelimit(key='user', rate='60/m', method='POST', block=False)
 def add_to_cart(request):
     """
@@ -335,7 +342,10 @@ def add_to_cart(request):
             return redirect('product_list')
 
         product_id = request.POST.get('product_id')
-        quantity = max(1, min(int(request.POST.get('quantity', 1)), 99))
+        try:
+            quantity = max(1, min(int(request.POST.get('quantity', 1)), 99))
+        except (TypeError, ValueError):
+            quantity = 1
 
         cart = request.session.get('cart', {})
 
@@ -360,7 +370,7 @@ def add_to_cart(request):
 
     return redirect('product_list')
 
-@login_required
+@customer_required
 def cart_view(request):
     """Display cart contents"""
     cart_items, total_price = get_cart_from_session(request)
@@ -369,7 +379,7 @@ def cart_view(request):
         'total_price': total_price
     })
 
-@login_required
+@customer_required
 def update_cart(request):
     """Update item quantities or remove them if quantity is zero. Handles clear_cart too."""
     if request.method == 'POST':
@@ -379,7 +389,10 @@ def update_cart(request):
             return redirect('cart')
 
         product_id = request.POST.get('product_id')
-        quantity = max(0, min(int(request.POST.get('quantity', 0)), 99))
+        try:
+            quantity = max(0, min(int(request.POST.get('quantity', 0)), 99))
+        except (TypeError, ValueError):
+            quantity = 0
 
         cart = request.session.get('cart', {})
 
@@ -393,7 +406,7 @@ def update_cart(request):
 
     return redirect('cart')
 
-@login_required
+@customer_required
 def remove_from_cart(request):
     """Remove item from cart"""
     if request.method == 'POST':
@@ -408,7 +421,7 @@ def remove_from_cart(request):
 
     return redirect('cart')
 
-@login_required
+@customer_required
 def checkout(request):
     """Display checkout page with auto-fill from last order and profile."""
     cart_items, total_price = get_cart_from_session(request)
@@ -470,7 +483,7 @@ def _create_order_atomic(user, total_price, cart_items, **order_fields):
         return order
 
 
-@login_required
+@customer_required
 @ratelimit(key='user', rate='10/m', method='POST', block=False)
 def submit_order(request):
     """
@@ -484,11 +497,11 @@ def submit_order(request):
             return redirect('checkout')
 
         cart_items, total_price = get_cart_from_session(request)
-        
+
         if not cart_items:
             messages.error(request, 'Your cart is empty!')
             return redirect('product_list')
-        
+
         # Capture realistic shipping information
         latitude = request.POST.get('latitude')
         longitude = request.POST.get('longitude')
@@ -533,7 +546,7 @@ def submit_order(request):
         except ValueError as e:
             messages.error(request, str(e))
             return redirect('checkout')
-        
+
         from admins.models import OrderEvent
         OrderEvent.objects.create(order=order, status='pending', actor=request.user)
         log_audit(request, 'order_created', target=order,
@@ -626,7 +639,7 @@ def submit_order(request):
 
     return redirect('checkout')
 
-@login_required
+@customer_required
 def order_success(request, order_id):
     """
     Order detail/success page with payment options for pending orders.
@@ -688,7 +701,7 @@ def logout_view(request):
     messages.success(request, "You have been logged out.")
     return redirect('product_list')
 
-@login_required
+@customer_required
 @ratelimit(key='user', rate='5/h', method='POST', block=False)
 def submit_complaint(request):
     """Handles the complaint submission form"""
@@ -749,7 +762,7 @@ def submit_complaint(request):
 # STRIPE PAYMENT CALLBACKS AND WEBHOOK
 # ============================================================================
 
-@login_required
+@customer_required
 def stripe_success(request, order_id):
     """
     Called after successful Stripe Checkout completion (via redirect_url).
@@ -767,7 +780,7 @@ def stripe_success(request, order_id):
     })
 
 
-@login_required
+@customer_required
 def stripe_cancel(request, order_id):
     """
     Called when customer cancels the Stripe Checkout flow.
@@ -870,7 +883,7 @@ def stripe_webhook(request):
     return JsonResponse({'received': True}, status=200)
 
 
-@login_required
+@customer_required
 def customer_orders(request):
     """Order history page with stats, loyalty tier, and per-order detail."""
     from django.db.models import Sum, Count, Avg
@@ -957,7 +970,7 @@ def customer_orders(request):
     })
 
 
-@login_required
+@customer_required
 def customer_support(request):
     complaints = Complaint.objects.filter(
         customer=request.user
@@ -978,7 +991,7 @@ def customer_support(request):
     })
 
 
-@login_required
+@customer_required
 def rejected_orders(request):
     """
     Display all rejected orders for the customer with rejection reasons.
@@ -1011,7 +1024,7 @@ def rejected_orders(request):
     })
 
 
-@login_required
+@customer_required
 def awaiting_payment_orders(request):
     """
     Display all orders awaiting payment for the customer.
@@ -1147,7 +1160,7 @@ def verify_receipt(request, order_id):
 # NOTIFICATIONS
 # ============================================================================
 
-@login_required
+@customer_required
 def notifications_list(request):
     """Show all of the current user's notifications, newest first."""
     from admins.models import Notification
@@ -1161,7 +1174,7 @@ def notifications_list(request):
     })
 
 
-@login_required
+@customer_required
 @ratelimit(key='user', rate='60/m', block=False)
 def notification_open(request, notification_id):
     """Mark a single notification as read and redirect to its link."""
@@ -1174,7 +1187,7 @@ def notification_open(request, notification_id):
     return redirect('notifications_list')
 
 
-@login_required
+@customer_required
 @ratelimit(key='user', rate='10/m', block=False)
 def notifications_mark_all_read(request):
     """Mark all notifications for the current user as read."""
@@ -1186,7 +1199,7 @@ def notifications_mark_all_read(request):
     return redirect('notifications_list')
 
 
-@login_required
+@customer_required
 @ratelimit(key='user', rate='5/m', method='POST', block=False)
 def cancel_order(request, order_id):
     """
@@ -1245,7 +1258,7 @@ def cancel_order(request, order_id):
     return redirect('customer_orders')
 
 
-@login_required
+@customer_required
 def update_profile(request):
     if request.method != 'POST':
         return JsonResponse({'success': False}, status=405)
@@ -1278,7 +1291,7 @@ def update_profile(request):
     return JsonResponse({'success': True})
 
 
-@login_required
+@customer_required
 @ratelimit(key='user', rate='20/m', block=False)
 def reorder(request, order_id):
     """Repopulate the cart from a past order, then go straight to checkout."""
@@ -1313,14 +1326,11 @@ def reorder(request, order_id):
         return redirect('customer_orders')
 
 
-@login_required
+@customer_required
 @ratelimit(key='user', rate='10/h', method='POST', block=True)
 def customer_profile(request):
     from customers.models import CustomerProfile, User as UserModel
     from django.contrib.auth import update_session_auth_hash
-
-    if request.user.role != 'customer':
-        return redirect('product_list')
 
     profile, _ = CustomerProfile.objects.get_or_create(user=request.user)
     show_pw_form = False
@@ -1354,18 +1364,24 @@ def customer_profile(request):
             if not user.check_password(current):
                 messages.error(request, 'Current password is incorrect.')
                 show_pw_form = True
-            elif len(new_pw) < 8:
-                messages.error(request, 'New password must be at least 8 characters.')
-                show_pw_form = True
             elif new_pw != confirm_pw:
                 messages.error(request, 'Passwords do not match.')
                 show_pw_form = True
             else:
-                user.set_password(new_pw)
-                user.save()
-                update_session_auth_hash(request, user)
-                messages.success(request, 'Password changed successfully.')
-                return redirect('customer_profile')
+                from django.contrib.auth.password_validation import validate_password
+                from django.core.exceptions import ValidationError as DjangoValidationError
+                try:
+                    validate_password(new_pw, user)
+                except DjangoValidationError as e:
+                    for msg in e.messages:
+                        messages.error(request, msg)
+                    show_pw_form = True
+                else:
+                    user.set_password(new_pw)
+                    user.save()
+                    update_session_auth_hash(request, user)
+                    messages.success(request, 'Password changed successfully.')
+                    return redirect('customer_profile')
 
     TIER_ORDER = ['bronze', 'silver', 'gold', 'platinum']
     TIER_THRESHOLDS = {'bronze': 0, 'silver': 500, 'gold': 2000, 'platinum': 5000}
@@ -1408,7 +1424,7 @@ def home(request):
     return render(request, 'customers/home.html', {'top_products': top_products})
 
 
-@login_required
+@customer_required
 def customer_complaint_detail(request, complaint_id):
     """Customer view of their own complaint with chat thread."""
     from admins.models import Complaint
@@ -1420,7 +1436,7 @@ def customer_complaint_detail(request, complaint_id):
     })
 
 
-@login_required
+@customer_required
 def customer_complaint_messages(request, complaint_id):
     """Poll for or send support chat messages (customer side)."""
     from admins.models import Complaint, SupportMessage
@@ -1467,3 +1483,90 @@ def customer_complaint_messages(request, complaint_id):
         return JsonResponse({'ok': True})
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+# ── Order Rating ──────────────────────────────────────────────────────────────
+
+@customer_required
+@ratelimit(key='user', rate='20/h', method='POST', block=True)
+def rate_order(request, order_id):
+    """Submit a 1–5 star rating + optional comment for a delivered order."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+    from admins.models import Order as AdminOrder
+    from .models import OrderRating
+
+    order = get_object_or_404(AdminOrder, id=order_id, customer=request.user)
+
+    if order.status != 'delivered':
+        return JsonResponse({'error': 'Only delivered orders can be rated.'}, status=400)
+
+    if hasattr(order, 'rating'):
+        return JsonResponse({'error': 'This order has already been rated.'}, status=400)
+
+    try:
+        rating_val = int(request.POST.get('rating', 0))
+    except (TypeError, ValueError):
+        rating_val = 0
+
+    if not (1 <= rating_val <= 5):
+        return JsonResponse({'error': 'Rating must be between 1 and 5.'}, status=400)
+
+    comment = request.POST.get('comment', '').strip()[:1000]
+
+    OrderRating.objects.create(
+        order=order,
+        customer=request.user,
+        rating=rating_val,
+        comment=comment,
+    )
+    return JsonResponse({'ok': True, 'rating': rating_val})
+
+
+# ── Product Review ────────────────────────────────────────────────────────────
+
+@customer_required
+@ratelimit(key='user', rate='30/h', method='POST', block=True)
+def submit_product_review(request, product_id):
+    """Submit a review for a product, verified via a delivered order."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+    from admins.models import Order as AdminOrder
+    from .models import ProductReview
+
+    product = get_object_or_404(Product, id=product_id)
+
+    delivered_order = AdminOrder.objects.filter(
+        customer=request.user,
+        status='delivered',
+        items__product=product,
+    ).first()
+
+    if not delivered_order:
+        return JsonResponse({'error': 'You can only review products from delivered orders.'}, status=400)
+
+    if ProductReview.objects.filter(product=product, customer=request.user, order=delivered_order).exists():
+        return JsonResponse({'error': 'You have already reviewed this product for that order.'}, status=400)
+
+    try:
+        rating_val = int(request.POST.get('rating', 0))
+    except (TypeError, ValueError):
+        rating_val = 0
+
+    if not (1 <= rating_val <= 5):
+        return JsonResponse({'error': 'Rating must be between 1 and 5.'}, status=400)
+
+    comment = request.POST.get('comment', '').strip()[:1000]
+
+    ProductReview.objects.create(
+        product=product,
+        customer=request.user,
+        order=delivered_order,
+        rating=rating_val,
+        comment=comment,
+    )
+    return JsonResponse({'ok': True, 'rating': rating_val})
+
+

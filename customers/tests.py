@@ -11,6 +11,10 @@ from customers.payment_utils import (
     get_all_payment_methods,
     generate_qr_code_base64,
 )
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.urls import reverse
+from unittest.mock import patch
+from decimal import Decimal
 
 
 class QRCodeGenerationTest(TestCase):
@@ -353,7 +357,63 @@ class RealWorldScenarioTest(TestCase):
         """Test payment for small orders"""
         order_id = 1111
         amount = '0.50'  # Small amount
-        
+
         qr = get_duitnow_qr(order_id, amount)
         self.assertEqual(qr['amount'], amount)
         self.assertTrue(len(qr['qr_image']) > 100)  # QR should still be valid
+
+
+class PaymentProofDeleteOldFileTest(TestCase):
+    """Verify the upload view deletes the old proof file before saving a new one."""
+
+    def setUp(self):
+        from customers.models import User
+        from admins.models import Order
+        self.user = User.objects.create_user(
+            username='testcustomer', password='testpass123', role='customer'
+        )
+        self.order = Order.objects.create(
+            customer=self.user,
+            total_amount=Decimal('25.00'),
+            status='pending_payment',
+        )
+        self.client.login(username='testcustomer', password='testpass123')
+
+    def _make_valid_jpeg(self):
+        from PIL import Image
+        from io import BytesIO
+        buf = BytesIO()
+        Image.new('RGB', (2, 2)).save(buf, format='JPEG')
+        return SimpleUploadedFile('proof.jpg', buf.getvalue(), content_type='image/jpeg')
+
+    def test_old_proof_file_is_deleted_on_reupload(self):
+        """When get_or_create returns created=False and proof_image exists,
+        delete(save=False) must be called before the new file is saved."""
+        from admins.models import Payment
+        from unittest.mock import MagicMock
+        old_proof = MagicMock()
+        old_proof.__bool__ = lambda self: True
+
+        existing_payment = MagicMock()
+        existing_payment.proof_image = old_proof
+
+        url = reverse('upload_payment_proof', args=[self.order.id])
+        with patch.object(Payment.objects, 'get_or_create',
+                          return_value=(existing_payment, False)):
+            self.client.post(url, {'payment_proof': self._make_valid_jpeg()})
+
+        old_proof.delete.assert_called_once_with(save=False)
+
+    def test_no_delete_on_first_upload(self):
+        """On first upload (created=True), proof_image.delete must not be called."""
+        from admins.models import Payment
+        from unittest.mock import MagicMock
+        new_payment = MagicMock()
+        new_payment.proof_image.__bool__ = lambda self: False
+
+        url = reverse('upload_payment_proof', args=[self.order.id])
+        with patch.object(Payment.objects, 'get_or_create',
+                          return_value=(new_payment, True)):
+            self.client.post(url, {'payment_proof': self._make_valid_jpeg()})
+
+        new_payment.proof_image.delete.assert_not_called()
