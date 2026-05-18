@@ -1,7 +1,12 @@
+import logging
+
 from django.shortcuts import render, redirect, get_object_or_404
+from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import login, logout
+
+logger = logging.getLogger(__name__)
 from django_ratelimit.decorators import ratelimit
 from django.utils import timezone
 from django.contrib import messages
@@ -125,7 +130,16 @@ def unified_login(request):
         form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
+            # Preserve anonymous cart before login() flushes the session
+            pre_login_cart = dict(request.session.get('cart', {}))
             login(request, user)
+            # Merge: pre-login cart quantities added to any existing session cart
+            if pre_login_cart and user.role == 'customer':
+                merged = dict(request.session.get('cart', {}))
+                for pid, qty in pre_login_cart.items():
+                    merged[pid] = merged.get(pid, 0) + qty
+                request.session['cart'] = merged
+                request.session.modified = True
             log_audit(request, 'login_success', target=user,
                       description=f"Login: {user.username}", actor=user)
             # Always redirect by role after login so staff land on the right area.
@@ -268,7 +282,38 @@ def manager_analytics_view(request):
     pending_refunds_count = Refund.objects.filter(status__in=['manual', 'failed']).count()
     recent_refunds = Refund.objects.select_related('order', 'order__customer').order_by('-created_at')[:5]
 
-    return render(request, 'admins/manager_dashboard.html', {
+    # --- Page views ---
+    from admins.models import PageView
+    pv_today = PageView.objects.filter(timestamp__date=today).count()
+    pv_week  = PageView.objects.filter(timestamp__gte=week_ago).count()
+    pv_unique_week = (
+        PageView.objects.filter(timestamp__gte=week_ago)
+        .exclude(session_key='')
+        .values('session_key').distinct().count()
+    )
+    top_pages = (
+        PageView.objects.filter(timestamp__gte=week_ago)
+        .values('path')
+        .annotate(hits=Count('id'))
+        .order_by('-hits')[:5]
+    )
+
+    # --- Retention & conversion ---
+    customers_ever_ordered = CustomerProfile.objects.filter(total_orders__gte=1).count()
+    repeat_customers       = CustomerProfile.objects.filter(total_orders__gt=1).count()
+    conversion_rate  = round(customers_ever_ordered / total_customers * 100, 1) if total_customers else 0
+    repeat_rate      = round(repeat_customers / customers_ever_ordered * 100, 1) if customers_ever_ordered else 0
+    new_customers_week = CustomerProfile.objects.filter(created_at__gte=week_ago).count()
+    returning_customers_week = (
+        Order.objects.filter(created_at__gte=week_ago, status__in=completed_statuses)
+        .exclude(is_walk_in=True)
+        .values('customer')
+        .distinct()
+        .filter(customer__customer_profile__total_orders__gt=1)
+        .count()
+    )
+
+    return render(request, 'admins/manager_analytics.html', {
         # Revenue
         'revenue_today': revenue_today,
         'revenue_week': revenue_week,
@@ -391,9 +436,9 @@ def add_product(request):
         )
         product.allergies.set(request.POST.getlist('allergies'))
 
-        log_audit(request, 'inventory_updated', target=product,
-                  description=f"New product '{name}' added by {request.user.username}",
-                  metadata={'price': str(price), 'stock': stock, 'category_id': category_id})
+        log_audit(request, 'product_added', target=product,
+                  description=f"Product '{name}' added to menu",
+                  metadata={'price': str(price), 'stock': int(stock), 'category_id': int(category_id)})
         messages.success(request, f"Product '{name}' added successfully.")
         return redirect('inventory_list')
 
@@ -408,6 +453,12 @@ def edit_product(request, product_id):
     product = get_object_or_404(Product, id=product_id)
 
     if request.method == 'POST':
+        before = {
+            'name': product.name,
+            'price': str(product.price),
+            'stock': product.stock,
+            'category_id': product.category_id,
+        }
         product.name = request.POST.get('name', product.name).strip()
         product.price = request.POST.get('price', product.price)
         product.stock = request.POST.get('stock', product.stock)
@@ -421,9 +472,16 @@ def edit_product(request, product_id):
             product.image = None
         product.save()
         product.allergies.set(request.POST.getlist('allergies'))
-        log_audit(request, 'inventory_updated', target=product,
-                  description=f"Product '{product.name}' updated by {request.user.username}",
-                  metadata={'price': str(product.price), 'stock': product.stock})
+        after = {
+            'name': product.name,
+            'price': str(product.price),
+            'stock': product.stock,
+            'category_id': product.category_id,
+        }
+        changes = {k: {'before': before[k], 'after': after[k]} for k in before if before[k] != after[k]}
+        log_audit(request, 'product_edited', target=product,
+                  description=f"Product '{product.name}' edited",
+                  metadata={'changes': changes})
         messages.success(request, f"'{product.name}' updated.")
         return redirect('inventory_list')
 
@@ -441,10 +499,16 @@ def delete_product(request, product_id):
     """Delete a product. POST only, manager-only."""
     product = get_object_or_404(Product, id=product_id)
     if request.method == 'POST':
-        name = product.name
+        snapshot = {
+            'name': product.name,
+            'price': str(product.price),
+            'stock': product.stock,
+            'category': product.category.name if product.category else None,
+        }
         product.delete()
-        log_audit(request, 'inventory_updated', target=None,
-                  description=f"Product '{name}' deleted by {request.user.username}")
+        log_audit(request, 'product_deleted', target=None,
+                  description=f"Product '{snapshot['name']}' permanently deleted from menu",
+                  metadata=snapshot)
         messages.success(request, f"'{name}' deleted from the menu.")
     return redirect('inventory_list')
 
@@ -862,6 +926,11 @@ def reject_pending_payment(request, order_id):
 
     # Clear proof from Payment record and mark rejected
     for p in order.payments.filter(payment_method='manual'):
+        if p.proof_image:
+            try:
+                p.proof_image.delete(save=False)
+            except Exception as del_err:
+                logger.warning(f"Could not delete proof image for Payment #{p.id}: {del_err}")
         p.proof_image = None
         p.status = 'rejected'
         p.save(update_fields=['proof_image', 'status'])
@@ -1380,7 +1449,12 @@ def bulk_reject_orders(request):
                     notify_rejection_to_customer(rejected_order_record, send_email=True)
                 except Exception as e:
                     print(f"Error notifying customer for order {order.id}: {str(e)}")
-            
+                try:
+                    from admins.refund_utils import process_refund
+                    process_refund(order, source='order_rejection', request=request)
+                except Exception as e:
+                    print(f"Error processing refund for order {order.id}: {str(e)}")
+
             rejected_count += 1
 
         if rejected_count:
@@ -1410,7 +1484,7 @@ def approve_order(request, order_id):
         order.save()
         log_order_event(order, 'pending_payment', actor=request.user)
         messages.success(request, f"Order #{order.id} Approved. Customer will see it in their Awaiting Payment list.")
-    
+
     return redirect('sales_admin_dashboard')
 
 
@@ -1510,7 +1584,8 @@ def admin_support_chats(request):
         .order_by(F('last_msg_at').desc(nulls_last=True), '-created_at')
     )
 
-    chat_list = []
+    # Build one entry per order — keep the complaint with most recent activity
+    seen_orders = {}
     for c in complaints:
         msgs = list(c.messages.all())
         last_msg = msgs[-1] if msgs else None
@@ -1521,13 +1596,25 @@ def admin_support_chats(request):
                 preview = raw[:80] + ('…' if len(raw) > 80 else '')
             except Exception:
                 preview = None
-        chat_list.append({
+        entry = {
             'complaint': c,
             'preview': preview,
             'last_at': last_msg.created_at if last_msg else None,
             'unread_count': c.unread_count,
             'msg_count': len(msgs),
-        })
+        }
+        order_id = c.order_id
+        if order_id not in seen_orders:
+            seen_orders[order_id] = entry
+        else:
+            existing = seen_orders[order_id]
+            # Prefer the entry with more recent activity; fall back to higher complaint id
+            existing_at = existing['last_at'] or existing['complaint'].created_at
+            this_at = entry['last_at'] or c.created_at
+            if this_at > existing_at:
+                seen_orders[order_id] = entry
+
+    chat_list = list(seen_orders.values())
 
     return render(request, 'admins/support_chats.html', {'chat_list': chat_list})
 
@@ -1690,25 +1777,29 @@ def audit_log_list(request):
             Q(actor__username__icontains=search_query)
         )
 
-    # Limit to a reasonable page size
     try:
-        limit = int(request.GET.get('count', '200'))
-        limit = max(1, min(limit, 1000))
+        page_size = int(request.GET.get('count', '200'))
+        page_size = max(1, min(page_size, 1000))
     except ValueError:
-        limit = 200
-    logs = logs[:limit]
+        page_size = 200
+
+    logs = logs.order_by('-timestamp')
+    paginator = Paginator(logs, page_size)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
 
     chain_valid, chain_broken_at = AuditLog.verify_chain()
 
     return render(request, 'admins/audit_log.html', {
-        'logs': logs,
+        'logs': page_obj,
+        'page_obj': page_obj,
         'action_choices': AuditLog.ACTION_CHOICES,
         'action_filter': action_filter,
         'actor_filter': actor_filter,
         'target_filter': target_filter,
         'days_filter': days_filter,
         'search_query': search_query,
-        'count_limit': limit,
+        'count_limit': page_size,
         'total_count': AuditLog.objects.count(),
         'chain_valid': chain_valid,
         'chain_broken_at': chain_broken_at,
@@ -2113,8 +2204,9 @@ def toggle_product_availability(request, product_id):
     product = get_object_or_404(Product, id=product_id)
     product.is_available = not product.is_available
     product.save(update_fields=['is_available'])
-    log_audit(request, 'inventory_updated', target=product,
-              description=f"Product '{product.name}' availability set to {product.is_available}")
+    log_audit(request, 'product_availability_toggled', target=product,
+              description=f"Product '{product.name}' {'listed' if product.is_available else 'hidden'} from menu",
+              metadata={'is_available': product.is_available})
     return JsonResponse({'is_available': product.is_available, 'name': product.name})
 
 

@@ -438,7 +438,6 @@ class AuditLog(models.Model):
         ('product_edited', 'Product Edited'),
         ('product_deleted', 'Product Deleted'),
         ('product_availability_toggled', 'Product Availability Toggled'),
-        ('payment_initiated', 'Payment Initiated'),
     )
 
     actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
