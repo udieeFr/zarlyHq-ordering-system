@@ -223,7 +223,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
   function updateBar() {
     const checked = document.querySelectorAll('.customer-check:checked');
     document.getElementById('selectedCount').textContent = checked.length;

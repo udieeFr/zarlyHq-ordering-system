@@ -267,7 +267,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
   function togglePw() {
     const sec = document.getElementById('pw-section');
     const btn = document.getElementById('pw-toggle-btn');

@@ -269,7 +269,7 @@
                         style="background:#0f172a;color:#fff;font-size:.78rem;padding:.3rem .9rem;">Save Note</button>
             </div>
         </div>
-        <script>
+        <script nonce="{{ request.csp_nonce }}">
         (function() {
             const btn = document.getElementById('staffNoteSaveBtn');
             const ta  = document.getElementById('staffNoteInput');

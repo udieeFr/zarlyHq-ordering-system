@@ -226,7 +226,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
   function showProofModal(imageUrl, orderId) {
     document.getElementById('proofImage').src = imageUrl;
     document.getElementById('proofOrderId').textContent = orderId;

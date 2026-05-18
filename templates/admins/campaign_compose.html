@@ -101,7 +101,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
   const MONTHLY_LIMIT = 2;
 
   function updatePreview() {

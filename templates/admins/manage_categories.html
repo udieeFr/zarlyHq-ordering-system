@@ -89,7 +89,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 function openRename(id, name) {
   document.getElementById('renameCatId').value = id;
   document.getElementById('renameInput').value = name;

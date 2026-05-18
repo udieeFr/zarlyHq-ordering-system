@@ -93,7 +93,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 document.getElementById('imageInput').addEventListener('change', function () {
   const preview = document.getElementById('imagePreview');
   const img = document.getElementById('previewImg');

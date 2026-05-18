@@ -141,7 +141,7 @@
   {% csrf_token %}
 </form>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 function confirmDelete(productId, productName) {
   if (!confirm(`Delete "${productName}" from the menu? This cannot be undone.`)) return;
   const form = document.getElementById('deleteProductForm');

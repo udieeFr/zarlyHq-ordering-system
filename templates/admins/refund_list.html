@@ -225,7 +225,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
   const baseUrl = "{% url 'mark_refund_processed' 0 %}".replace('/0/', '/');
 
   function openModal(refundId, orderId, amount, customer) {

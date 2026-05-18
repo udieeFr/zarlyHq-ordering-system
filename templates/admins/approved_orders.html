@@ -168,7 +168,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 // Store order data for JavaScript
 const ordersData = [
     {% for order in approved_orders %}

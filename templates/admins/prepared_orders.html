@@ -106,7 +106,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 function printGroup(groupId) {
     const url = `/dashboard/prep-group/${groupId}/`;
     window.open(url, '_blank');

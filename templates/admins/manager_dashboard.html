@@ -453,7 +453,7 @@
 
 {% block extra_scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script>
+<script nonce="{{ request.csp_nonce }}">
   const allLabels  = {{ chart_labels|safe }};
   const allRevenue = {{ chart_revenue|safe }};
 

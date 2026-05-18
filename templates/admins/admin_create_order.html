@@ -154,7 +154,7 @@
   </div>
 </form>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 const PRODUCTS = [
   {% for p in products %}
   { id: {{ p.id }}, name: "{{ p.name|escapejs }}", price: {{ p.price }}, stock: {{ p.stock }}, category: "{{ p.category.name|escapejs }}" }{% if not forloop.last %},{% endif %}

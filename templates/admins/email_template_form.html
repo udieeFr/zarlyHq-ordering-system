@@ -76,7 +76,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
   function insertPlaceholder(text) {
     const field = document.getElementById('bodyField');
     const start = field.selectionStart, end = field.selectionEnd;

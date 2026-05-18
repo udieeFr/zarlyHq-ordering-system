@@ -147,7 +147,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script>
+<script nonce="{{ request.csp_nonce }}">
 const labels  = {{ chart_labels|safe }};
 const revenue = {{ chart_revenue|safe }};
 const orders  = {{ chart_orders|safe }};
