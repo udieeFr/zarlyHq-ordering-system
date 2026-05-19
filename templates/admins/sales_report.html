@@ -3,64 +3,146 @@
 {% block page_title %}Sales Report{% endblock %}
 
 {% block content %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&display=swap');
+
+  .page-header h1 {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 1.9rem; font-weight: 400; letter-spacing: -0.02em;
+    color: oklch(16% 0.04 52); margin-bottom: 0.2rem;
+  }
+
+  /* ── Metric strip ── */
+  .rpt-metric-strip {
+    background: oklch(14% 0.045 52);
+    border-radius: 1rem;
+    display: flex; overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+  .rpt-metric-item {
+    flex: 1; padding: 1.1rem 1.4rem;
+    border-right: 1px solid oklch(28% 0.04 52);
+  }
+  .rpt-metric-item:last-child { border-right: none; }
+  .rpt-metric-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .08em; color: oklch(58% 0.02 54); margin-bottom: 0.25rem;
+  }
+  .rpt-metric-value {
+    font-size: 1.5rem; font-weight: 900; color: #ff9933; line-height: 1.1;
+  }
+  .rpt-metric-value.is-warn { color: oklch(55% 0.18 22); }
+  .rpt-metric-sub { font-size: 0.68rem; color: oklch(48% 0.02 54); margin-top: 0.1rem; }
+
+  /* ── Period pills ── */
+  .period-bar { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  .period-label { font-size: 0.78rem; font-weight: 700; color: oklch(42% 0.06 52); margin-right: 0.25rem; }
+  .period-pill {
+    font-size: 0.75rem; font-weight: 600; padding: 0.3rem 0.875rem; border-radius: 999px;
+    border: 1.5px solid oklch(84% 0.04 62); color: oklch(42% 0.06 52);
+    text-decoration: none; transition: all .15s; background: oklch(99.5% 0.006 60);
+  }
+  .period-pill:hover { border-color: oklch(16% 0.04 52); color: oklch(16% 0.04 52); }
+  .period-pill.active { background: oklch(16% 0.04 52); border-color: oklch(16% 0.04 52); color: oklch(93% 0.012 62); }
+  .period-range { font-size: 0.78rem; color: oklch(48% 0.06 54); margin-left: 0.5rem; }
+
+  /* ── Data panels ── */
+  .rpt-panel {
+    background: oklch(97% 0.016 62);
+    border-radius: 1rem;
+    border: 1px solid oklch(91% 0.03 62);
+    box-shadow: 0 4px 24px oklch(70% 0.15 57 / 0.08);
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+    padding: 1.1rem 1.25rem;
+  }
+  .rpt-panel-title {
+    font-size: 0.88rem; font-weight: 800; color: oklch(18% 0.04 52);
+    letter-spacing: -.01em; margin-bottom: 1rem;
+  }
+
+  /* ── Tables ── */
+  .rpt-table { width: 100%; font-size: 0.82rem; border-collapse: collapse; }
+  .rpt-table th {
+    font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em;
+    color: oklch(42% 0.06 52); padding: 0.5rem 0.875rem;
+    background: oklch(93% 0.022 62); border-bottom: 1px solid oklch(88% 0.03 62);
+  }
+  .rpt-table td { padding: 0.65rem 0.875rem; border-bottom: 1px solid oklch(91% 0.025 62); color: oklch(22% 0.04 52); vertical-align: middle; }
+  .rpt-table tr:last-child td { border-bottom: none; }
+  .rpt-table tr:hover td { background: oklch(97% 0.022 62); }
+
+  /* ── Funnel bars ── */
+  .funnel-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.45rem 0; border-bottom: 1px solid oklch(91% 0.025 62);
+    font-size: 0.82rem; color: oklch(22% 0.04 52);
+  }
+  .funnel-row:last-child { border-bottom: none; }
+  .funnel-count { font-weight: 700; color: oklch(28% 0.1 57); }
+
+  /* ── Refund sub-metrics ── */
+  .refund-sub-item { text-align: center; }
+  .refund-sub-label { font-size: 0.72rem; color: oklch(48% 0.06 54); margin-bottom: 0.2rem; }
+  .refund-sub-value { font-weight: 800; font-size: 0.95rem; color: oklch(16% 0.04 52); }
+  .refund-sub-value.danger { color: oklch(43% 0.1 22); }
+  .refund-sub-value.warn   { color: oklch(55% 0.18 22); }
+</style>
+
 <div class="page-header">
   <h1>Sales Report</h1>
   <p>Revenue, refund analytics, and product performance.</p>
 </div>
 
 <!-- Period selector -->
-<form method="get" class="mb-4 d-flex align-items-center gap-2 flex-wrap">
-  <span class="fw-bold small">Period:</span>
+<div class="period-bar">
+  <span class="period-label">Period:</span>
   {% for label, val in period_choices.items %}
-  <a href="?period={{ val }}" class="btn btn-sm {% if period == val %}btn-dark{% else %}btn-outline-secondary{% endif %}">{{ label }}</a>
+  <a href="?period={{ val }}" class="period-pill {% if period == val %}active{% endif %}">{{ label }}</a>
   {% endfor %}
-  <span class="text-muted small ms-2">{{ since }} → {{ today }}</span>
-</form>
+  <span class="period-range">{{ since }} — {{ today }}</span>
+</div>
 
-<!-- KPI row -->
-<div class="row g-3 mb-4">
-  <div class="col-6 col-md-3">
-    <div class="content-card text-center py-3">
-      <div class="text-muted small">Revenue</div>
-      <div class="fw-bold fs-4 text-success">RM {{ revenue_total|floatformat:2 }}</div>
-    </div>
+<!-- Metric strip (replaces banned KPI cards) -->
+<div class="rpt-metric-strip">
+  <div class="rpt-metric-item">
+    <div class="rpt-metric-label">Revenue</div>
+    <div class="rpt-metric-value">RM {{ revenue_total|floatformat:2 }}</div>
+    <div class="rpt-metric-sub">{{ orders_count }} orders</div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="content-card text-center py-3">
-      <div class="text-muted small">Orders</div>
-      <div class="fw-bold fs-4">{{ orders_count }}</div>
-    </div>
+  <div class="rpt-metric-item">
+    <div class="rpt-metric-label">Avg Order Value</div>
+    <div class="rpt-metric-value">RM {{ avg_order_val }}</div>
+    <div class="rpt-metric-sub">per delivered order</div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="content-card text-center py-3">
-      <div class="text-muted small">Avg Order Value</div>
-      <div class="fw-bold fs-4">RM {{ avg_order_val }}</div>
-    </div>
+  <div class="rpt-metric-item">
+    <div class="rpt-metric-label">Refund Rate</div>
+    <div class="rpt-metric-value {% if refund_rate > 10 %}is-warn{% endif %}">{{ refund_rate }}%</div>
+    <div class="rpt-metric-sub">RM {{ refund_total|floatformat:2 }} refunded</div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="content-card text-center py-3">
-      <div class="text-muted small">Refund Rate</div>
-      <div class="fw-bold fs-4 {% if refund_rate > 10 %}text-danger{% else %}text-success{% endif %}">{{ refund_rate }}%</div>
-    </div>
+  <div class="rpt-metric-item">
+    <div class="rpt-metric-label">Pending Action</div>
+    <div class="rpt-metric-value {% if pending_refunds > 0 %}is-warn{% endif %}">{{ pending_refunds }}</div>
+    <div class="rpt-metric-sub">refund{{ pending_refunds|pluralize }} need processing</div>
   </div>
 </div>
 
 <div class="row g-4 mb-4">
   <!-- Revenue chart -->
   <div class="col-lg-8">
-    <div class="content-card">
-      <h6 class="fw-bold mb-3">Daily Revenue</h6>
+    <div class="rpt-panel">
+      <div class="rpt-panel-title">Daily Revenue</div>
       <canvas id="revenueChart" height="100"></canvas>
     </div>
   </div>
   <!-- Order status funnel -->
   <div class="col-lg-4">
-    <div class="content-card h-100">
-      <h6 class="fw-bold mb-3">Order Funnel (All Time)</h6>
+    <div class="rpt-panel" style="height:100%;margin-bottom:0;">
+      <div class="rpt-panel-title">Order Funnel (All Time)</div>
       {% for status, count in status_counts.items %}
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <span class="small text-capitalize">{{ status|replace:"_, " }}</span>
-        <span class="badge bg-secondary">{{ count }}</span>
+      <div class="funnel-row">
+        <span class="text-capitalize">{{ status|replace:"_, " }}</span>
+        <span class="funnel-count">{{ count }}</span>
       </div>
       {% endfor %}
     </div>
@@ -70,22 +152,22 @@
 <div class="row g-4 mb-4">
   <!-- Top products -->
   <div class="col-lg-6">
-    <div class="content-card">
-      <h6 class="fw-bold mb-3">Top Products by Revenue</h6>
-      <table class="table table-sm table-hover mb-0">
-        <thead class="table-light small text-uppercase">
-          <tr><th>Product</th><th>Category</th><th class="text-end">Qty</th><th class="text-end">Revenue</th></tr>
+    <div class="rpt-panel">
+      <div class="rpt-panel-title">Top Products by Revenue</div>
+      <table class="rpt-table">
+        <thead>
+          <tr><th>Product</th><th>Category</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Revenue</th></tr>
         </thead>
         <tbody>
           {% for p in top_products %}
           <tr>
-            <td class="fw-bold">{{ p.product__name }}</td>
-            <td class="text-muted small">{{ p.product__category__name }}</td>
-            <td class="text-end">{{ p.qty }}</td>
-            <td class="text-end fw-bold text-success">RM {{ p.revenue|floatformat:2 }}</td>
+            <td style="font-weight:700;">{{ p.product__name }}</td>
+            <td style="color:oklch(48% 0.06 54);font-size:.78rem;">{{ p.product__category__name }}</td>
+            <td style="text-align:right;">{{ p.qty }}</td>
+            <td style="text-align:right;font-weight:700;color:#ff9933;">RM {{ p.revenue|floatformat:2 }}</td>
           </tr>
           {% empty %}
-          <tr><td colspan="4" class="text-muted text-center py-3">No data for this period.</td></tr>
+          <tr><td colspan="4" style="text-align:center;color:oklch(48% 0.06 54);padding:1.5rem;">No data for this period.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -94,8 +176,8 @@
 
   <!-- Category breakdown -->
   <div class="col-lg-6">
-    <div class="content-card">
-      <h6 class="fw-bold mb-3">Revenue by Category</h6>
+    <div class="rpt-panel">
+      <div class="rpt-panel-title">Revenue by Category</div>
       <canvas id="categoryChart" height="180"></canvas>
     </div>
   </div>
@@ -104,33 +186,35 @@
 <!-- Refund analytics -->
 <div class="row g-4 mb-4">
   <div class="col-lg-6">
-    <div class="content-card">
-      <h6 class="fw-bold mb-3">Refund Analytics</h6>
+    <div class="rpt-panel">
+      <div class="rpt-panel-title">Refund Analytics</div>
       <div class="row g-3 mb-3">
-        <div class="col-4 text-center">
-          <div class="text-muted small">Total Refunded</div>
-          <div class="fw-bold text-danger">RM {{ refund_total|floatformat:2 }}</div>
+        <div class="col-4 refund-sub-item">
+          <div class="refund-sub-label">Total Refunded</div>
+          <div class="refund-sub-value danger">RM {{ refund_total|floatformat:2 }}</div>
         </div>
-        <div class="col-4 text-center">
-          <div class="text-muted small">Refunds Issued</div>
-          <div class="fw-bold">{{ refund_count }}</div>
+        <div class="col-4 refund-sub-item">
+          <div class="refund-sub-label">Refunds Issued</div>
+          <div class="refund-sub-value">{{ refund_count }}</div>
         </div>
-        <div class="col-4 text-center">
-          <div class="text-muted small">Pending Action</div>
-          <div class="fw-bold text-warning">{{ pending_refunds }}</div>
+        <div class="col-4 refund-sub-item">
+          <div class="refund-sub-label">Pending Action</div>
+          <div class="refund-sub-value {% if pending_refunds > 0 %}warn{% endif %}">{{ pending_refunds }}</div>
         </div>
       </div>
-      <table class="table table-sm mb-0">
-        <thead class="table-light small text-uppercase"><tr><th>Source</th><th class="text-end">Count</th><th class="text-end">Amount</th></tr></thead>
+      <table class="rpt-table">
+        <thead>
+          <tr><th>Source</th><th style="text-align:right;">Count</th><th style="text-align:right;">Amount</th></tr>
+        </thead>
         <tbody>
           {% for r in refunds_by_source %}
           <tr>
             <td>{{ r.source|replace:"_, "|capfirst }}</td>
-            <td class="text-end">{{ r.count }}</td>
-            <td class="text-end text-danger">RM {{ r.total|floatformat:2 }}</td>
+            <td style="text-align:right;">{{ r.count }}</td>
+            <td style="text-align:right;color:oklch(43% 0.1 22);font-weight:600;">RM {{ r.total|floatformat:2 }}</td>
           </tr>
           {% empty %}
-          <tr><td colspan="3" class="text-center text-muted py-2">No refunds in this period.</td></tr>
+          <tr><td colspan="3" style="text-align:center;color:oklch(48% 0.06 54);padding:1rem;">No refunds in this period.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -139,8 +223,8 @@
 
   <!-- Loyalty tier breakdown -->
   <div class="col-lg-6">
-    <div class="content-card">
-      <h6 class="fw-bold mb-3">Customer Loyalty Tiers</h6>
+    <div class="rpt-panel">
+      <div class="rpt-panel-title">Customer Loyalty Tiers</div>
       <canvas id="tierChart" height="180"></canvas>
     </div>
   </div>
@@ -157,8 +241,8 @@ new Chart(document.getElementById('revenueChart'), {
   data: {
     labels,
     datasets: [
-      { label: 'Revenue (RM)', data: revenue, backgroundColor: 'rgba(249,115,22,.7)', yAxisID: 'y' },
-      { label: 'Orders', data: orders, type: 'line', borderColor: '#0f172a', backgroundColor: 'transparent', yAxisID: 'y1', tension: .3 }
+      { label: 'Revenue (RM)', data: revenue, backgroundColor: 'rgba(255,153,51,.75)', yAxisID: 'y' },
+      { label: 'Orders', data: orders, type: 'line', borderColor: 'oklch(14% 0.045 52)', backgroundColor: 'transparent', yAxisID: 'y1', tension: .3 }
     ]
   },
   options: {
@@ -175,7 +259,7 @@ const catLabels = [{% for c in category_revenue %}"{{ c.product__category__name 
 const catRevenue = [{% for c in category_revenue %}{{ c.revenue|floatformat:2 }}{% if not forloop.last %},{% endif %}{% endfor %}];
 new Chart(document.getElementById('categoryChart'), {
   type: 'doughnut',
-  data: { labels: catLabels, datasets: [{ data: catRevenue, backgroundColor: ['#f97316','#0f172a','#94a3b8','#fbbf24','#7c3aed','#10b981'] }] },
+  data: { labels: catLabels, datasets: [{ data: catRevenue, backgroundColor: ['#ff9933','oklch(14% 0.045 52)','#94a3b8','#fbbf24','#7c3aed','oklch(44% 0.14 148)'] }] },
   options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
 });
 

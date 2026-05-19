@@ -1,125 +1,474 @@
 {% extends 'admin_base.html' %}
-
 {% block page_title %}Analytics Dashboard{% endblock %}
 
 {% block content %}
-<!-- Page Header -->
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&display=swap');
+
+  .page-header h1 {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 1.9rem; font-weight: 400; letter-spacing: -0.02em;
+    color: oklch(16% 0.04 52); margin-bottom: 0.2rem;
+  }
+
+  /* ── Metric strip ── */
+  .rpt-metric-strip {
+    background: oklch(14% 0.045 52);
+    border-radius: 1rem;
+    display: flex; overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+  .rpt-metric-item {
+    flex: 1; padding: 1.1rem 1.4rem;
+    border-right: 1px solid oklch(28% 0.04 52);
+  }
+  .rpt-metric-item:last-child { border-right: none; }
+  .rpt-metric-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .08em; color: oklch(58% 0.02 54); margin-bottom: 0.25rem;
+  }
+  .rpt-metric-value {
+    font-size: 1.5rem; font-weight: 900; color: #ff9933; line-height: 1.1;
+  }
+  .rpt-metric-value.is-warn { color: oklch(55% 0.18 22); }
+  .rpt-metric-value.is-ok   { color: oklch(55% 0.18 148); }
+  .rpt-metric-sub { font-size: 0.68rem; color: oklch(48% 0.02 54); margin-top: 0.1rem; }
+
+  /* ── Panels ── */
+  .rpt-panel {
+    background: oklch(97% 0.016 62);
+    border-radius: 1rem;
+    border: 1px solid oklch(91% 0.03 62);
+    box-shadow: 0 4px 24px oklch(70% 0.15 57 / 0.08);
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+    padding: 1.1rem 1.25rem;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .rpt-panel-title {
+    font-size: 0.88rem; font-weight: 800; color: oklch(18% 0.04 52);
+    letter-spacing: -.01em; margin-bottom: 1rem;
+  }
+
+  /* ── Tables ── */
+  .rpt-table { width: 100%; font-size: 0.82rem; border-collapse: collapse; }
+  .rpt-table th {
+    font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em;
+    color: oklch(42% 0.06 52); padding: 0.5rem 0.875rem;
+    background: oklch(93% 0.022 62); border-bottom: 1px solid oklch(88% 0.03 62);
+  }
+  .rpt-table td { padding: 0.65rem 0.875rem; border-bottom: 1px solid oklch(91% 0.025 62); color: oklch(22% 0.04 52); vertical-align: middle; }
+  .rpt-table tr:last-child td { border-bottom: none; }
+  .rpt-table tr:hover td { background: oklch(96% 0.022 62); }
+
+  /* ── Funnel rows ── */
+  .funnel-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.45rem 0; border-bottom: 1px solid oklch(91% 0.025 62);
+    font-size: 0.82rem; color: oklch(22% 0.04 52);
+  }
+  .funnel-row:last-child { border-bottom: none; }
+  .funnel-count { font-weight: 700; color: oklch(28% 0.1 57); }
+
+  /* ── Status badge ── */
+  .status-badge {
+    display: inline-block; font-size: 0.68rem; font-weight: 600; padding: 0.15rem 0.55rem;
+    border-radius: 999px; text-transform: capitalize; letter-spacing: 0.03em;
+  }
+  .badge-pending    { background: oklch(96% 0.06 88);  color: oklch(44% 0.12 68); }
+  .badge-resolved   { background: oklch(96% 0.06 148); color: oklch(38% 0.14 148); }
+  .badge-open       { background: oklch(95% 0.05 260); color: oklch(40% 0.14 260); }
+  .badge-approved   { background: oklch(96% 0.06 148); color: oklch(38% 0.14 148); }
+  .badge-delivered  { background: oklch(96% 0.04 220); color: oklch(42% 0.14 220); }
+  .badge-rejected   { background: oklch(96% 0.06 22);  color: oklch(42% 0.14 22); }
+
+  /* ── Chart range toggle ── */
+  .rev-range-btn {
+    background: transparent;
+    border: 1px solid oklch(85% 0.04 62);
+    color: oklch(42% 0.06 52);
+    padding: 0.2rem 0.6rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .12s, color .12s;
+    font-family: inherit;
+  }
+  .rev-range-btn:first-child { border-radius: 6px 0 0 6px; }
+  .rev-range-btn:last-child  { border-radius: 0 6px 6px 0; }
+  .rev-range-btn.active,
+  .rev-range-btn:hover {
+    background: #ff9933;
+    border-color: #ff9933;
+    color: #fff;
+  }
+
+  /* ── Retention sub-metrics ── */
+  .ret-item { text-align: center; }
+  .ret-label { font-size: 0.72rem; color: oklch(48% 0.06 54); margin-bottom: 0.2rem; }
+  .ret-value { font-weight: 800; font-size: 1.05rem; color: oklch(16% 0.04 52); }
+  .ret-value.accent { color: #ff9933; }
+</style>
+
 <div class="page-header">
-    <h1>Analytics Dashboard</h1>
-    <p>Business insights and performance metrics</p>
+  <h1>Analytics Dashboard</h1>
+  <p>Revenue, customers, operations — at a glance.</p>
 </div>
 
- <!-- Key Metrics -->
-<div class="row g-3 mb-4">
-    <!-- Total Orders -->
-    <div class="col-md-3">
-        <div class="content-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div>
-                    <p class="text-muted small mb-1">Total Orders</p>
-                    <h3 class="fw-bold mb-0" style="color: #0f172a;">{{ total_orders }}</h3>
-                </div>
-                <span style="font-size: 2.5rem;">📦</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Approved Orders -->
-    <div class="col-md-3">
-        <div class="content-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div>
-                    <p class="text-muted small mb-1">Approved Orders</p>
-                    <h3 class="fw-bold mb-0" style="color: #10b981;">{{ approved_orders }}</h3>
-                </div>
-                <span style="font-size: 2.5rem;">✅</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Pending Orders -->
-    <div class="col-md-3">
-        <div class="content-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div>
-                    <p class="text-muted small mb-1">Pending Orders</p>
-                    <h3 class="fw-bold mb-0" style="color: #f59e0b;">{{ pending_orders }}</h3>
-                </div>
-                <span style="font-size: 2.5rem;">⏳</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Total Revenue -->
-    <div class="col-md-3">
-        <div class="content-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div>
-                    <p class="text-muted small mb-1">Total Revenue</p>
-                    <h3 class="fw-bold mb-0" style="color: #3b82f6;">RM {{ total_revenue|floatformat:2 }}</h3>
-                </div>
-                <span style="font-size: 2.5rem;">💰</span>
-            </div>
-        </div>
-    </div>
+<!-- ── Revenue KPI strip ── -->
+<div class="rpt-metric-strip">
+  <div class="rpt-metric-item">
+    <div class="rpt-metric-label">Today's Revenue</div>
+    <div class="rpt-metric-value">RM {{ revenue_today|floatformat:2 }}</div>
+    <div class="rpt-metric-sub">{{ orders_today }} order{{ orders_today|pluralize }} today</div>
+  </div>
+  <div class="rpt-metric-item">
+    <div class="rpt-metric-label">Last 7 Days</div>
+    <div class="rpt-metric-value">RM {{ revenue_week|floatformat:2 }}</div>
+    <div class="rpt-metric-sub">{{ orders_week }} order{{ orders_week|pluralize }}</div>
+  </div>
+  <div class="rpt-metric-item">
+    <div class="rpt-metric-label">Last 30 Days</div>
+    <div class="rpt-metric-value">RM {{ revenue_month|floatformat:2 }}</div>
+    <div class="rpt-metric-sub">{{ total_orders }} active order{{ total_orders|pluralize }} in system</div>
+  </div>
+  <div class="rpt-metric-item">
+    <div class="rpt-metric-label">All-Time Revenue</div>
+    <div class="rpt-metric-value">RM {{ revenue_all_time|floatformat:2 }}</div>
+    <div class="rpt-metric-sub">{{ delivery_rate }}% delivery rate</div>
+  </div>
 </div>
 
-<!-- Charts and Analytics Section -->
-<div class="row g-3">
-    <!-- Sales Trends -->
-    <div class="col-lg-8">
-        <div class="content-card">
-            <h5 class="fw-bold mb-3">📊 Sales Trends</h5>
-            <div class="bg-light p-5 rounded text-center text-muted" style="min-height: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                <p style="font-size: 3rem; margin-bottom: 1rem;">📈</p>
-                <p class="mb-0 fw-bold">Chart visualization coming soon...</p>
-                <small class="text-muted mt-2">Daily/Weekly/Monthly sales data</small>
-            </div>
+<!-- ── Revenue chart + Order funnel ── -->
+<div class="row g-4 mb-4">
+  <div class="col-lg-8">
+    <div class="rpt-panel">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <div class="rpt-panel-title" style="margin-bottom:0;" id="revenueChartTitle">Daily Revenue — Last 30 Days</div>
+        <div class="btn-group btn-group-sm" role="group" aria-label="Date range">
+          <button type="button" class="rev-range-btn active" data-days="30">30d</button>
+          <button type="button" class="rev-range-btn" data-days="14">14d</button>
+          <button type="button" class="rev-range-btn" data-days="7">7d</button>
         </div>
+      </div>
+      <div style="position:relative;height:220px;">
+        <canvas id="revenueChart"></canvas>
+      </div>
     </div>
-
-    <!-- Top Products -->
-    <div class="col-lg-4">
-        <div class="content-card">
-            <h5 class="fw-bold mb-3">🏆 Top Products</h5>
-            <div class="bg-light p-5 rounded text-center text-muted" style="min-height: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                <p style="font-size: 3rem; margin-bottom: 1rem;">🎯</p>
-                <p class="mb-0 fw-bold">Product rankings coming soon...</p>
-                <small class="text-muted mt-2">By sales volume</small>
-            </div>
-        </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="rpt-panel">
+      <div class="rpt-panel-title">Order Status Breakdown</div>
+      {% for status, count in status_breakdown.items %}
+      <div class="funnel-row">
+        <span style="text-transform:capitalize;">{{ status|cut:"_" }}</span>
+        <span class="funnel-count">{{ count }}</span>
+      </div>
+      {% endfor %}
     </div>
+  </div>
 </div>
 
-<!-- Additional Analytics -->
-<div class="row g-3 mt-2">
-    <!-- Customer Activity -->
-    <div class="col-lg-6">
-        <div class="content-card">
-            <h5 class="fw-bold mb-3">👥 Customer Activity</h5>
-            <div class="bg-light p-5 rounded text-center text-muted" style="min-height: 250px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                <p style="font-size: 3rem; margin-bottom: 1rem;">📊</p>
-                <p class="mb-0 fw-bold">Customer insights coming soon...</p>
-                <small class="text-muted mt-2">Active users, repeat orders, engagement</small>
-            </div>
-        </div>
+<!-- ── Top products + Retention & Conversion ── -->
+<div class="row g-4 mb-4">
+  <div class="col-lg-7">
+    <div class="rpt-panel">
+      <div class="rpt-panel-title">Top 5 Products by Volume</div>
+      <table class="rpt-table">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th style="text-align:right;">Qty Sold</th>
+            <th style="text-align:right;">Revenue</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in top_products %}
+          <tr>
+            <td style="font-weight:700;">{{ p.product__name }}</td>
+            <td style="text-align:right;">{{ p.qty }}</td>
+            <td style="text-align:right;font-weight:700;color:#ff9933;">RM {{ p.revenue|floatformat:2 }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" style="text-align:center;color:oklch(48% 0.06 54);padding:1.5rem;">No order data yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
-
-    <!-- Inventory Status -->
-    <div class="col-lg-6">
-        <div class="content-card">
-            <h5 class="fw-bold mb-3">📦 Inventory Status</h5>
-            <div class="bg-light p-5 rounded text-center text-muted" style="min-height: 250px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                <p style="font-size: 3rem; margin-bottom: 1rem;">📉</p>
-                <p class="mb-0 fw-bold">Stock analysis coming soon...</p>
-                <small class="text-muted mt-2">Low stock items, fast-moving products</small>
-            </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="rpt-panel">
+      <div class="rpt-panel-title">Retention & Conversion</div>
+      <div class="row g-3 mb-3">
+        <div class="col-6 ret-item">
+          <div class="ret-label">Conversion Rate</div>
+          <div class="ret-value accent">{{ conversion_rate }}%</div>
+          <div style="font-size:.7rem;color:oklch(52% 0.04 54);margin-top:.15rem;">visitors → ordered</div>
         </div>
+        <div class="col-6 ret-item">
+          <div class="ret-label">Repeat Rate</div>
+          <div class="ret-value accent">{{ repeat_rate }}%</div>
+          <div style="font-size:.7rem;color:oklch(52% 0.04 54);margin-top:.15rem;">ordered 2+ times</div>
+        </div>
+        <div class="col-6 ret-item">
+          <div class="ret-label">New Customers (7d)</div>
+          <div class="ret-value">{{ new_customers_week }}</div>
+        </div>
+        <div class="col-6 ret-item">
+          <div class="ret-label">Returning (7d)</div>
+          <div class="ret-value">{{ returning_customers_week }}</div>
+        </div>
+      </div>
+      <hr style="border-color:oklch(91% 0.025 62);margin:.5rem 0 .75rem;">
+      <div class="row g-2 text-center" style="font-size:.78rem;">
+        <div class="col-6 ret-item">
+          <div class="ret-label">Total Customers</div>
+          <div class="ret-value">{{ total_customers }}</div>
+        </div>
+        <div class="col-6 ret-item">
+          <div class="ret-label">Page Views (7d)</div>
+          <div class="ret-value">{{ pv_week }}</div>
+        </div>
+      </div>
     </div>
+  </div>
 </div>
 
-<!-- Info Alert -->
-<div class="alert alert-info mt-4 mb-0" style="background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%); border: 1px solid #0ea5e9; color: #0369a1;">
-    <strong>Manager Access:</strong> This analytics dashboard is only accessible to managers and superusers. It provides insights into business performance, sales trends, and operational metrics. More analytics features will be added here soon.
+<!-- ── Customer tiers + Top customers ── -->
+<div class="row g-4 mb-4">
+  <div class="col-lg-5">
+    <div class="rpt-panel">
+      <div class="rpt-panel-title">Customer Loyalty Tiers</div>
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+        <canvas id="tierChart" height="180"></canvas>
+      </div>
+      <div class="row g-2 mt-2 text-center" style="font-size:.78rem;">
+        <div class="col-3"><div style="font-weight:700;">{{ tier_map.bronze|default:0 }}</div><div style="color:oklch(48% 0.06 54);">Bronze</div></div>
+        <div class="col-3"><div style="font-weight:700;">{{ tier_map.silver|default:0 }}</div><div style="color:oklch(48% 0.06 54);">Silver</div></div>
+        <div class="col-3"><div style="font-weight:700;">{{ tier_map.gold|default:0 }}</div><div style="color:oklch(48% 0.06 54);">Gold</div></div>
+        <div class="col-3"><div style="font-weight:700;">{{ tier_map.platinum|default:0 }}</div><div style="color:oklch(48% 0.06 54);">Platinum</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="rpt-panel">
+      <div class="rpt-panel-title">Top 5 Customers by Spend</div>
+      <table class="rpt-table">
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th style="text-align:right;">Orders</th>
+            <th style="text-align:right;">Total Spent</th>
+            <th>Tier</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cp in top_customers %}
+          <tr>
+            <td style="font-weight:600;">{{ cp.user.get_full_name|default:cp.user.username }}</td>
+            <td style="text-align:right;">{{ cp.total_orders }}</td>
+            <td style="text-align:right;font-weight:700;color:#ff9933;">RM {{ cp.total_spent|floatformat:2 }}</td>
+            <td>
+              <span class="status-badge
+                {% if cp.loyalty_tier == 'platinum' %}badge-delivered
+                {% elif cp.loyalty_tier == 'gold' %}badge-pending
+                {% elif cp.loyalty_tier == 'silver' %}badge-open
+                {% else %}badge-approved{% endif %}">
+                {{ cp.loyalty_tier|capfirst }}
+              </span>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" style="text-align:center;color:oklch(48% 0.06 54);padding:1.5rem;">No customer data yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
+
+<!-- ── Complaints + Refunds ── -->
+<div class="row g-4 mb-4">
+  <div class="col-lg-6">
+    <div class="rpt-panel">
+      <div class="rpt-panel-title">
+        Complaints
+        {% if pending_complaints %}<span class="status-badge badge-pending" style="margin-left:.5rem;">{{ pending_complaints }} pending</span>{% endif %}
+      </div>
+      <div class="row g-3 mb-3 text-center" style="font-size:.82rem;">
+        <div class="col-4 ret-item">
+          <div class="ret-label">Pending</div>
+          <div class="ret-value {% if pending_complaints %}accent{% endif %}">{{ pending_complaints }}</div>
+        </div>
+        <div class="col-4 ret-item">
+          <div class="ret-label">Resolved</div>
+          <div class="ret-value is-ok">{{ resolved_complaints }}</div>
+        </div>
+        <div class="col-4 ret-item">
+          <div class="ret-label">Total</div>
+          <div class="ret-value">{{ pending_complaints|add:resolved_complaints }}</div>
+        </div>
+      </div>
+      <table class="rpt-table">
+        <thead><tr><th>Order</th><th>Customer</th><th>Status</th><th>Date</th></tr></thead>
+        <tbody>
+          {% for c in recent_complaints %}
+          <tr>
+            <td><a href="{% url 'admin_complaint_detail' c.id %}" style="color:#ff9933;font-weight:600;">#{{ c.order.id }}</a></td>
+            <td>{{ c.customer.get_full_name|default:c.customer.username }}</td>
+            <td><span class="status-badge {% if c.status == 'pending' %}badge-pending{% else %}badge-resolved{% endif %}">{{ c.status }}</span></td>
+            <td style="color:oklch(48% 0.06 54);font-size:.75rem;">{{ c.created_at|date:"d M" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" style="text-align:center;color:oklch(48% 0.06 54);padding:1rem;">No complaints.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="rpt-panel">
+      <div class="rpt-panel-title">
+        Refunds
+        {% if pending_refunds_count %}<span class="status-badge badge-pending" style="margin-left:.5rem;">{{ pending_refunds_count }} need action</span>{% endif %}
+      </div>
+      <table class="rpt-table">
+        <thead><tr><th>Order</th><th>Customer</th><th style="text-align:right;">Amount</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for r in recent_refunds %}
+          <tr>
+            <td style="font-weight:600;">#{{ r.order.id }}</td>
+            <td>{{ r.order.customer.get_full_name|default:r.order.customer.username }}</td>
+            <td style="text-align:right;font-weight:700;color:oklch(43% 0.1 22);">RM {{ r.amount|floatformat:2 }}</td>
+            <td><span class="status-badge {% if r.status == 'manual' or r.status == 'failed' %}badge-pending{% elif r.status == 'completed' %}badge-resolved{% else %}badge-open{% endif %}">{{ r.status }}</span></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" style="text-align:center;color:oklch(48% 0.06 54);padding:1rem;">No refunds.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── Audit log + Top pages ── -->
+<div class="row g-4 mb-2">
+  <div class="col-lg-7">
+    <div class="rpt-panel">
+      <div class="rpt-panel-title">Recent Purchases <a href="{% url 'approved_orders_list' %}" style="font-size:.75rem;font-weight:500;color:#ff9933;margin-left:.5rem;">View all →</a></div>
+      <table class="rpt-table">
+        <thead><tr><th>Order</th><th>Customer</th><th style="text-align:right;">Amount</th><th>Date</th></tr></thead>
+        <tbody>
+          {% for order in recent_purchases %}
+          <tr>
+            <td style="font-weight:600;"><a href="{% url 'admin_order_detail' order.id %}" style="color:#ff9933;text-decoration:none;">#{{ order.id }}</a></td>
+            <td>{{ order.customer.get_full_name|default:order.customer.username }}</td>
+            <td style="text-align:right;font-weight:700;color:#ff9933;">RM {{ order.total_amount|floatformat:2 }}</td>
+            <td style="color:oklch(48% 0.06 54);font-size:.75rem;">{{ order.created_at|date:"d M H:i" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" style="text-align:center;color:oklch(48% 0.06 54);padding:1rem;">No recent purchases.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="rpt-panel">
+      <div class="rpt-panel-title">Top Pages — Last 7 Days</div>
+      {% if top_pages %}
+      <table class="rpt-table">
+        <thead><tr><th>Path</th><th style="text-align:right;">Hits</th></tr></thead>
+        <tbody>
+          {% for page in top_pages %}
+          <tr>
+            <td style="font-family:monospace;font-size:.78rem;overflow:hidden;text-overflow:ellipsis;max-width:200px;white-space:nowrap;">{{ page.path }}</td>
+            <td style="text-align:right;font-weight:700;">{{ page.hits }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div class="row g-2 mt-2 text-center" style="font-size:.78rem;">
+        <div class="col-4 ret-item"><div class="ret-label">Today</div><div class="ret-value">{{ pv_today }}</div></div>
+        <div class="col-4 ret-item"><div class="ret-label">This Week</div><div class="ret-value">{{ pv_week }}</div></div>
+        <div class="col-4 ret-item"><div class="ret-label">Unique (7d)</div><div class="ret-value">{{ pv_unique_week }}</div></div>
+      </div>
+      {% else %}
+      <div style="text-align:center;color:oklch(48% 0.06 54);padding:2rem 1rem;">No page view data yet.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script nonce="{{ request.csp_nonce }}">
+const allLabels  = {{ chart_labels|safe }};
+const allRevenue = {{ chart_revenue|safe }};
+
+const revenueChart = new Chart(document.getElementById('revenueChart'), {
+  type: 'bar',
+  data: {
+    labels: allLabels,
+    datasets: [{
+      label: 'Revenue (RM)',
+      data: allRevenue,
+      backgroundColor: 'rgba(255,153,51,.75)',
+      hoverBackgroundColor: 'rgba(255,153,51,1)',
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { title: { display: true, text: 'RM' }, beginAtZero: true, grid: { color: 'rgba(0,0,0,.05)' } },
+      x: { ticks: { maxTicksLimit: 10 }, grid: { display: false } }
+    }
+  }
+});
+
+document.querySelectorAll('.rev-range-btn').forEach(btn => {
+  btn.addEventListener('click', function () {
+    document.querySelectorAll('.rev-range-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    const days = parseInt(this.dataset.days, 10);
+    revenueChart.data.labels   = allLabels.slice(-days);
+    revenueChart.data.datasets[0].data = allRevenue.slice(-days);
+    revenueChart.update();
+    const labels = {30: 'Last 30 Days', 14: 'Last 14 Days', 7: 'Last 7 Days'};
+    document.getElementById('revenueChartTitle').textContent = 'Daily Revenue — ' + labels[days];
+  });
+});
+
+new Chart(document.getElementById('tierChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Bronze', 'Silver', 'Gold', 'Platinum'],
+    datasets: [{
+      data: [
+        {{ tier_map.bronze|default:0 }},
+        {{ tier_map.silver|default:0 }},
+        {{ tier_map.gold|default:0 }},
+        {{ tier_map.platinum|default:0 }}
+      ],
+      backgroundColor: ['#cd7f32', '#94a3b8', '#fbbf24', '#7c3aed'],
+      borderWidth: 2,
+      borderColor: 'oklch(97% 0.016 62)',
+    }]
+  },
+  options: {
+    responsive: true,
+    cutout: '65%',
+    plugins: { legend: { display: false } }
+  }
+});
+</script>
 {% endblock %}

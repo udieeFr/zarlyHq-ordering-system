@@ -4,21 +4,28 @@
 
 {% block content %}
 <style>
-  /* Panels */
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&display=swap');
+
+  .page-header h1 {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 1.9rem; font-weight: 400; letter-spacing: -0.02em;
+    color: oklch(16% 0.04 52); margin-bottom: 0.2rem;
+  }
+
   .log-panel {
-    background: #fff;
+    background: oklch(97% 0.016 62);
     border-radius: 1rem;
-    border: 1px solid oklch(93% 0.006 60);
-    box-shadow: 0 4px 24px rgba(15,23,42,.08), 0 1.5px 6px rgba(15,23,42,.04);
+    border: 1px solid oklch(91% 0.03 62);
+    box-shadow: 0 4px 24px oklch(70% 0.15 57 / 0.08);
     overflow: hidden;
     margin-bottom: 1.25rem;
   }
   .log-panel-header {
     padding: 0.875rem 1.25rem;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid oklch(89% 0.03 62);
     display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;
   }
-  .log-panel-title { font-size: 0.88rem; font-weight: 800; color: #0f172a; letter-spacing: -.01em; margin: 0; }
+  .log-panel-title { font-size: 0.88rem; font-weight: 800; color: oklch(18% 0.04 52); letter-spacing: -.01em; margin: 0; }
   .log-panel-body { padding: 1.1rem 1.25rem; }
 
   /* Integrity banner */
@@ -27,49 +34,59 @@
     border-radius: 0.875rem; padding: 0.875rem 1.1rem;
     margin-bottom: 1.25rem; font-size: 0.85rem;
   }
-  .integrity-ok  { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
-  .integrity-err { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
+  .integrity-ok  { background: oklch(95% 0.06 148); border: 1px solid oklch(80% 0.1 148); color: oklch(28% 0.1 148); }
+  .integrity-err { background: oklch(95% 0.05 22); border: 1px solid oklch(72% 0.12 22); color: oklch(30% 0.1 22); }
   .integrity-icon { flex-shrink: 0; margin-top: 1px; }
   .integrity-banner strong { display: block; margin-bottom: 0.15rem; }
   .integrity-banner span { font-size: 0.8rem; opacity: 0.85; }
 
-  /* Log table — optimized for dense scanning */
+  /* Log table */
   .log-table { width: 100%; font-size: 0.78rem; border-collapse: collapse; }
   .log-table th {
-    font-size: 0.63rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #64748b;
-    padding: 0.5rem 0.875rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; white-space: nowrap;
+    font-size: 0.63rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em;
+    color: oklch(42% 0.06 52); padding: 0.5rem 0.875rem;
+    background: oklch(93% 0.022 62); border-bottom: 1px solid oklch(88% 0.03 62); white-space: nowrap;
   }
-  .log-table td { padding: 0.35rem 0.875rem; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; }
+  .log-table td { padding: 0.35rem 0.875rem; border-bottom: 1px solid oklch(91% 0.025 62); color: oklch(28% 0.04 52); vertical-align: middle; background: oklch(99.5% 0.006 60); }
   .log-table tr:last-child td { border-bottom: none; }
-  .log-table tr:hover td { background: oklch(98.5% 0.004 60); }
+  .log-table tr:hover td { background: oklch(97% 0.022 62); }
 
-  /* Monospace cells */
-  .lc-mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 0.72rem; color: #475569; white-space: nowrap; }
-
-  /* Truncated cells */
-  .lc-clip     { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .lc-clip-sm  { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lc-mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 0.72rem; color: oklch(42% 0.04 52); white-space: nowrap; }
+  .lc-clip    { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lc-clip-sm { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* Action pills */
   .audit-action-pill {
     display: inline-block; padding: 0.12rem 0.5rem; border-radius: 999px;
     font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
-    background: #f1f5f9; color: #334155; white-space: nowrap;
+    background: oklch(93% 0.022 62); color: oklch(38% 0.06 52); white-space: nowrap;
   }
   .audit-action-pill.act-order_approved,
   .audit-action-pill.act-signature_created,
   .audit-action-pill.act-payment_verified,
-  .audit-action-pill.act-receipt_verified { background:#ecfdf5; color:#065f46; }
+  .audit-action-pill.act-receipt_verified { background: oklch(94% 0.06 148); color: oklch(28% 0.1 148); }
   .audit-action-pill.act-order_rejected,
   .audit-action-pill.act-payment_rejected,
-  .audit-action-pill.act-login_failed     { background:#fef2f2; color:#991b1b; }
-  .audit-action-pill.act-login_success    { background:#eff6ff; color:#1e40af; }
+  .audit-action-pill.act-login_failed     { background: oklch(95% 0.05 22); color: oklch(30% 0.1 22); }
+  .audit-action-pill.act-login_success    { background: oklch(93% 0.06 250); color: oklch(28% 0.12 250); }
   .audit-action-pill.act-complaint_submitted,
-  .audit-action-pill.act-complaint_resolved { background:#fffbeb; color:#92400e; }
+  .audit-action-pill.act-complaint_resolved { background: oklch(95% 0.06 72); color: oklch(30% 0.12 60); }
   .audit-action-pill.act-refund_issued,
-  .audit-action-pill.act-refund_processed   { background:#ecfdf5; color:#065f46; }
-  .audit-action-pill.act-refund_failed      { background:#fef2f2; color:#991b1b; }
-  .audit-action-pill.act-refund_manual      { background:#fef9c3; color:#854d0e; }
+  .audit-action-pill.act-refund_processed   { background: oklch(94% 0.06 148); color: oklch(28% 0.1 148); }
+  .audit-action-pill.act-refund_failed      { background: oklch(95% 0.05 22); color: oklch(30% 0.1 22); }
+  .audit-action-pill.act-refund_manual      { background: oklch(95% 0.07 78); color: oklch(30% 0.14 64); }
+
+  /* Pagination */
+  .btn-page {
+    font-size: 0.78rem; font-weight: 600; padding: 0.3rem 0.65rem; border-radius: 6px;
+    border: 1.5px solid oklch(82% 0.03 62); color: oklch(38% 0.06 52);
+    background: oklch(97% 0.016 62); text-decoration: none; display: inline-block;
+    transition: background .15s;
+  }
+  .btn-page:hover { background: oklch(94% 0.022 62); }
+  .btn-page.active {
+    background: oklch(16% 0.04 52); border-color: oklch(16% 0.04 52); color: oklch(92% 0.012 62);
+  }
 </style>
 
 <div class="page-header">
@@ -77,8 +94,8 @@
   <p>Immutable, cryptographically chained record of every security-relevant action.</p>
 </div>
 
-<div class="mb-3" style="font-size:0.85rem;color:#64748b;">
-  <strong style="color:#0f172a;">{{ total_count }}</strong> total entries on record
+<div class="mb-3" style="font-size:0.85rem;color:oklch(48% 0.06 54);">
+  <strong style="color:oklch(16% 0.04 52);">{{ total_count }}</strong> total entries on record
 </div>
 
 <!-- Integrity status -->
@@ -112,11 +129,11 @@
   <div class="log-panel-body">
     <form method="get" class="row g-2 align-items-end">
       <div class="col-md-3">
-        <label class="form-label" style="font-size:0.78rem;font-weight:600;color:#64748b;margin-bottom:0.3rem;">Search</label>
-        <input type="text" name="q" value="{{ search_query }}" class="form-control form-control-sm" placeholder="Description, IP, actor">
+        <label class="form-label" style="font-size:.78rem;font-weight:600;color:oklch(48% 0.06 54);margin-bottom:.3rem;">Search</label>
+        <input type="text" name="q" value="{{ search_query }}" class="form-control form-control-sm" placeholder="Order ID, user, customer, IP">
       </div>
       <div class="col-md-2">
-        <label class="form-label" style="font-size:0.78rem;font-weight:600;color:#64748b;margin-bottom:0.3rem;">Action</label>
+        <label class="form-label" style="font-size:.78rem;font-weight:600;color:oklch(48% 0.06 54);margin-bottom:.3rem;">Action</label>
         <select name="action" class="form-select form-select-sm">
           <option value="">All actions</option>
           {% for code, label in action_choices %}
@@ -125,32 +142,44 @@
         </select>
       </div>
       <div class="col-md-2">
-        <label class="form-label" style="font-size:0.78rem;font-weight:600;color:#64748b;margin-bottom:0.3rem;">Actor</label>
+        <label class="form-label" style="font-size:.78rem;font-weight:600;color:oklch(48% 0.06 54);margin-bottom:.3rem;">Actor</label>
         <input type="text" name="actor" value="{{ actor_filter }}" class="form-control form-control-sm" placeholder="username">
       </div>
       <div class="col-md-2">
-        <label class="form-label" style="font-size:0.78rem;font-weight:600;color:#64748b;margin-bottom:0.3rem;">Target type</label>
+        <label class="form-label" style="font-size:.78rem;font-weight:600;color:oklch(48% 0.06 54);margin-bottom:.3rem;">Target type</label>
         <input type="text" name="target_model" value="{{ target_filter }}" class="form-control form-control-sm" placeholder="Order, Payment...">
       </div>
       <div class="col-md-1">
-        <label class="form-label" style="font-size:0.78rem;font-weight:600;color:#64748b;margin-bottom:0.3rem;">Days</label>
+        <label class="form-label" style="font-size:.78rem;font-weight:600;color:oklch(48% 0.06 54);margin-bottom:.3rem;">Days</label>
         <input type="number" name="days" value="{{ days_filter }}" class="form-control form-control-sm" placeholder="7">
       </div>
       <div class="col-md-1">
-        <label class="form-label" style="font-size:0.78rem;font-weight:600;color:#64748b;margin-bottom:0.3rem;">Per page</label>
+        <label class="form-label" style="font-size:.78rem;font-weight:600;color:oklch(48% 0.06 54);margin-bottom:.3rem;">Per page</label>
         <input type="number" name="count" value="{{ count_limit }}" class="form-control form-control-sm" min="1" max="1000">
       </div>
       <div class="col-md-1">
-        <button type="submit" class="btn btn-primary btn-sm w-100">Filter</button>
+        <button type="submit" class="btn btn-sm w-100" style="background:#ff9933;color:oklch(13% 0.04 52);font-weight:700;border:none;">Filter</button>
       </div>
     </form>
   </div>
 </div>
 
+<script nonce="{{ request.csp_nonce }}">
+(function () {
+  var form = document.querySelector('form[method="get"]');
+  if (!form) return;
+  var delay;
+  function submit() { form.submit(); }
+  function debounced() { clearTimeout(delay); delay = setTimeout(submit, 600); }
+  form.querySelectorAll('select').forEach(function(el) { el.addEventListener('change', submit); });
+  form.querySelectorAll('input[type="text"], input[type="number"]').forEach(function(el) { el.addEventListener('input', debounced); });
+})();
+</script>
+
 <!-- Log table -->
 <div class="log-panel">
   <div class="log-panel-header">
-    <span class="log-panel-title">Audit Entries <span style="font-weight:500;color:#64748b;">({{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }})</span></span>
+    <span class="log-panel-title">Audit Entries <span style="font-weight:500;color:oklch(48% 0.06 54);">({{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }})</span></span>
   </div>
   <div class="table-responsive">
     <table class="log-table">
@@ -172,33 +201,33 @@
           <td class="lc-mono">{{ log.timestamp|date:"d M Y H:i:s" }}</td>
           <td>
             {% if log.actor %}
-              <span style="font-weight:600;color:#0f172a;">{{ log.actor.username }}</span>
+              <span style="font-weight:600;color:oklch(16% 0.04 52);">{{ log.actor.username }}</span>
             {% else %}
-              <span style="color:#94a3b8;font-size:0.72rem;">system</span>
+              <span style="color:oklch(62% 0.02 54);font-size:0.72rem;">system</span>
             {% endif %}
           </td>
           <td>
             <span class="audit-action-pill act-{{ log.action_type }}">{{ log.get_action_type_display }}</span>
           </td>
           <td class="lc-clip" title="{{ log.description }}">{{ log.description|default:"—" }}</td>
-          <td class="lc-clip-sm" style="font-size:0.75rem;color:#64748b;">
+          <td class="lc-clip-sm" style="font-size:.75rem;color:oklch(48% 0.06 54);">
             {% if log.target_model %}{{ log.target_model }} #{{ log.target_id }}{% else %}—{% endif %}
           </td>
           <td class="lc-mono">{{ log.ip_address|default:"—" }}</td>
-          <td class="lc-clip-sm lc-mono" style="font-size:0.68rem;" title="{{ log.metadata }}">
-            {% if log.metadata %}{{ log.metadata }}{% else %}<span style="color:#94a3b8;">—</span>{% endif %}
+          <td class="lc-clip-sm lc-mono" style="font-size:.68rem;" title="{{ log.metadata }}">
+            {% if log.metadata %}{{ log.metadata }}{% else %}<span style="color:oklch(62% 0.02 54);">—</span>{% endif %}
           </td>
           <td>
             {% if log.chain_hash %}
-            <span class="lc-mono" style="font-size:0.65rem;color:#94a3b8;" title="{{ log.chain_hash }}">{{ log.chain_hash|slice:":8" }}…</span>
+            <span class="lc-mono" style="font-size:.65rem;color:oklch(58% 0.02 54);" title="{{ log.chain_hash }}">{{ log.chain_hash|slice:":8" }}…</span>
             {% else %}
-            <span style="color:#94a3b8;">—</span>
+            <span style="color:oklch(62% 0.02 54);">—</span>
             {% endif %}
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="8" style="text-align:center;color:#64748b;padding:2.5rem 1rem;">
+          <td colspan="8" style="text-align:center;color:oklch(48% 0.06 54);padding:2.5rem 1rem;background:oklch(99.5% 0.006 60);">
             No audit entries match your filters.
           </td>
         </tr>
@@ -209,24 +238,20 @@
 </div>
 
 {% if page_obj.paginator.num_pages > 1 %}
-<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-top:1rem;">
-  <span style="font-size:0.8rem;color:#64748b;">
+<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-top:1rem;">
+  <span style="font-size:.8rem;color:oklch(48% 0.06 54);">
     Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
     &nbsp;·&nbsp; {{ page_obj.paginator.count }} total entries
   </span>
-  <div style="display:flex;gap:0.4rem;align-items:center;">
+  <div style="display:flex;gap:.4rem;align-items:center;">
     {% if page_obj.has_previous %}
-      <a href="?q={{ search_query }}&action={{ action_filter }}&actor={{ actor_filter }}&target_model={{ target_filter }}&days={{ days_filter }}&count={{ count_limit }}&page=1"
-         class="btn btn-sm btn-outline-secondary">« First</a>
-      <a href="?q={{ search_query }}&action={{ action_filter }}&actor={{ actor_filter }}&target_model={{ target_filter }}&days={{ days_filter }}&count={{ count_limit }}&page={{ page_obj.previous_page_number }}"
-         class="btn btn-sm btn-outline-secondary">‹ Prev</a>
+      <a href="?q={{ search_query }}&action={{ action_filter }}&actor={{ actor_filter }}&target_model={{ target_filter }}&days={{ days_filter }}&count={{ count_limit }}&page=1" class="btn-page">« First</a>
+      <a href="?q={{ search_query }}&action={{ action_filter }}&actor={{ actor_filter }}&target_model={{ target_filter }}&days={{ days_filter }}&count={{ count_limit }}&page={{ page_obj.previous_page_number }}" class="btn-page">‹ Prev</a>
     {% endif %}
-    <span class="btn btn-sm btn-primary" style="pointer-events:none;">{{ page_obj.number }}</span>
+    <span class="btn-page active">{{ page_obj.number }}</span>
     {% if page_obj.has_next %}
-      <a href="?q={{ search_query }}&action={{ action_filter }}&actor={{ actor_filter }}&target_model={{ target_filter }}&days={{ days_filter }}&count={{ count_limit }}&page={{ page_obj.next_page_number }}"
-         class="btn btn-sm btn-outline-secondary">Next ›</a>
-      <a href="?q={{ search_query }}&action={{ action_filter }}&actor={{ actor_filter }}&target_model={{ target_filter }}&days={{ days_filter }}&count={{ count_limit }}&page={{ page_obj.paginator.num_pages }}"
-         class="btn btn-sm btn-outline-secondary">Last »</a>
+      <a href="?q={{ search_query }}&action={{ action_filter }}&actor={{ actor_filter }}&target_model={{ target_filter }}&days={{ days_filter }}&count={{ count_limit }}&page={{ page_obj.next_page_number }}" class="btn-page">Next ›</a>
+      <a href="?q={{ search_query }}&action={{ action_filter }}&actor={{ actor_filter }}&target_model={{ target_filter }}&days={{ days_filter }}&count={{ count_limit }}&page={{ page_obj.paginator.num_pages }}" class="btn-page">Last »</a>
     {% endif %}
   </div>
 </div>

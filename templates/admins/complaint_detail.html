@@ -3,212 +3,354 @@
 {% block page_title %}Complaint #{{ complaint.id }}{% endblock %}
 
 {% block content %}
-<!-- Page Header -->
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&display=swap');
+
+  .page-header h1 {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 1.9rem; font-weight: 400; letter-spacing: -0.02em;
+    color: oklch(16% 0.04 52); margin-bottom: 0.2rem;
+  }
+
+  .cd-panel {
+    background: oklch(97% 0.016 62);
+    border-radius: 1rem;
+    border: 1px solid oklch(91% 0.03 62);
+    box-shadow: 0 4px 24px oklch(70% 0.15 57 / 0.08);
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+  }
+  .cd-panel-header {
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid oklch(89% 0.03 62);
+  }
+  .cd-panel-title { font-size: 0.88rem; font-weight: 800; color: oklch(18% 0.04 52); letter-spacing: -.01em; margin: 0; }
+  .cd-panel-body  { padding: 1.25rem; }
+
+  .cd-field-label {
+    display: block; font-size: 0.7rem; font-weight: 700; color: oklch(48% 0.06 54);
+    text-transform: uppercase; letter-spacing: .06em; margin-bottom: 0.3rem;
+  }
+  .cd-field-value { font-size: 0.85rem; color: oklch(22% 0.04 52); }
+
+  .evidence-img {
+    max-height: 360px; border-radius: 8px; border: 1px solid oklch(84% 0.04 62);
+    cursor: zoom-in; transition: box-shadow .15s;
+  }
+  .evidence-img:hover { box-shadow: 0 0 0 3px oklch(70% 0.15 55 / 0.35); }
+
+  /* Integrity card */
+  .integrity-card {
+    background: oklch(14% 0.045 52);
+    border-radius: 1rem;
+    border: 1px solid oklch(22% 0.04 52);
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+  }
+  .integrity-card-header {
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid oklch(22% 0.04 52);
+  }
+  .integrity-card-title { font-size: 0.88rem; font-weight: 800; color: oklch(84% 0.02 60); letter-spacing: -.01em; margin: 0; }
+  .integrity-card-body  { padding: 1.25rem; }
+  .hash-block {
+    background: oklch(10% 0.03 52); border-radius: 6px; padding: 0.75rem;
+    font-family: ui-monospace, 'SFMono-Regular', monospace; font-size: 0.65rem;
+    color: oklch(55% 0.02 54); word-break: break-all; line-height: 1.5;
+    border: 1px solid oklch(20% 0.04 52);
+  }
+  .btn-signed-receipt {
+    display: block; text-align: center; background: #ff9933; color: oklch(13% 0.04 52);
+    font-weight: 700; font-size: 0.82rem; padding: 0.55rem 1rem; border-radius: 8px;
+    text-decoration: none; margin-bottom: 1rem; transition: background .15s;
+  }
+  .btn-signed-receipt:hover { background: oklch(70% 0.2 54); color: oklch(13% 0.04 52); }
+
+  /* Resolution panel */
+  .btn-confirm-resolution {
+    background: oklch(44% 0.14 148); color: oklch(98% 0.01 148);
+    border: none; padding: 0.7rem 1.25rem; border-radius: 8px;
+    font-size: 0.85rem; font-weight: 700; width: 100%; cursor: pointer; font-family: inherit;
+    transition: background .15s;
+  }
+  .btn-confirm-resolution:hover { background: oklch(36% 0.12 148); }
+
+  .resolution-done {
+    background: oklch(94% 0.06 148); border: 1px solid oklch(80% 0.1 148);
+    border-radius: 8px; padding: 1rem 1.1rem; font-size: 0.85rem; color: oklch(28% 0.1 148);
+  }
+  .resolution-done-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: oklch(40% 0.08 148); margin-bottom: .25rem; }
+
+  /* Support chat */
+  .chat-bubble-mine {
+    max-width: 75%; background: oklch(97% 0.03 65); border: 1px solid oklch(82% 0.1 62);
+    border-radius: 12px 12px 4px 12px; padding: 0.5rem 0.75rem;
+  }
+  .chat-bubble-theirs {
+    max-width: 75%; background: oklch(97% 0.012 62); border: 1px solid oklch(88% 0.025 62);
+    border-radius: 12px 12px 12px 4px; padding: 0.5rem 0.75rem;
+  }
+  .chat-meta-text { font-size: 0.72rem; color: oklch(48% 0.06 54); margin-bottom: 2px; font-weight: 600; }
+  .chat-body-text { font-size: 0.84rem; color: oklch(18% 0.04 52); }
+
+  .chat-send-input { border: 1.5px solid oklch(84% 0.04 62); border-radius: 8px; }
+  .chat-send-input:focus { border-color: #ff9933; box-shadow: 0 0 0 3px oklch(70% 0.15 55 / .14); outline: none; }
+  .btn-send {
+    background: #ff9933; color: oklch(13% 0.04 52); border: none;
+    padding: 0.4rem 0.9rem; border-radius: 8px; font-weight: 700; font-size: 0.82rem; cursor: pointer;
+  }
+  .btn-send:hover { background: oklch(70% 0.2 54); }
+
+  .readonly-chat-note {
+    background: oklch(95% 0.015 62); border: 1px solid oklch(88% 0.025 62);
+    border-radius: 8px; padding: 0.6rem 0.875rem;
+    font-size: 0.78rem; color: oklch(42% 0.06 52);
+  }
+</style>
+
 <div class="page-header">
-    <h1>🚨 Complaint #{{ complaint.id }}</h1>
-    <p>Reviewing issue for Order #{{ complaint.order.id }}</p>
+  <h1>Complaint #{{ complaint.id }}</h1>
+  <p>Reviewing issue for Order #{{ complaint.order.id }}</p>
 </div>
 
-<!-- Navigation -->
 <div class="mb-4">
-    <a href="{% url 'admin_complaints_list' %}" class="btn btn-outline-secondary">← Back to Complaints</a>
+  <a href="{% url 'admin_complaints_list' %}" class="btn btn-outline-secondary">← Back to Complaints</a>
 </div>
 
 <div class="row g-4">
-    <div class="col-lg-7">
-        <!-- Reported Issue -->
-        <div class="content-card">
-            <h5 class="fw-bold border-bottom pb-3 mb-3" style="color: #ef4444;">⚠️ Reported Issue</h5>
-            <h6 class="fw-bold mb-3">{{ complaint.subject }}</h6>
-            <p class="text-muted mb-4">{{ complaint.message }}</p>
-            {% if complaint.evidence_image %}
-                <img src="{{ complaint.evidence_image.url }}" class="img-fluid rounded border mb-3" style="max-height: 400px; cursor: zoom-in; border-color: #ef4444;" onclick="window.open(this.src)">
-            {% else %}
-                <p class="small text-muted">No evidence image provided.</p>
-            {% endif %}
-        </div>
+  <div class="col-lg-7">
 
-        <!-- Customer Contact Information -->
-        <div class="content-card">
-            <h5 class="fw-bold border-bottom pb-3 mb-3">👤 Customer Contact</h5>
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <label class="small text-muted d-block mb-1"><strong>Full Name</strong></label>
-                    {{ order.full_name }}
-                </div>
-                <div class="col-md-6">
-                    <label class="small text-muted d-block mb-1"><strong>Phone Number</strong></label>
-                    <span class="text-primary">{{ order.phone_number }}</span>
-                </div>
-                <div class="col-md-6">
-                    <label class="small text-muted d-block mb-1"><strong>Username</strong></label>
-                    <span class="badge bg-light text-dark">{{ customer.username }}</span>
-                </div>
-                <div class="col-md-6">
-                    <label class="small text-muted d-block mb-1"><strong>Order Date</strong></label>
-                    {{ order.created_at|date:"d M Y" }}
-                </div>
+    <!-- Reported Issue -->
+    <div class="cd-panel">
+      <div class="cd-panel-header">
+        <div class="cd-panel-title" style="color:oklch(43% 0.1 22);">Reported Issue</div>
+      </div>
+      <div class="cd-panel-body">
+        <h6 style="font-weight:700;color:oklch(16% 0.04 52);margin-bottom:.75rem;">{{ complaint.subject }}</h6>
+        <p style="font-size:.85rem;color:oklch(38% 0.04 52);margin-bottom:1.25rem;">{{ complaint.message }}</p>
+        {% if complaint.evidence_image %}
+          <img src="{{ complaint.evidence_image.url }}" class="evidence-img js-evidence-img img-fluid mb-2"
+               data-src="{{ complaint.evidence_image.url }}"
+               alt="Evidence image">
+        {% else %}
+          <p style="font-size:.82rem;color:oklch(48% 0.06 54);">No evidence image provided.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Customer Contact -->
+    <div class="cd-panel">
+      <div class="cd-panel-header">
+        <div class="cd-panel-title">Customer Contact</div>
+      </div>
+      <div class="cd-panel-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <span class="cd-field-label">Full Name</span>
+            <div class="cd-field-value">{{ order.full_name }}</div>
+          </div>
+          <div class="col-md-6">
+            <span class="cd-field-label">Phone Number</span>
+            <div class="cd-field-value" style="font-weight:600;color:#ff9933;">{{ order.phone_number }}</div>
+          </div>
+          <div class="col-md-6">
+            <span class="cd-field-label">Username</span>
+            <div class="cd-field-value">
+              <span style="background:oklch(93% 0.022 62);color:oklch(22% 0.04 52);padding:0.12rem 0.5rem;border-radius:6px;font-size:.78rem;font-weight:600;">{{ customer.username }}</span>
             </div>
+          </div>
+          <div class="col-md-6">
+            <span class="cd-field-label">Order Date</span>
+            <div class="cd-field-value">{{ order.created_at|date:"d M Y" }}</div>
+          </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+
+    <!-- Integrity Check -->
+    <div class="integrity-card">
+      <div class="integrity-card-header">
+        <div class="integrity-card-title">Integrity Check</div>
+      </div>
+      <div class="integrity-card-body">
+        {% if order.digital_signature %}
+          <a href="{{ order.digital_signature.pdf_path.url }}" class="btn-signed-receipt" target="_blank">View Signed Receipt</a>
+          <div class="hash-block">
+            <div style="font-size:.6rem;color:oklch(42% 0.02 54);margin-bottom:4px;font-weight:700;letter-spacing:.05em;">SIGNATURE HASH</div>
+            {{ order.digital_signature.signature_hash }}
+          </div>
+        {% else %}
+          <div style="background:oklch(20% 0.06 52);border:1px solid oklch(40% 0.08 52);border-radius:8px;padding:.75rem 1rem;font-size:.82rem;color:oklch(72% 0.06 60);">
+            No signed receipt found for this order.
+          </div>
+        {% endif %}
+      </div>
     </div>
 
-    <div class="col-lg-5">
-        <!-- Integrity Check -->
-        <div class="content-card" style="border: 2px solid #3b82f6; background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%);">
-            <h5 class="fw-bold mb-3" style="color: #0369a1;">🔒 Integrity Check</h5>
-            {% if order.digital_signature %}
-                <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-primary w-100 fw-bold py-2 mb-3" target="_blank">📄 View Signed Receipt</a>
-                <div class="p-3 bg-white rounded border small text-break" style="border-color: #3b82f6;">
-                    <strong style="font-size: 0.75rem;">HASH:</strong><br>
-                    <code style="font-size: 0.65rem; word-break: break-all;">{{ order.digital_signature.signature_hash }}</code>
-                </div>
-            {% else %}
-                <div class="alert alert-warning small mb-0">⚠️ No signed receipt found.</div>
-            {% endif %}
-        </div>
-
-        <!-- Resolution Action -->
-        <div class="content-card">
-            <h5 class="fw-bold mb-4">⚡ Resolution Action</h5>
-            <form method="post" action="{% url 'resolve_complaint' complaint.id %}">
-                {% csrf_token %}
-                {% if complaint.status == 'pending' %}
-                    <div class="mb-4">
-                        <label class="form-label small fw-bold">Select Administrative Action:</label>
-                        <select name="action_taken" class="form-select border-2" style="border-color: #3b82f6;" required>
-                            <option value="" disabled selected>-- Choose action --</option>
-                            <option value="refund">💰 Contact User for Refund</option>
-                            <option value="remake">🔄 Remake Order</option>
-                            <option value="dismissed">❌ Dismiss Complaint</option>
-                        </select>
-                    </div>
-                    <div class="mb-4">
-                        <label class="form-label small fw-bold">Message to Customer <span class="text-muted fw-normal">(optional)</span></label>
-                        <textarea name="resolution_note" class="form-control" rows="3"
-                                  placeholder="Briefly explain the outcome — the customer will see this on their support page."></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-success w-100 py-3 fw-bold">✓ Confirm Resolution</button>
-                {% else %}
-                    <div class="alert alert-success mb-0">
-                        <strong>Resolution Outcome:</strong><br>
-                        {{ complaint.get_action_taken_display }}<br>
-                        {% if complaint.resolution_note %}
-                        <div class="mt-2 pt-2 border-top" style="border-color: rgba(0,0,0,0.1) !important;">
-                            <small class="text-muted d-block mb-1">Message sent to customer:</small>
-                            <em style="font-size: 0.85rem;">{{ complaint.resolution_note }}</em>
-                        </div>
-                        {% endif %}
-                        <small class="text-muted mt-2 d-block">Closed on {{ complaint.created_at|date:"d M Y" }}</small>
-                    </div>
-                {% endif %}
-            </form>
-        </div>
+    <!-- Resolution Action -->
+    <div class="cd-panel">
+      <div class="cd-panel-header">
+        <div class="cd-panel-title">Resolution Action</div>
+      </div>
+      <div class="cd-panel-body">
+        <form method="post" action="{% url 'resolve_complaint' complaint.id %}">
+          {% csrf_token %}
+          {% if complaint.status == 'pending' %}
+            <div class="mb-3">
+              <label class="cd-field-label" for="action_taken">Administrative Action</label>
+              <select name="action_taken" id="action_taken" class="form-select form-select-sm" required>
+                <option value="" disabled selected>Choose action</option>
+                <option value="refund">Contact Customer for Refund</option>
+                <option value="remake">Remake Order</option>
+                <option value="dismissed">Dismiss Complaint</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="cd-field-label" for="resolution_note">Message to Customer <span style="text-transform:none;font-weight:400;letter-spacing:0;color:oklch(58% 0.02 54);">(optional)</span></label>
+              <textarea name="resolution_note" id="resolution_note" class="form-control form-control-sm" rows="3"
+                        placeholder="Briefly explain the outcome — the customer will see this."></textarea>
+            </div>
+            <button type="submit" class="btn-confirm-resolution">Confirm Resolution</button>
+          {% else %}
+            <div class="resolution-done">
+              <div class="resolution-done-label">Resolution Outcome</div>
+              <div style="font-weight:700;margin-bottom:.5rem;">{{ complaint.get_action_taken_display }}</div>
+              {% if complaint.resolution_note %}
+              <div style="border-top:1px solid oklch(80% 0.1 148);padding-top:.5rem;margin-top:.5rem;">
+                <div style="font-size:.72rem;color:oklch(40% 0.08 148);margin-bottom:.25rem;font-weight:600;">Message sent to customer</div>
+                <em style="font-size:.83rem;">{{ complaint.resolution_note }}</em>
+              </div>
+              {% endif %}
+              <div style="font-size:.72rem;color:oklch(40% 0.08 148);margin-top:.5rem;">Closed on {{ complaint.created_at|date:"d M Y" }}</div>
+            </div>
+          {% endif %}
+        </form>
+      </div>
     </div>
+
+  </div>
 </div>
 
-<!-- ── Support Chat Panel ──────────────────────────────── -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="content-card">
-            <h5 class="fw-bold border-bottom pb-3 mb-3">💬 Support Chat</h5>
+<!-- Support Chat -->
+<div class="row mt-2">
+  <div class="col-12">
+    <div class="cd-panel">
+      <div class="cd-panel-header">
+        <div class="cd-panel-title">Support Chat</div>
+      </div>
+      <div class="cd-panel-body">
+        {% if complaint.status == 'resolved' %}
+        <div class="readonly-chat-note mb-3">This complaint is resolved. Chat is read-only.</div>
+        {% endif %}
 
-            {% if complaint.status == 'resolved' %}
-            <div class="alert alert-secondary small mb-3">🔒 This complaint is resolved. Chat is read-only.</div>
-            {% endif %}
-
-            <div id="chat-thread" style="max-height:380px; overflow-y:auto; padding-right:4px; margin-bottom:1rem;">
-                {% for msg in initial_messages %}
-                <div class="d-flex {% if msg.is_mine %}justify-content-end{% endif %} mb-2">
-                    <div class="p-2 px-3 rounded-3 small"
-                         style="max-width:75%; {% if msg.is_mine %}background:#fff7ed; border:1px solid #fb923c;{% else %}background:#f1f5f9; border:1px solid #cbd5e1;{% endif %}">
-                        <div class="fw-semibold" style="font-size:0.72rem; color:#64748b; margin-bottom:2px;">
-                            {{ msg.sender }}{% if msg.is_mine %} (you){% endif %} · {{ msg.created_at }}
-                        </div>
-                        <div>{{ msg.body }}</div>
-                    </div>
-                </div>
-                {% empty %}
-                <p class="text-muted small text-center" id="empty-msg">No messages yet. Start the conversation.</p>
-                {% endfor %}
+        <div id="chat-thread" style="max-height:380px;overflow-y:auto;padding-right:4px;margin-bottom:1rem;">
+          {% for msg in initial_messages %}
+          <div class="d-flex {% if msg.is_mine %}justify-content-end{% endif %} mb-2">
+            <div class="{% if msg.is_mine %}chat-bubble-mine{% else %}chat-bubble-theirs{% endif %}">
+              <div class="chat-meta-text">{{ msg.sender }}{% if msg.is_mine %} (you){% endif %} · {{ msg.created_at }}</div>
+              <div class="chat-body-text">{{ msg.body }}</div>
             </div>
-
-            {% if complaint.status != 'resolved' %}
-            <form id="chat-form" class="d-flex gap-2">
-                {% csrf_token %}
-                <input type="text" id="chat-input" class="form-control form-control-sm"
-                       placeholder="Type a message…" autocomplete="off">
-                <button type="submit" class="btn btn-sm btn-warning fw-bold px-3">Send</button>
-            </form>
-            {% endif %}
+          </div>
+          {% empty %}
+          <p style="text-align:center;color:oklch(48% 0.06 54);font-size:.82rem;" id="empty-msg">No messages yet. Start the conversation.</p>
+          {% endfor %}
         </div>
+
+        {% if complaint.status != 'resolved' %}
+        <form id="chat-form" class="d-flex gap-2">
+          {% csrf_token %}
+          <input type="text" id="chat-input" class="form-control form-control-sm chat-send-input"
+                 placeholder="Type a message…" autocomplete="off">
+          <button type="submit" class="btn-send">Send</button>
+        </form>
+        {% endif %}
+      </div>
     </div>
+  </div>
 </div>
 
+{% endblock %}
+
+{% block extra_scripts %}
 <script nonce="{{ request.csp_nonce }}">
 (function () {
-    const MESSAGES_URL = "{% url 'admin_complaint_messages' complaint.id %}";
-    const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
-    const CSRF      = csrfInput ? csrfInput.value : '';
-    const thread = document.getElementById('chat-thread');
-    const form   = document.getElementById('chat-form');
-    const input  = document.getElementById('chat-input');
-    let lastSeen = null;
+  /* Evidence image lightbox */
+  document.addEventListener('click', function (e) {
+    var img = e.target.closest('.js-evidence-img');
+    if (img) window.open(img.dataset.src, '_blank');
+  });
 
-    function appendMessage(msg) {
-        const emptyMsg = document.getElementById('empty-msg');
-        if (emptyMsg) emptyMsg.remove();
-        const wrap = document.createElement('div');
-        wrap.className = 'd-flex ' + (msg.is_mine ? 'justify-content-end' : '') + ' mb-2';
-        const style = msg.is_mine
-            ? 'background:#fff7ed;border:1px solid #fb923c;'
-            : 'background:#f1f5f9;border:1px solid #cbd5e1;';
-        const bubble = document.createElement('div');
-        bubble.className = 'p-2 px-3 rounded-3 small';
-        bubble.style.cssText = 'max-width:75%;' + style;
-        const meta = document.createElement('div');
-        meta.className = 'fw-semibold';
-        meta.style.cssText = 'font-size:0.72rem;color:#64748b;margin-bottom:2px;';
-        meta.textContent = msg.sender + (msg.is_mine ? ' (you)' : '');
-        const body = document.createElement('div');
-        body.textContent = msg.body;
-        bubble.appendChild(meta);
-        bubble.appendChild(body);
-        wrap.appendChild(bubble);
-        thread.appendChild(wrap);
-        lastSeen = msg.created_at;
-        thread.scrollTop = thread.scrollHeight;
-    }
+  /* Support chat */
+  var MESSAGES_URL = "{% url 'admin_complaint_messages' complaint.id %}";
+  var csrfInput    = document.querySelector('[name=csrfmiddlewaretoken]');
+  var CSRF         = csrfInput ? csrfInput.value : '';
+  var thread       = document.getElementById('chat-thread');
+  var form         = document.getElementById('chat-form');
+  var input        = document.getElementById('chat-input');
+  var lastSeen     = null;
 
-    function poll() {
-        const url = lastSeen ? MESSAGES_URL + '?since=' + encodeURIComponent(lastSeen) : MESSAGES_URL;
-        fetch(url).then(r => r.json()).then(data => {
-            data.messages.forEach(appendMessage);
-            if (data.locked && form) form.style.display = 'none';
-        });
-    }
-
-    if (form) {
-        form.addEventListener('submit', function (e) {
-            e.preventDefault();
-            const body = input.value.trim();
-            if (!body) return;
-            input.value = '';
-            fetch(MESSAGES_URL, {
-                method: 'POST',
-                headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded'},
-                body: 'body=' + encodeURIComponent(body),
-            }).then(r => r.json()).then(data => { if (data.ok) poll(); });
-        });
-    }
-
-    let pollTimer;
-    function startPolling() { pollTimer = setInterval(poll, 20000); }
-    function stopPolling()  { clearInterval(pollTimer); }
-    document.addEventListener('visibilitychange', () => document.hidden ? stopPolling() : startPolling());
-
+  function appendMessage(msg) {
+    var emptyMsg = document.getElementById('empty-msg');
+    if (emptyMsg) emptyMsg.remove();
+    var wrap = document.createElement('div');
+    wrap.className = 'd-flex ' + (msg.is_mine ? 'justify-content-end' : '') + ' mb-2';
+    var bubble = document.createElement('div');
+    bubble.className = msg.is_mine ? 'chat-bubble-mine' : 'chat-bubble-theirs';
+    var meta = document.createElement('div');
+    meta.className = 'chat-meta-text';
+    meta.textContent = msg.sender + (msg.is_mine ? ' (you)' : '') + ' · ' + msg.created_at;
+    var body = document.createElement('div');
+    body.className = 'chat-body-text';
+    body.textContent = msg.body;
+    bubble.appendChild(meta);
+    bubble.appendChild(body);
+    wrap.appendChild(bubble);
+    thread.appendChild(wrap);
+    lastSeen = msg.created_at;
     thread.scrollTop = thread.scrollHeight;
-    startPolling();
+  }
+
+  function handleExpiry(r) {
+    if (r.status !== 401) return r.json();
+    r.json().then(function(d) { window.location.href = d.redirect || '/login/'; });
+    return null;
+  }
+
+  function poll() {
+    var url = lastSeen ? MESSAGES_URL + '?since=' + encodeURIComponent(lastSeen) : MESSAGES_URL;
+    fetch(url).then(handleExpiry).then(function(data) {
+      if (!data) return;
+      data.messages.forEach(appendMessage);
+      if (data.locked && form) form.style.display = 'none';
+    });
+  }
+
+  if (form) {
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var body = input.value.trim();
+      if (!body) return;
+      input.value = '';
+      fetch(MESSAGES_URL, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'body=' + encodeURIComponent(body)
+      }).then(handleExpiry).then(function(data) { if (data && data.ok) poll(); });
+    });
+  }
+
+  var pollTimer;
+  function startPolling() { pollTimer = setInterval(poll, 20000); }
+  function stopPolling()  { clearInterval(pollTimer); }
+  document.addEventListener('visibilitychange', function() {
+    document.hidden ? stopPolling() : startPolling();
+  });
+
+  thread.scrollTop = thread.scrollHeight;
+  startPolling();
 })();
 </script>
-
 {% endblock %}

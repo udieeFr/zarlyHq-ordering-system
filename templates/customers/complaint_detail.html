@@ -100,9 +100,16 @@
         thread.scrollTop = thread.scrollHeight;
     }
 
+    const handleExpiry = r => {
+        if (r.status !== 401) return r.json();
+        r.json().then(d => { window.location.href = d.redirect || '/login/customer/'; });
+        return null;
+    };
+
     function poll() {
         const url = lastSeen ? MESSAGES_URL + '?since=' + encodeURIComponent(lastSeen) : MESSAGES_URL;
-        fetch(url).then(r => r.json()).then(data => {
+        fetch(url).then(handleExpiry).then(data => {
+            if (!data) return;
             if (!hasMessages && data.messages.length === 0 && emptyMsg) {
                 emptyMsg.textContent = 'No messages yet. Start the conversation.';
             }
@@ -121,7 +128,7 @@
                 method: 'POST',
                 headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded'},
                 body: 'body=' + encodeURIComponent(body),
-            }).then(r => r.json()).then(data => { if (data.ok) poll(); });
+            }).then(handleExpiry).then(data => { if (data && data.ok) poll(); });
         });
     }
 

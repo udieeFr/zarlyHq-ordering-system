@@ -44,7 +44,7 @@
                   <span class="fs-4">📱</span>
                   <h5 class="mb-0 fw-bold">Pay with QR / Bank Transfer</h5>
                 </div>
-                <p class="text-muted small mb-4">Scan the QR code or transfer directly. After payment, upload your receipt for verification.</p>
+                <p class="text-muted small mb-4">Scan the QR code or transfer directly. After payment, upload your payment proof for verification.</p>
 
                 <ul class="nav nav-pills mb-3 gap-2" id="paymentTabs" role="tablist">
                   <li class="nav-item" role="presentation">
@@ -101,14 +101,21 @@
                     </div>
                     {% endif %}
                     <div class="alert alert-warning mb-0 small">
-                      Follow the bank transfer details above, then upload your receipt after payment.
+                      Follow the bank transfer details above, then upload your payment proof after payment.
                     </div>
                   </div>
                 </div>
 
-                <div class="d-grid gap-2 mt-4">
-                  <a href="{% url 'order_success' order.id %}" class="btn btn-outline-secondary">Open order details / upload receipt</a>
-                </div>
+                <hr class="my-3">
+                <p class="fw-bold small mb-2">Upload payment proof</p>
+                <form method="post" action="{% url 'upload_payment_proof' order.id %}" enctype="multipart/form-data">
+                  {% csrf_token %}
+                  <div class="mb-3">
+                    <input type="file" name="payment_proof" accept="image/*,.pdf" class="form-control form-control-sm" required>
+                    <div class="form-text">Screenshot or PDF, max 5 MB.</div>
+                  </div>
+                  <button type="submit" class="btn btn-success w-100 fw-bold">Submit Payment Proof</button>
+                </form>
               </div>
             </div>
           </div>

@@ -101,7 +101,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
-  padding: 1.125rem 1.5rem;
+  padding: 1.75rem 1.5rem 1.25rem;
   align-items: start;
 }
 @media (max-width: 880px) { .od-body { grid-template-columns: 1fr; } }
@@ -226,9 +226,15 @@
     <div class="od-actions">
       {% if order.status == 'pending' %}
         {% if has_payment %}
-        <a href="{% url 'approve_order' order.id %}" class="od-btn b-approve">✅ Approve</a>
+        <form method="post" action="{% url 'approve_order' order.id %}" style="display:inline;">
+          {% csrf_token %}
+          <button type="submit" class="od-btn b-approve">✅ Approve</button>
+        </form>
         {% else %}
-        <a href="{% url 'approve_order' order.id %}" class="od-btn b-warn">→ Payment</a>
+        <form method="post" action="{% url 'approve_order' order.id %}" style="display:inline;">
+          {% csrf_token %}
+          <button type="submit" class="od-btn b-warn">→ Payment</button>
+        </form>
         {% endif %}
         <button type="button" class="od-btn b-ghost" id="rejectToggle">Reject</button>
       {% elif order.status == 'pending_payment' %}

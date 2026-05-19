@@ -3,31 +3,146 @@
 {% block page_title %}Inventory Management{% endblock %}
 
 {% block content %}
+<style>
+    /* ── Stock status badges ────────────────────────────── */
+    .stock-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.18rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.25px;
+        white-space: nowrap;
+    }
+    .stock-instock  { background: #16a34a; background: oklch(42% 0.14 148); color: #fff; color: oklch(97% 0.01 148); }
+    .stock-soldout  { background: #dc2626; background: oklch(48% 0.18 22);  color: #fff; color: oklch(97% 0.01 22); }
+    .stock-hidden   { background: #6b7280; background: oklch(56% 0.025 60); color: #fff; color: oklch(97% 0.006 60); }
+    .stock-updating { background: #ea580c; background: oklch(52% 0.16 46);  color: #fff; color: oklch(97% 0.01 60); }
+
+    /* ── Category badge ─────────────────────────────────── */
+    .cat-badge {
+        display: inline-block;
+        background: oklch(95% 0.018 62);
+        color: oklch(38% 0.04 60);
+        border: 1px solid oklch(88% 0.02 62);
+        padding: 0.12rem 0.55rem;
+        border-radius: 6px;
+        font-size: 0.72rem;
+        font-weight: 600;
+    }
+
+    /* ── Staged row highlight ───────────────────────────── */
+    .row-staging { background: oklch(97% 0.025 58) !important; }
+
+    /* ── Table header ───────────────────────────────────── */
+    .inv-thead th {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        color: oklch(42% 0.06 52);
+        background: oklch(93% 0.022 62);
+        border-bottom: 1.5px solid oklch(88% 0.03 62);
+        padding-top: 0.85rem;
+        padding-bottom: 0.85rem;
+    }
+
+    /* ── Price ──────────────────────────────────────────── */
+    .price-cell { font-weight: 700; color: var(--accent); letter-spacing: -0.01em; }
+
+    /* ── Action buttons ─────────────────────────────────── */
+    .btn-brand-action {
+        display: inline-flex;
+        align-items: center;
+        background: var(--accent);
+        color: oklch(99% 0.008 65);
+        border: none;
+        padding: 0.45rem 1rem;
+        border-radius: 7px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+        font-family: inherit;
+        transition: background 0.15s ease-out, transform 0.12s ease-out;
+    }
+    .btn-brand-action:hover {
+        background: var(--accent-hover);
+        color: oklch(99% 0.008 65);
+        transform: translateY(-1px);
+    }
+    .btn-review-action {
+        display: inline-flex;
+        align-items: center;
+        background: oklch(93% 0.09 52);
+        color: oklch(28% 0.16 46);
+        border: 1.5px solid oklch(82% 0.12 52);
+        padding: 0.45rem 1rem;
+        border-radius: 7px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: inherit;
+        transition: background 0.15s ease-out, transform 0.12s ease-out;
+    }
+    .btn-review-action:hover {
+        background: oklch(88% 0.12 52);
+        transform: translateY(-1px);
+    }
+
+    /* ── Modal ──────────────────────────────────────────── */
+    .inv-modal-header {
+        background: oklch(18% 0.03 52);
+        color: oklch(97% 0.008 60);
+        border-radius: 0.75rem 0.75rem 0 0;
+        padding: 1.25rem 1.5rem;
+    }
+    .inv-modal-new-stock { font-weight: 800; color: var(--accent); }
+    .btn-apply-action {
+        background: oklch(44% 0.14 148);
+        color: oklch(98% 0.01 148);
+        border: none;
+        padding: 0.5rem 1.5rem;
+        border-radius: 7px;
+        font-size: 0.875rem;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: inherit;
+        min-width: 150px;
+        transition: background 0.15s ease-out;
+    }
+    .btn-apply-action:hover {
+        background: oklch(36% 0.12 148);
+        color: oklch(98% 0.01 148);
+    }
+</style>
+
 <!-- Page Header -->
 <div class="page-header">
-    <h1>📦 Inventory Stock Management</h1>
-    <p>Manage product stock levels and quantities</p>
+    <h1>Inventory</h1>
+    <p>Stock levels and product availability</p>
 </div>
 
 <!-- Action Buttons -->
 <div class="mb-4 d-flex flex-wrap gap-2">
     {% if has_staging %}
-        <button class="btn btn-warning fw-bold" data-bs-toggle="modal" data-bs-target="#summaryModal">
-            ⚠️ Review and Confirm ({{ staging_count }} Pending)
+        <button class="btn-review-action" data-bs-toggle="modal" data-bs-target="#summaryModal">
+            Review and Confirm ({{ staging_count }} pending)
         </button>
         <a href="{% url 'clear_stock_staging' %}" class="btn btn-outline-danger">Discard Changes</a>
     {% endif %}
     {% if request.user.role == 'manager' or request.user.is_superuser %}
-    <a href="{% url 'add_product' %}" class="btn btn-primary fw-bold">➕ New Product</a>
-    <a href="{% url 'manage_categories' %}" class="btn btn-outline-primary">🗂 Categories</a>
+    <a href="{% url 'add_product' %}" class="btn-brand-action">New Product</a>
+    <a href="{% url 'manage_categories' %}" class="btn btn-outline-secondary">Categories</a>
     {% endif %}
     <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">← Dashboard</a>
 </div>
 
 <!-- Inventory Table -->
-<div class="content-card overflow-hidden">
+<div class="content-card overflow-hidden" style="border-color:oklch(91% 0.03 62);">
     <table class="table table-hover align-middle mb-0">
-        <thead class="bg-light text-uppercase small fw-bold">
+        <thead class="inv-thead">
             <tr>
                 <th class="ps-4">Product Name</th>
                 <th>Category</th>
@@ -43,10 +158,10 @@
         </thead>
         <tbody>
             {% for item in inventory_data %}
-            <tr class="{% if item.has_change %}table-warning{% endif %}" id="row-{{ item.product.id }}">
+            <tr class="{% if item.has_change %}row-staging{% endif %}" id="row-{{ item.product.id }}">
                 <td class="ps-4 fw-bold">{{ item.product.name }}</td>
-                <td><span class="badge bg-light text-dark border">{{ item.product.category.name }}</span></td>
-                <td class="text-end fw-bold text-success">RM {{ item.product.price }}</td>
+                <td><span class="cat-badge">{{ item.product.category.name }}</span></td>
+                <td class="text-end price-cell">RM {{ item.product.price }}</td>
                 <td class="text-center">{{ item.product.stock }}</td>
                 <td>
                     <input type="number"
@@ -58,13 +173,13 @@
                 </td>
                 <td class="text-center">
                     {% if item.has_change %}
-                        <span class="badge bg-primary">Updating</span>
+                        <span class="stock-badge stock-updating" style="background:oklch(52% 0.16 46);color:oklch(97% 0.01 60);">Updating</span>
                     {% elif not item.product.is_available %}
-                        <span class="badge bg-secondary">Hidden</span>
+                        <span class="stock-badge stock-hidden" style="background:oklch(56% 0.025 60);color:oklch(97% 0.006 60);">Hidden</span>
                     {% elif item.product.stock <= 0 %}
-                        <span class="badge bg-danger">Out of Stock</span>
+                        <span class="stock-badge stock-soldout" style="background:oklch(48% 0.18 22);color:oklch(97% 0.01 22);">Out of Stock</span>
                     {% else %}
-                        <span class="badge bg-success">In Stock</span>
+                        <span class="stock-badge stock-instock" style="background:oklch(42% 0.14 148);color:oklch(97% 0.01 148);">In Stock</span>
                     {% endif %}
                 </td>
                 {% if request.user.role == 'manager' or request.user.is_superuser %}
@@ -79,9 +194,10 @@
                     </div>
                 </td>
                 <td class="text-end pe-4">
-                    <a href="{% url 'edit_product' item.product.id %}" class="btn btn-sm btn-outline-primary me-1">Edit</a>
-                    <button type="button" class="btn btn-sm btn-outline-danger"
-                            onclick="confirmDelete({{ item.product.id }}, '{{ item.product.name|escapejs }}')">Delete</button>
+                    <a href="{% url 'edit_product' item.product.id %}" class="btn btn-sm btn-outline-secondary me-1">Edit</a>
+                    <button type="button" class="btn btn-sm btn-outline-danger js-delete-product"
+                            data-product-id="{{ item.product.id }}"
+                            data-product-name="{{ item.product.name|escapejs }}">Delete</button>
                 </td>
                 {% endif %}
             </tr>
@@ -96,7 +212,7 @@
 <div class="modal fade" id="summaryModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content border-0 rounded-4">
-            <div class="modal-header" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: white;">
+            <div class="modal-header inv-modal-header">
                 <h5 class="modal-title fw-bold">Confirm Inventory Updates</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -118,7 +234,7 @@
                                 <td class="fw-bold">{{ item.product.name }}</td>
                                 <td class="text-center">{{ item.product.stock }}</td>
                                 <td class="text-center">→</td>
-                                <td class="text-center text-primary fw-bold">{{ item.staged_stock }}</td>
+                                <td class="text-center inv-modal-new-stock">{{ item.staged_stock }}</td>
                             </tr>
                             {% endif %}
                         {% endfor %}
@@ -129,7 +245,7 @@
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                 <form method="post" action="{% url 'confirm_stock_changes' %}" style="display: inline;">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-success fw-bold" style="min-width: 150px;">✓ Apply Changes</button>
+                    <button type="submit" class="btn-apply-action">Apply Changes</button>
                 </form>
             </div>
         </div>
@@ -142,18 +258,38 @@
 </form>
 
 <script nonce="{{ request.csp_nonce }}">
-function confirmDelete(productId, productName) {
-  if (!confirm(`Delete "${productName}" from the menu? This cannot be undone.`)) return;
-  const form = document.getElementById('deleteProductForm');
-  form.action = `/dashboard/inventory/${productId}/delete/`;
-  form.submit();
-}
+document.addEventListener('click', function (e) {
+  var btn = e.target.closest('.js-delete-product');
+  if (!btn) return;
+  var productName = btn.dataset.productName;
+  var productId   = btn.dataset.productId;
+  if (!confirm('Delete "' + productName + '" from the menu? This cannot be undone.')) return;
+
+  AdminAJAX.request('/dashboard/inventory/' + productId + '/delete/', {
+    method: 'POST',
+    showToast: true,
+    onSuccess: function(data) {
+      const row = document.getElementById('row-' + productId);
+      if (row) {
+        row.style.opacity = '0';
+        row.style.transform = 'translateX(-20px)';
+        row.style.transition = 'opacity .3s, transform .3s';
+        setTimeout(() => row.remove(), 300);
+      }
+    }
+  });
+});
 
 document.querySelectorAll('.stock-input').forEach(input => {
     input.addEventListener('change', function() {
         const url = this.dataset.url;
         const val = this.value;
+        const rowId = this.closest('tr').id;
         const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const button = this;
+
+        button.disabled = true;
+        button.style.opacity = '0.6';
 
         fetch(url, {
             method: 'POST',
@@ -163,27 +299,54 @@ document.querySelectorAll('.stock-input').forEach(input => {
                 'X-Requested-With': 'XMLHttpRequest'
             },
             body: 'stock=' + val
-        }).then(response => {
-            if (response.ok) {
-                location.reload(); 
-            }
-        });
+        }).then(response => response.json())
+          .then(data => {
+              AdminAJAX.showToast('Stock updated', 'success');
+          })
+          .catch(error => {
+              AdminAJAX.showToast('Failed to update stock', 'error');
+          })
+          .finally(() => {
+              button.disabled = false;
+              button.style.opacity = '1';
+          });
     });
 });
 
-// Availability toggle
 document.querySelectorAll('.availability-toggle').forEach(toggle => {
     toggle.addEventListener('change', function () {
         const url = this.dataset.url;
         const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const toggleSwitch = this;
+
+        toggleSwitch.disabled = true;
+        toggleSwitch.style.opacity = '0.6';
+
         fetch(url, {
             method: 'POST',
             headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' }
-        }).then(r => r.json()).then(data => {
-            const label = this.closest('td');
-            this.title = data.is_available ? 'Visible to customers' : 'Hidden from menu';
-            location.reload();
-        });
+        }).then(r => r.json())
+          .then(data => {
+              toggleSwitch.title = data.is_available ? 'Visible to customers' : 'Hidden from menu';
+              const row = toggleSwitch.closest('tr');
+              const statusCell = row.querySelector('td:nth-child(6)');
+              if (statusCell) {
+                  if (data.is_available) {
+                      statusCell.innerHTML = '<span class="stock-badge stock-instock" style="background:oklch(42% 0.14 148);color:oklch(97% 0.01 148);">In Stock</span>';
+                  } else {
+                      statusCell.innerHTML = '<span class="stock-badge stock-hidden" style="background:oklch(56% 0.025 60);color:oklch(97% 0.006 60);">Hidden</span>';
+                  }
+              }
+              AdminAJAX.showToast('Availability updated', 'success');
+          })
+          .catch(error => {
+              AdminAJAX.showToast('Failed to update availability', 'error');
+              toggleSwitch.checked = !toggleSwitch.checked;
+          })
+          .finally(() => {
+              toggleSwitch.disabled = false;
+              toggleSwitch.style.opacity = '1';
+          });
     });
 });
 </script>

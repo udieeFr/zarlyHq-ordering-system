@@ -150,16 +150,16 @@
 
                         <!-- Payment Proof Upload Form -->
                         <div class="card bg-light border-0 mt-4 p-4">
-                            <h6 class="fw-bold mb-3">📸 Upload Payment Receipt</h6>
+                            <h6 class="fw-bold mb-3">📸 Upload Payment Proof</h6>
                             <p class="small text-muted mb-3">After completing your payment, upload a screenshot or image of the success confirmation. This helps us verify your payment faster.</p>
                             
                             <form method="post" action="{% url 'upload_payment_proof' order.id %}" enctype="multipart/form-data" id="payment-form">
                                 {% csrf_token %}
                                 <div class="mb-3">
-                                    <label for="payment_proof" class="form-label fw-bold">Select Receipt Image</label>
-                                    <input 
-                                        type="file" 
-                                        name="payment_proof" 
+                                    <label for="payment_proof" class="form-label fw-bold">Select Payment Proof</label>
+                                    <input
+                                        type="file"
+                                        name="payment_proof"
                                         id="payment_proof"
                                         class="form-control"
                                         accept="image/jpeg,image/png,application/pdf"
@@ -175,7 +175,7 @@
                                     <img id="preview-img" src="" alt="Preview" class="img-thumbnail" style="max-width: 200px;">
                                 </div>
                                 <button type="submit" class="btn btn-success w-100 fw-bold py-2">
-                                    ✓ Upload Receipt & Verify
+                                    ✓ Upload & Verify
                                 </button>
                             </form>
                         </div>
@@ -185,7 +185,7 @@
                         <div class="alert alert-success" role="alert">
                             <h5 class="alert-heading">✓ Payment Proof Submitted</h5>
                             <p class="mb-0">
-                                Your payment receipt has been uploaded and is awaiting admin verification.<br>
+                                Your payment proof has been uploaded and is awaiting admin verification.<br>
                                 <small class="text-muted">You'll receive a notification once your payment is confirmed. Typically verified within 1-2 hours.</small>
                             </p>
                         </div>
@@ -194,7 +194,7 @@
                         <div class="alert alert-warning" role="alert">
                             <h5 class="alert-heading">⏳ Pay After Admin Approval</h5>
                             <p class="mb-3">
-                                Your order has been created! Once our admin team approves your order, you'll have the opportunity to pay and upload your payment receipt from your dashboard.
+                                Your order has been created! Once our admin team approves your order, you'll have the opportunity to pay and upload your payment proof from your dashboard.
                             </p>
                             <div class="alert alert-info mb-0">
                                 <strong>Payment methods available on your dashboard:</strong>

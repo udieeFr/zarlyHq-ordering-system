@@ -64,6 +64,9 @@ def create_stripe_checkout_session(order, request):
             },
         )
         
+        # Cancel any dangling pending sessions so the order never has multiple open Stripe sessions
+        order.payments.filter(payment_method='stripe', status='pending').update(status='cancelled')
+
         # Save session info to Payment record
         Payment.objects.create(
             order=order,

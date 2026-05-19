@@ -3,54 +3,107 @@
 {% block page_title %}Complaint Management{% endblock %}
 
 {% block content %}
-<!-- Page Header -->
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&display=swap');
+
+  .page-header h1 {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 1.9rem; font-weight: 400; letter-spacing: -0.02em;
+    color: oklch(16% 0.04 52); margin-bottom: 0.2rem;
+  }
+
+  .cl-panel {
+    background: oklch(97% 0.016 62);
+    border-radius: 1rem;
+    border: 1px solid oklch(91% 0.03 62);
+    box-shadow: 0 4px 24px oklch(70% 0.15 57 / 0.08);
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+  }
+
+  .cl-table { width: 100%; font-size: 0.82rem; border-collapse: collapse; }
+  .cl-table th {
+    font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em;
+    color: oklch(42% 0.06 52); padding: 0.55rem 1rem;
+    background: oklch(93% 0.022 62); border-bottom: 1px solid oklch(88% 0.03 62); white-space: nowrap;
+  }
+  .cl-table td { padding: 0.72rem 1rem; border-bottom: 1px solid oklch(91% 0.025 62); color: oklch(22% 0.04 52); vertical-align: middle; background: oklch(99.5% 0.006 60); }
+  .cl-table tr:last-child td { border-bottom: none; }
+  .cl-table tr:hover td { background: oklch(97% 0.022 62); }
+
+  .status-pill {
+    display: inline-block; font-size: 0.68rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 999px;
+    border: 1px solid transparent;
+  }
+  .sp-pending  { background: oklch(96% 0.05 72); color: oklch(32% 0.12 60); border-color: oklch(82% 0.1 68); }
+  .sp-resolved { background: oklch(94% 0.06 148); color: oklch(28% 0.1 148); border-color: oklch(80% 0.1 148); }
+
+  .btn-resolve {
+    font-size: 0.75rem; font-weight: 700; padding: 0.3rem 0.75rem; border-radius: 6px;
+    background: #ff9933; color: oklch(13% 0.04 52); border: none; cursor: pointer; text-decoration: none;
+    font-family: inherit; display: inline-block; transition: background .15s;
+  }
+  .btn-resolve:hover { background: oklch(70% 0.2 54); color: oklch(13% 0.04 52); }
+  .btn-view {
+    font-size: 0.75rem; font-weight: 600; padding: 0.3rem 0.75rem; border-radius: 6px;
+    border: 1.5px solid oklch(82% 0.03 62); color: oklch(38% 0.06 52);
+    background: oklch(97% 0.016 62); text-decoration: none; display: inline-block;
+    transition: background .15s;
+  }
+  .btn-view:hover { background: oklch(94% 0.022 62); color: oklch(28% 0.06 52); }
+</style>
+
 <div class="page-header">
-    <h1>🚨 Customer Complaints</h1>
-    <p>Review and resolve customer issues against signed receipts</p>
+  <h1>Customer Complaints</h1>
+  <p>Review and resolve customer issues against signed receipts.</p>
 </div>
 
-<!-- Action Buttons -->
 <div class="mb-4">
-    <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
+  <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
 </div>
 
-<!-- Complaints Table -->
-<div class="content-card overflow-hidden">
-    <table class="table table-hover mb-0">
-        <thead class="bg-light">
-            <tr>
-                <th class="ps-4">Order #</th>
-                <th>Customer</th>
-                <th>Subject</th>
-                <th>Resolution</th>
-                <th>Status</th>
-                <th class="text-end pe-4">Action</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for c in complaints %}
-            <tr class="align-middle">
-                <td class="ps-4 fw-bold">#{{ c.order.id }}</td>
-                <td>{{ c.customer.username }}</td>
-                <td>{{ c.subject }}</td>
-                <td>
-                    <span class="small text-muted">{{ c.get_action_taken_display|default:"Pending Outcome" }}</span>
-                </td>
-                <td>
-                    <span class="badge {% if c.status == 'resolved' %}bg-success{% else %}bg-danger{% endif %} rounded-pill">
-                        {{ c.status|capfirst }}
-                    </span>
-                </td>
-                <td class="text-end pe-4">
-                    <a href="{% url 'admin_complaint_detail' c.id %}" class="btn btn-sm {% if c.status == 'pending' %}btn-dark{% else %}btn-outline-secondary{% endif %}">
-                        {% if c.status == 'pending' %}Resolve{% else %}View Details{% endif %}
-                    </a>
-                </td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="6" class="text-center py-5 text-muted">No complaints recorded.</td></tr>
-            {% endfor %}
-        </tbody>
+<div class="cl-panel">
+  <div class="table-responsive">
+    <table class="cl-table">
+      <thead>
+        <tr>
+          <th style="padding-left:1.25rem;">Order</th>
+          <th>Customer</th>
+          <th>Subject</th>
+          <th>Resolution</th>
+          <th>Status</th>
+          <th style="text-align:right;padding-right:1.25rem;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in complaints %}
+        <tr>
+          <td style="font-weight:700;padding-left:1.25rem;">#{{ c.order.id }}</td>
+          <td>{{ c.customer.username }}</td>
+          <td style="color:oklch(28% 0.04 52);">{{ c.subject }}</td>
+          <td style="font-size:.78rem;color:oklch(48% 0.06 54);">{{ c.get_action_taken_display|default:"Pending Outcome" }}</td>
+          <td>
+            <span class="status-pill {% if c.status == 'resolved' %}sp-resolved{% else %}sp-pending{% endif %}">
+              {{ c.status|capfirst }}
+            </span>
+          </td>
+          <td style="text-align:right;padding-right:1.25rem;">
+            <a href="{% url 'admin_complaint_detail' c.id %}"
+               class="{% if c.status == 'pending' %}btn-resolve{% else %}btn-view{% endif %}">
+              {% if c.status == 'pending' %}Resolve{% else %}View Details{% endif %}
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" style="text-align:center;color:oklch(48% 0.06 54);padding:3rem 1rem;background:oklch(99.5% 0.006 60);">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto .75rem;opacity:.35;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            No complaints recorded.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
     </table>
+  </div>
 </div>
 {% endblock %}

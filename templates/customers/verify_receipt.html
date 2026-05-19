@@ -108,7 +108,16 @@
 
   <div class="verify-card">
 
-    {% if status == 'not_found' %}
+    {% if status == 'rate_limited' %}
+    <div class="verify-banner warning">
+      <span class="verify-icon">⏳</span>
+      <div>
+        <p class="verify-banner-title">Too Many Requests</p>
+        <p class="verify-banner-sub">You are making verification requests too quickly. Please wait a moment and try again.</p>
+      </div>
+    </div>
+
+    {% elif status == 'not_found' %}
     <div class="verify-banner warning">
       <span class="verify-icon">🔍</span>
       <div>
@@ -163,7 +172,7 @@
     </div>
     {% endif %}
 
-    {% if status != 'not_found' and status != 'file_missing' %}
+    {% if status != 'not_found' and status != 'file_missing' and status != 'rate_limited' %}
     <div class="verify-body">
 
       <!-- Order details -->
@@ -172,7 +181,7 @@
         <span class="verify-label">Order</span>
         <span class="verify-value plain">#{{ order_id }}</span>
       </div>
-      {% if sig_record %}
+      {% if signed_at %}
       <div class="verify-row">
         <span class="verify-label">Signed by</span>
         <span class="verify-value plain">{{ signer }}</span>
@@ -234,8 +243,8 @@
       </div>
       {% endif %}
 
-      {% if sig_record %}
-      <a href="{{ sig_record.pdf_path.url }}" class="btn-download-signed" target="_blank">
+      {% if pdf_download_url %}
+      <a href="{{ pdf_download_url }}" class="btn-download-signed" target="_blank">
         Download Signed PDF
       </a>
       {% endif %}

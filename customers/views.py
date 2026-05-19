@@ -1,14 +1,14 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from customers.auth_utils import customer_required
-from django.contrib.auth import logout
+from django.contrib.auth import logout, login
 from django.contrib import messages
 from django.http import HttpResponse, JsonResponse  # Required for PDF downloads
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
-from .models import Product, Category, Allergy, Favourite, OrderRating, ProductReview
+from .models import Product, Category, Allergy, Favourite, OrderRating, ProductReview, User
 from admins.models import Order, OrderItem, Complaint, Payment, DigitalSignature
 from admins.utils import generate_invoice_pdf  # The PDF generation engine
 from admins.notifications import log_audit, notify, notify_admins
@@ -23,43 +23,102 @@ from .stripe_utils import (
 from decimal import Decimal
 from django.conf import settings
 import os
+import secrets
 import logging
 import hashlib
 from .payment_utils import validate_payment_proof, get_payment_proof_context, get_all_payment_methods
 
 logger = logging.getLogger(__name__)
 
+def customer_signup(request):
+    """Customer registration view."""
+    if request.user.is_authenticated:
+        return redirect('product_list')
+
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        email = request.POST.get('email', '').strip()
+        password = request.POST.get('password', '').strip()
+        password_confirm = request.POST.get('password_confirm', '').strip()
+
+        errors = {}
+
+        # Validation
+        if not username or len(username) < 3:
+            errors['username'] = 'Username must be at least 3 characters.'
+        if User.objects.filter(username=username).exists():
+            errors['username'] = 'Username already taken.'
+
+        if not email or '@' not in email:
+            errors['email'] = 'Valid email required.'
+        if User.objects.filter(email=email).exists():
+            errors['email'] = 'Email already registered.'
+
+        if not password or len(password) < 6:
+            errors['password'] = 'Password must be at least 6 characters.'
+        if password != password_confirm:
+            errors['password_confirm'] = 'Passwords do not match.'
+
+        if errors:
+            return render(request, 'registration/signup.html', {'errors': errors, 'username': username, 'email': email})
+
+        # Create user with customer role
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            role='customer'
+        )
+
+        # Log the signup
+        log_audit(request, 'customer_signup', target=user,
+                  description=f"New customer registered: {user.username}", actor=user)
+
+        messages.success(request, f"Account created! Welcome, {username}. You can now log in.")
+        return redirect('login')
+
+    return render(request, 'registration/signup.html')
+
 def get_cart_from_session(request):
     """
     Retrieves the cart from the session, calculates subtotals and totals,
     and cleans up any 'ghost products' that no longer exist in the database.
+    Uses a single batch query instead of one query per cart item.
     """
     cart = request.session.get('cart', {})
+    if not cart:
+        return [], Decimal('0.00')
+
+    # Batch-fetch all products in the cart in one query
+    product_map = {
+        str(p.id): p
+        for p in Product.objects.filter(id__in=cart.keys())
+    }
+
     cart_items = []
     total_price = Decimal('0.00')
     ids_to_remove = []
-    
+
     for product_id, quantity in cart.items():
-        try:
-            # FIX: Prevents Product.DoesNotExist crash if a product is deleted from DB
-            product = Product.objects.get(id=product_id)
-            subtotal = product.price * quantity
-            cart_items.append({
-                'product': product,
-                'quantity': quantity,
-                'subtotal': subtotal
-            })
-            total_price += subtotal
-        except Product.DoesNotExist:
+        product = product_map.get(str(product_id))
+        if product is None:
             ids_to_remove.append(product_id)
-    
-    # Session cleanup for missing products
+            continue
+        subtotal = product.price * quantity
+        cart_items.append({
+            'product': product,
+            'quantity': quantity,
+            'subtotal': subtotal,
+        })
+        total_price += subtotal
+
+    # Session cleanup for ghost products (deleted from DB)
     if ids_to_remove:
         for pid in ids_to_remove:
             del cart[pid]
         request.session['cart'] = cart
         request.session.modified = True
-    
+
     return cart_items, total_price
 
 def product_list(request):
@@ -146,9 +205,12 @@ def favourites_list(request):
 
 
 @customer_required
+@ratelimit(key='user', rate='60/m', method='POST', block=False)
 def toggle_favourite(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
+    if getattr(request, 'limited', False):
+        return JsonResponse({'error': 'Too many requests. Please slow down.'}, status=429)
     product = get_object_or_404(Product, id=request.POST.get('product_id'))
     fav, created = Favourite.objects.get_or_create(customer=request.user, product=product)
     if not created:
@@ -160,13 +222,17 @@ def toggle_favourite(request):
 
 
 @customer_required
+@ratelimit(key='user', rate='20/h', block=False)
 def download_invoice(request, order_id):
     """
     Generates and downloads an unsigned PDF invoice for 'pending_payment' orders.
     This supports the 'request for payment' stage of the transaction.
     """
+    if getattr(request, 'limited', False):
+        messages.error(request, 'Too many requests. Please wait before downloading again.')
+        return redirect('customer_orders')
     order = get_object_or_404(Order, id=order_id, customer=request.user)
-    
+
     if order.status != 'pending_payment':
         messages.error(request, "Invoice is only available for orders pending payment.")
         return redirect('product_list')
@@ -274,8 +340,8 @@ def upload_payment_proof(request, order_id):
             return redirect('order_success', order_id=order.id)
             
         except Exception as e:
-            messages.error(request, f"Error saving payment proof: {str(e)}")
-            logger.error(f"Error uploading payment proof for Order #{order.id}: {str(e)}")
+            logger.error("Payment proof upload failed for order %s: %s", order.id, e, exc_info=True)
+            messages.error(request, "Could not save your payment proof. Please try again or contact support.")
             return redirect('order_success', order_id=order.id)
     
     return redirect('order_success', order_id=order.id)
@@ -302,15 +368,23 @@ def payment_page(request, order_id):
 
 @customer_required
 @require_http_methods(['POST'])
+@ratelimit(key='user', rate='5/m', method='POST', block=False)
 def start_stripe_payment(request, order_id):
     """
     Creates a Stripe Checkout session for an existing order and redirects the
     customer to Stripe.
     """
+    if getattr(request, 'limited', False):
+        messages.error(request, 'Too many requests. Please wait before trying again.')
+        return redirect('payment_page', order_id=order_id)
     order = get_object_or_404(Order, id=order_id, customer=request.user)
 
     if order.status not in ['pending', 'pending_payment', 'awaiting_payment']:
         messages.info(request, 'Stripe payment is not available for this order.')
+        return redirect('order_success', order_id=order.id)
+
+    if order.payments.filter(payment_method='stripe', status='succeeded').exists():
+        messages.info(request, 'This order has already been paid. No action needed.')
         return redirect('order_success', order_id=order.id)
 
     session_id, error = create_stripe_checkout_session(order, request)
@@ -383,9 +457,13 @@ def cart_view(request):
     })
 
 @customer_required
+@ratelimit(key='user', rate='60/m', method='POST', block=False)
 def update_cart(request):
     """Update item quantities or remove them if quantity is zero. Handles clear_cart too."""
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many requests. Please slow down.')
+            return redirect('cart')
         if request.POST.get('clear_cart'):
             request.session['cart'] = {}
             request.session.modified = True
@@ -410,9 +488,13 @@ def update_cart(request):
     return redirect('cart')
 
 @customer_required
+@ratelimit(key='user', rate='60/m', method='POST', block=False)
 def remove_from_cart(request):
     """Remove item from cart"""
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many requests. Please slow down.')
+            return redirect('cart')
         product_id = request.POST.get('product_id')
         cart = request.session.get('cart', {})
         
@@ -441,11 +523,15 @@ def checkout(request):
         street_address__isnull=False,
     ).exclude(street_address='').order_by('-created_at').first()
 
+    checkout_key = secrets.token_hex(16)
+    request.session['checkout_key'] = checkout_key
+
     return render(request, 'customers/checkout.html', {
         'cart_items': cart_items,
         'total_price': total_price,
         'profile': profile,
         'last_order': last_order,
+        'checkout_key': checkout_key,
     })
 
 def _create_order_atomic(user, total_price, cart_items, **order_fields):
@@ -498,6 +584,14 @@ def submit_order(request):
         if getattr(request, 'limited', False):
             messages.error(request, 'Too many orders submitted. Please wait a moment before trying again.')
             return redirect('checkout')
+
+        # Idempotency guard: one-time key generated on checkout page load, consumed here.
+        # Prevents duplicate orders if a POST succeeds server-side but the redirect is lost.
+        key = request.POST.get('checkout_key', '')
+        session_key = request.session.pop('checkout_key', None)
+        if not key or key != session_key:
+            messages.warning(request, 'This order was already submitted or the page expired. Check your orders below.')
+            return redirect('customer_orders')
 
         cart_items, total_price = get_cart_from_session(request)
 
@@ -1073,6 +1167,7 @@ def awaiting_payment_orders(request):
     })
 
 
+@ratelimit(key='ip', rate='20/m', block=False)
 def verify_receipt(request, order_id):
     """
     Public receipt verification endpoint — no login required.
@@ -1084,8 +1179,15 @@ def verify_receipt(request, order_id):
       3. Compare with the stored hash — mismatch means the file was tampered.
       4. Use PyHanko to validate the embedded PKCS#7 signature (intact + signer identity).
     """
+    if getattr(request, 'limited', False):
+        return render(request, 'customers/verify_receipt.html', {
+            'order_id': order_id,
+            'status': 'rate_limited',
+        })
     try:
-        sig_record = DigitalSignature.objects.select_related('order__customer').get(order_id=order_id)
+        sig_record = DigitalSignature.objects.only(
+            'order_id', 'signature_hash', 'timestamp', 'pdf_path'
+        ).get(order_id=order_id)
     except DigitalSignature.DoesNotExist:
         return render(request, 'customers/verify_receipt.html', {
             'order_id': order_id,
@@ -1093,9 +1195,10 @@ def verify_receipt(request, order_id):
         })
 
     pdf_path = os.path.join(settings.MEDIA_ROOT, str(sig_record.pdf_path))
+    pdf_download_url = sig_record.pdf_path.url if sig_record.pdf_path else None
     result = {
         'order_id': order_id,
-        'sig_record': sig_record,
+        'pdf_download_url': pdf_download_url,
         'signed_at': sig_record.timestamp,
         'signer': 'Zarly BigFood Sdn Bhd',
         'stored_hash': sig_record.signature_hash,
@@ -1146,10 +1249,9 @@ def verify_receipt(request, order_id):
         result['status'] = 'valid' if sig_status.intact else 'invalid'
 
     except Exception as e:
-        # Signature validation failed — treat as tampered
+        logger.error("PyHanko signature validation failed for order %s: %s", order_id, e, exc_info=True)
         result['hash_match'] = True  # Hash was fine; signature layer failed
         result['status'] = 'sig_error'
-        result['error_detail'] = str(e)
 
     log_audit(request, 'receipt_verified', target=sig_record,
               description=f"Receipt verification check on Order #{order_id}",
@@ -1262,9 +1364,12 @@ def cancel_order(request, order_id):
 
 
 @customer_required
+@ratelimit(key='user', rate='10/h', method='POST', block=False)
 def update_profile(request):
     if request.method != 'POST':
         return JsonResponse({'success': False}, status=405)
+    if getattr(request, 'limited', False):
+        return JsonResponse({'success': False, 'error': 'Too many requests. Please wait before updating your profile again.'}, status=429)
     import json
     try:
         data = json.loads(request.body)
@@ -1440,6 +1545,7 @@ def customer_complaint_detail(request, complaint_id):
 
 
 @customer_required
+@ratelimit(key='user', rate='30/m', method='POST', block=False)
 def customer_complaint_messages(request, complaint_id):
     """Poll for or send support chat messages (customer side)."""
     from admins.models import Complaint, SupportMessage
@@ -1471,6 +1577,8 @@ def customer_complaint_messages(request, complaint_id):
         return JsonResponse({'messages': msgs, 'locked': complaint.status == 'resolved'})
 
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            return JsonResponse({'error': 'Too many messages. Please slow down.'}, status=429)
         if complaint.status == 'resolved':
             return JsonResponse({'error': 'Chat is locked'}, status=403)
         body = request.POST.get('body', '').strip()

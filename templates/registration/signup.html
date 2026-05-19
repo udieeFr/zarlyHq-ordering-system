@@ -1,0 +1,189 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center min-vh-100 align-items-center">
+        <div class="col-md-5">
+            <!-- Signup Card -->
+            <div class="card border-0 signup-card">
+                <div class="card-body p-5">
+                    <!-- Header -->
+                    <div class="text-center mb-4">
+                        <div class="signup-logo-wrap">🍊</div>
+                        <h2 class="fw-bold mb-1" style="letter-spacing:-0.02em;">Join Zarly BigFood</h2>
+                        <p class="text-muted mb-0" style="font-size:0.875rem;">Create your account to start ordering</p>
+                    </div>
+
+                    <!-- Error Messages -->
+                    {% if errors %}
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <strong>Signup Failed</strong>
+                        {% for field, message in errors.items %}
+                            <div>{{ message }}</div>
+                        {% endfor %}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endif %}
+
+                    <!-- Signup Form -->
+                    <form method="post" class="mb-4">
+                        {% csrf_token %}
+
+                        <!-- Username Field -->
+                        <div class="mb-3">
+                            <label for="username" class="form-label fw-bold small">
+                                Username
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-end-0">👤</span>
+                                <input type="text" id="username" name="username" class="form-control"
+                                       placeholder="Choose a username" value="{{ username }}" required>
+                            </div>
+                        </div>
+
+                        <!-- Email Field -->
+                        <div class="mb-3">
+                            <label for="email" class="form-label fw-bold small">
+                                Email Address
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-end-0">✉️</span>
+                                <input type="email" id="email" name="email" class="form-control"
+                                       placeholder="your@email.com" value="{{ email }}" required>
+                            </div>
+                        </div>
+
+                        <!-- Password Field -->
+                        <div class="mb-3">
+                            <label for="password" class="form-label fw-bold small">
+                                Password (min. 6 characters)
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-end-0">🔒</span>
+                                <input type="password" id="password" name="password" class="form-control"
+                                       placeholder="Enter password" required>
+                            </div>
+                        </div>
+
+                        <!-- Confirm Password Field -->
+                        <div class="mb-4">
+                            <label for="password_confirm" class="form-label fw-bold small">
+                                Confirm Password
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-end-0">🔒</span>
+                                <input type="password" id="password_confirm" name="password_confirm" class="form-control"
+                                       placeholder="Confirm password" required>
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold mb-3">
+                            <span>Create Account</span>
+                        </button>
+                    </form>
+
+                    <!-- Divider -->
+                    <div class="position-relative mb-4">
+                        <hr class="text-muted">
+                        <span class="position-absolute top-50 start-50 translate-middle bg-white px-2 text-muted small">or</span>
+                    </div>
+
+                    <!-- Already have account -->
+                    <a href="{% url 'login' %}" class="btn btn-outline-secondary w-100 py-2 fw-semibold">
+                        Already have an account? Sign In
+                    </a>
+
+                    <!-- Info -->
+                    <div class="mt-4 pt-3 border-top text-center">
+                        <p class="text-muted small mb-0">
+                            By creating an account, you agree to our terms of service and can start ordering immediately.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Info -->
+            <div class="text-center mt-4">
+                <p class="text-muted small">
+                    Secure registration • Instant access • Customer support
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    body { background: linear-gradient(135deg, #fff7ed 0%, #f8fafc 60%, #fff7ed 100%); }
+
+    .signup-card {
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 20px 50px rgb(0 0 0 / 0.08);
+    }
+
+    .signup-logo-wrap {
+        width: 64px;
+        height: 64px;
+        background: linear-gradient(135deg, #ff9933, #e07e1e);
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.75rem;
+        margin: 0 auto 1rem;
+        box-shadow: 0 8px 20px rgba(255, 153, 51, 0.3);
+    }
+
+    .form-control, .input-group-text {
+        border-radius: 8px;
+        border: 1.5px solid #e2e8f0;
+        font-size: 0.9rem;
+        padding: 0.6rem 0.875rem;
+    }
+
+    .form-control:focus {
+        border-color: #ff9933;
+        box-shadow: 0 0 0 3px rgba(255, 153, 51, 0.18);
+    }
+
+    .input-group-text {
+        background: #f8fafc;
+        border-right: none;
+        color: #64748b;
+    }
+
+    .input-group .form-control { border-left: none; }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #ff9933, #e07e1e);
+        border: none;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        box-shadow: 0 4px 14px rgba(255, 153, 51, 0.35);
+        transition: all 0.2s;
+    }
+
+    .btn-primary:hover {
+        background: linear-gradient(135deg, #e07e1e, #c96d10);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(255, 153, 51, 0.4);
+    }
+
+    .btn-outline-secondary {
+        border: 1.5px solid #e2e8f0;
+        color: #334155;
+        font-weight: 600;
+        background: #fff;
+    }
+
+    .btn-outline-secondary:hover {
+        background: #f8fafc;
+        border-color: #ff9933;
+        color: #ff9933;
+    }
+
+    .card { border-radius: 16px; }
+</style>
+{% endblock %}

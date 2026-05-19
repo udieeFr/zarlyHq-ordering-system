@@ -4,389 +4,325 @@
 
 {% block content %}
 <style>
-    .sortable-header {
-        cursor: pointer;
-        user-select: none;
-        white-space: nowrap;
-    }
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&display=swap');
 
-    .sortable-header .sort-indicator {
-        margin-left: 0.35rem;
-        font-size: 0.75rem;
-        opacity: 0.3;
-        transition: opacity 0.1s;
-    }
+  .page-header h1 {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 1.9rem; font-weight: 400; letter-spacing: -0.02em;
+    color: oklch(16% 0.04 52); margin-bottom: 0.2rem;
+  }
 
-    .sortable-header:hover .sort-indicator { opacity: 0.6; }
+  .sortable-header { cursor: pointer; user-select: none; white-space: nowrap; }
+  .sortable-header .sort-indicator { margin-left: .35rem; font-size: .75rem; opacity: .3; transition: opacity .1s; }
+  .sortable-header:hover .sort-indicator { opacity: .6; }
+  .sortable-header.sort-asc .sort-indicator,
+  .sortable-header.sort-desc .sort-indicator { opacity: 1; }
 
-    .sortable-header.sort-asc .sort-indicator,
-    .sortable-header.sort-desc .sort-indicator {
-        opacity: 1;
-    }
+  /* Status badges */
+  .status-badge {
+    display: inline-flex; align-items: center;
+    padding: 0.18rem 0.6rem; border-radius: 999px;
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.25px; white-space: nowrap;
+  }
+  .status-ready     { background: oklch(94% 0.07 75);  color: oklch(33% 0.12 62); }
+  .status-out       { background: oklch(93% 0.09 52);  color: oklch(33% 0.18 46); }
+  .status-delivered { background: oklch(94% 0.04 150); color: oklch(32% 0.08 148); }
 
-    /* ── Status badges ──────────────────────────────────── */
-    .status-badge {
-        display: inline-flex;
-        align-items: center;
-        padding: 0.18rem 0.6rem;
-        border-radius: 999px;
-        font-size: 0.7rem;
-        font-weight: 700;
-        letter-spacing: 0.25px;
-        white-space: nowrap;
-    }
-    .status-ready {
-        background: oklch(94% 0.07 75);
-        color: oklch(33% 0.12 62);
-    }
-    .status-out {
-        background: oklch(93% 0.09 52);
-        color: oklch(33% 0.18 46);
-    }
-    .status-delivered {
-        background: oklch(94% 0.04 150);
-        color: oklch(32% 0.08 148);
-    }
+  /* Action buttons */
+  .btn-brand-action {
+    display: inline-block; background: var(--accent); color: oklch(99% 0.008 65);
+    border: none; padding: 0.25rem 0.8rem; border-radius: 6px;
+    font-size: 0.8rem; font-weight: 700; text-decoration: none;
+    cursor: pointer; font-family: inherit; line-height: 1.5; margin-bottom: .25rem;
+    transition: background .15s, transform .12s;
+  }
+  .btn-brand-action:hover { background: var(--accent-hover); color: oklch(99% 0.008 65); transform: translateY(-1px); }
+  .btn-brand-action[disabled] { opacity: .4; cursor: not-allowed; transform: none; }
 
-    /* ── Action buttons ─────────────────────────────────── */
-    .btn-brand-action {
-        display: inline-block;
-        background: var(--accent);
-        color: oklch(99% 0.008 65);
-        border: none;
-        padding: 0.25rem 0.8rem;
-        border-radius: 6px;
-        font-size: 0.8rem;
-        font-weight: 700;
-        text-decoration: none;
-        cursor: pointer;
-        font-family: inherit;
-        line-height: 1.5;
-        margin-bottom: 0.25rem;
-        transition: background 0.15s ease-out, transform 0.12s ease-out;
-    }
-    .btn-brand-action:hover {
-        background: var(--accent-hover);
-        color: oklch(99% 0.008 65);
-        transform: translateY(-1px);
-    }
-    .btn-brand-action[disabled] {
-        opacity: 0.4;
-        cursor: not-allowed;
-        transform: none;
-    }
+  .btn-deliver-action {
+    display: inline-block; background: oklch(44% 0.14 148); color: oklch(98% 0.01 148);
+    border: none; padding: 0.25rem 0.8rem; border-radius: 6px;
+    font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: inherit;
+    line-height: 1.5; margin-bottom: .25rem; text-decoration: none;
+    transition: background .15s, transform .12s;
+  }
+  .btn-deliver-action:hover { background: oklch(36% 0.12 148); color: oklch(98% 0.01 148); transform: translateY(-1px); }
 
-    .btn-deliver-action {
-        display: inline-block;
-        background: oklch(44% 0.14 148);
-        color: oklch(98% 0.01 148);
-        border: none;
-        padding: 0.25rem 0.8rem;
-        border-radius: 6px;
-        font-size: 0.8rem;
-        font-weight: 700;
-        text-decoration: none;
-        cursor: pointer;
-        font-family: inherit;
-        line-height: 1.5;
-        margin-bottom: 0.25rem;
-        transition: background 0.15s ease-out, transform 0.12s ease-out;
-    }
-    .btn-deliver-action:hover {
-        background: oklch(36% 0.12 148);
-        color: oklch(98% 0.01 148);
-        transform: translateY(-1px);
-    }
+  /* UNPAID row: warm background tint instead of side-stripe */
+  .row-unpaid td { background: oklch(97.5% 0.03 65) !important; }
+  .row-unpaid:hover td { background: oklch(96.5% 0.04 65) !important; }
 
-    /* ── UNPAID row: left-border accent, no background tint ── */
-    .row-unpaid > td:first-child {
-        position: relative;
-        padding-left: calc(0.5rem + 4px);
-    }
-    .row-unpaid > td:first-child::before {
-        content: '';
-        position: absolute;
-        left: 0; top: 0; bottom: 0;
-        width: 3px;
-        background: var(--accent);
-        border-radius: 0 2px 2px 0;
-    }
+  .badge-unpaid {
+    display: inline-block;
+    background: oklch(93% 0.09 52); color: oklch(28% 0.16 46);
+    font-size: 0.61rem; font-weight: 800;
+    padding: 0.1rem 0.4rem; border-radius: 4px; letter-spacing: 0.4px;
+    vertical-align: middle; margin-left: 0.25rem;
+  }
 
-    .badge-unpaid {
-        display: inline-block;
-        background: oklch(93% 0.09 52);
-        color: oklch(28% 0.16 46);
-        font-size: 0.61rem;
-        font-weight: 800;
-        padding: 0.1rem 0.4rem;
-        border-radius: 4px;
-        letter-spacing: 0.4px;
-        vertical-align: middle;
-        margin-left: 0.25rem;
-    }
+  /* Panels */
+  .do-panel {
+    background: oklch(97% 0.016 62);
+    border-radius: 1rem;
+    border: 1px solid oklch(91% 0.03 62);
+    box-shadow: 0 4px 24px oklch(70% 0.15 57 / 0.08);
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+  }
+  .do-panel-header {
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid oklch(89% 0.03 62);
+  }
+  .do-panel-title { font-size: 0.88rem; font-weight: 800; color: oklch(18% 0.04 52); letter-spacing: -.01em; margin: 0; }
+  .do-panel-body { padding: 1.1rem 1.25rem; }
 
-    /* ── Delivered table: archive visual weight ──────────── */
-    .delivered-table thead th {
-        font-weight: 500;
-        font-size: 0.82rem;
-        color: oklch(56% 0.025 60);
-        border-bottom-color: oklch(92% 0.01 60);
-    }
-    .delivered-table tbody td {
-        color: oklch(44% 0.018 60);
-        font-size: 0.875rem;
-    }
-    .delivered-table tbody a {
-        color: oklch(44% 0.03 60);
-    }
+  .do-table { width: 100%; font-size: 0.82rem; border-collapse: collapse; }
+  .do-table th {
+    font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em;
+    color: oklch(42% 0.06 52); padding: 0.55rem 1rem;
+    background: oklch(93% 0.022 62); border-bottom: 1px solid oklch(88% 0.03 62);
+  }
+  .do-table td { padding: 0.65rem 1rem; border-bottom: 1px solid oklch(91% 0.025 62); color: oklch(22% 0.04 52); vertical-align: middle; background: oklch(99.5% 0.006 60); }
+  .do-table tr:last-child td { border-bottom: none; }
+  .do-table tr:hover td { background: oklch(97% 0.022 62); }
+
+  /* Delivered table: visually quieter */
+  .do-table.delivered thead th {
+    font-weight: 500; font-size: 0.82rem;
+    color: oklch(52% 0.025 60); border-bottom-color: oklch(92% 0.01 60);
+  }
+  .do-table.delivered tbody td { color: oklch(44% 0.018 60); font-size: .875rem; }
+  .do-table.delivered tbody a { color: oklch(44% 0.03 60); }
+
+  .btn-filter {
+    background: #ff9933; color: oklch(13% 0.04 52); font-weight: 700; font-size: 0.82rem;
+    border: none; padding: 0.375rem 0.875rem; border-radius: 6px; cursor: pointer; font-family: inherit;
+  }
+  .btn-filter:hover { background: oklch(70% 0.2 54); }
 </style>
 
-<!-- Page Header -->
 <div class="page-header">
-    <h1>Delivery Orders</h1>
-    <p>Track what's on the move and confirm what's been received.</p>
+  <h1>Delivery Orders</h1>
+  <p>Track what's on the move and confirm what's been received.</p>
 </div>
 
-<!-- Navigation -->
-<div class="mb-4">
-    <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
-    <a href="{% url 'approved_orders_list' %}" class="btn btn-outline-primary">Approved Orders</a>
-    <a href="{% url 'prepared_orders_list' %}" class="btn btn-outline-primary">Order Preparation</a>
+<div class="mb-4 d-flex gap-2 flex-wrap">
+  <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
+  <a href="{% url 'approved_orders_list' %}" class="btn btn-outline-secondary">Approved Orders</a>
+  <a href="{% url 'prepared_orders_list' %}" class="btn btn-outline-secondary">Order Preparation</a>
 </div>
 
-<!-- Filters and Search -->
-<div class="content-card mb-4">
-    <form method="get" class="row g-3">
-        <div class="col-md-3">
-            <label for="q" class="form-label">Search</label>
-            <input type="text" name="q" id="q" value="{{ search_query }}" class="form-control" placeholder="Order #, customer, phone, tracking">
-        </div>
-        <div class="col-md-2">
-            <label for="status" class="form-label">Status</label>
-            <select name="status" id="status" class="form-select">
-                <option value="">All</option>
-                <option value="ready_for_delivery" {% if status_filter == 'ready_for_delivery' %}selected{% endif %}>Ready for Delivery</option>
-                <option value="out_for_delivery" {% if status_filter == 'out_for_delivery' %}selected{% endif %}>Out for Delivery</option>
-                <option value="delivered" {% if status_filter == 'delivered' %}selected{% endif %}>Delivered</option>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label for="days" class="form-label">Recent days</label>
-            <input type="number" name="days" id="days" value="{{ days_filter }}" class="form-control" placeholder="e.g. 7">
-        </div>
-        <div class="col-md-2">
-            <label for="count" class="form-label">Limit results</label>
-            <input type="number" name="count" id="count" value="{{ order_count_filter }}" class="form-control" placeholder="e.g. 50">
-        </div>
-        <div class="col-md-2">
-            <label for="order_by" class="form-label">Sort by</label>
-            <select name="order_by" id="order_by" class="form-select">
-                <option value="-ready_for_delivery_at" {% if order_by == '-ready_for_delivery_at' %}selected{% endif %}>Newest assigned</option>
-                <option value="ready_for_delivery_at" {% if order_by == 'ready_for_delivery_at' %}selected{% endif %}>Oldest assigned</option>
-                <option value="-total_amount" {% if order_by == '-total_amount' %}selected{% endif %}>Highest amount</option>
-                <option value="total_amount" {% if order_by == 'total_amount' %}selected{% endif %}>Lowest amount</option>
-                <option value="customer__username" {% if order_by == 'customer__username' %}selected{% endif %}>Customer</option>
-            </select>
-        </div>
-        <div class="col-md-1 d-flex align-items-end">
-            <button type="submit" class="btn btn-primary w-100">Filter</button>
-        </div>
+<!-- Filters -->
+<div class="do-panel">
+  <div class="do-panel-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label" style="font-size:.78rem;font-weight:600;color:oklch(48% 0.06 54);margin-bottom:.3rem;">Search</label>
+        <input type="text" name="q" id="q" value="{{ search_query }}" class="form-control form-control-sm" placeholder="Order #, customer, phone, tracking">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" style="font-size:.78rem;font-weight:600;color:oklch(48% 0.06 54);margin-bottom:.3rem;">Status</label>
+        <select name="status" id="status" class="form-select form-select-sm">
+          <option value="">All</option>
+          <option value="ready_for_delivery" {% if status_filter == 'ready_for_delivery' %}selected{% endif %}>Ready for Delivery</option>
+          <option value="out_for_delivery" {% if status_filter == 'out_for_delivery' %}selected{% endif %}>Out for Delivery</option>
+          <option value="delivered" {% if status_filter == 'delivered' %}selected{% endif %}>Delivered</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" style="font-size:.78rem;font-weight:600;color:oklch(48% 0.06 54);margin-bottom:.3rem;">Recent days</label>
+        <input type="number" name="days" id="days" value="{{ days_filter }}" class="form-control form-control-sm" placeholder="e.g. 7">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" style="font-size:.78rem;font-weight:600;color:oklch(48% 0.06 54);margin-bottom:.3rem;">Limit results</label>
+        <input type="number" name="count" id="count" value="{{ order_count_filter }}" class="form-control form-control-sm" placeholder="e.g. 50">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" style="font-size:.78rem;font-weight:600;color:oklch(48% 0.06 54);margin-bottom:.3rem;">Sort by</label>
+        <select name="order_by" id="order_by" class="form-select form-select-sm">
+          <option value="-ready_for_delivery_at" {% if order_by == '-ready_for_delivery_at' %}selected{% endif %}>Newest assigned</option>
+          <option value="ready_for_delivery_at" {% if order_by == 'ready_for_delivery_at' %}selected{% endif %}>Oldest assigned</option>
+          <option value="-total_amount" {% if order_by == '-total_amount' %}selected{% endif %}>Highest amount</option>
+          <option value="total_amount" {% if order_by == 'total_amount' %}selected{% endif %}>Lowest amount</option>
+          <option value="customer__username" {% if order_by == 'customer__username' %}selected{% endif %}>Customer</option>
+        </select>
+      </div>
+      <div class="col-md-1 d-flex align-items-end">
+        <button type="submit" class="btn-filter w-100">Filter</button>
+      </div>
     </form>
+  </div>
 </div>
+
 <script nonce="{{ request.csp_nonce }}">
 (function () {
-    var form = document.querySelector('.content-card form[method="get"]');
-    if (!form) return;
-    var delay;
-    function submit() { form.submit(); }
-    function debounced() { clearTimeout(delay); delay = setTimeout(submit, 450); }
-    form.querySelectorAll('select').forEach(function (el) {
-        el.addEventListener('change', submit);
-    });
-    form.querySelectorAll('input[type="text"], input[type="number"]').forEach(function (el) {
-        el.addEventListener('input', debounced);
-    });
+  var form = document.querySelector('.do-panel form[method="get"]');
+  if (!form) return;
+  var delay;
+  function submit() { form.submit(); }
+  function debounced() { clearTimeout(delay); delay = setTimeout(submit, 600); }
+  form.querySelectorAll('select').forEach(function(el) { el.addEventListener('change', submit); });
+  form.querySelectorAll('input[type="text"], input[type="number"]').forEach(function(el) { el.addEventListener('input', debounced); });
 })();
 </script>
 
-<!-- Delivery Orders In Process Table -->
-<div class="content-card mb-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="fw-bold mb-0">Delivery Orders (In Process) ({{ in_delivery_orders|length }})</h5>
-    </div>
-
-    <div class="table-responsive">
-        <table class="table table-hover align-middle sortable-table">
-            <thead>
-                <tr>
-                    <th class="sortable-header" data-sort-type="number">Order #<span class="sort-indicator">↕</span></th>
-                    <th class="sortable-header" data-sort-type="text">Customer<span class="sort-indicator">↕</span></th>
-                    <th class="sortable-header" data-sort-type="text">Delivery Contact<span class="sort-indicator">↕</span></th>
-                    <th class="sortable-header" data-sort-type="text">Courier / Tracking<span class="sort-indicator">↕</span></th>
-                    <th class="sortable-header" data-sort-type="text">Status<span class="sort-indicator">↕</span></th>
-                    <th class="sortable-header" data-sort-type="number">Amount<span class="sort-indicator">↕</span></th>
-                    <th class="sortable-header" data-sort-type="number">Assigned<span class="sort-indicator">↕</span></th>
-                    <th class="sortable-header" data-sort-type="text">Actions<span class="sort-indicator">↕</span></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for order in in_delivery_orders %}
-                <tr{% if order.id in unpaid_ids %} class="row-unpaid"{% endif %}>
-                    <td data-sort="{{ order.id }}">
-                        <a href="{% url 'admin_order_detail' order.id %}">#{{ order.id }}</a>
-                        {% if order.id in unpaid_ids %}<span class="badge-unpaid">UNPAID</span>{% endif %}
-                    </td>
-                    <td>{{ order.customer_label }}<br>{{ order.full_name }}</td>
-                    <td>{{ order.phone_number }}</td>
-                    <td>
-                        <form method="post" action="{% url 'update_order_tracking' order.id %}" class="d-inline-block w-100">
-                            {% csrf_token %}
-                            <div class="input-group input-group-sm">
-                                <input type="text" name="tracking_number" class="form-control" placeholder="Enter tracking #" value="{{ order.tracking_number|default:'' }}" maxlength="100">
-                                <button type="submit" class="btn btn-outline-primary" title="Save tracking number">✓</button>
-                            </div>
-                        </form>
-                    </td>
-                    <td>
-                        {% if order.status == 'ready_for_delivery' %}
-                        <span class="status-badge status-ready">{{ order.get_status_display }}</span>
-                        {% elif order.status == 'out_for_delivery' %}
-                        <span class="status-badge status-out">{{ order.get_status_display }}</span>
-                        {% else %}
-                        <span class="status-badge status-delivered">{{ order.get_status_display }}</span>
-                        {% endif %}
-                    </td>
-                    <td data-sort="{{ order.total_amount }}">{{ order.total_amount|floatformat:2 }}</td>
-                    <td data-sort="{% if order.delivery_assigned_at %}{{ order.delivery_assigned_at|date:'U' }}{% else %}0{% endif %}">{% if order.delivery_assigned_at %}{{ order.delivery_assigned_at|date:'M d, Y H:i' }}{% else %}-{% endif %}</td>
-                    <td>
-                        {% if order.status == 'ready_for_delivery' %}
-                            {% if order.tracking_number %}
-                            <a href="{% url 'mark_order_out_for_delivery' order.id %}" class="btn-brand-action">Out for Delivery</a>
-                            {% else %}
-                            <button class="btn-brand-action" disabled title="Enter a tracking number first">Out for Delivery</button>
-                            <small class="d-block text-danger" style="font-size:0.7rem;">Tracking # required</small>
-                            {% endif %}
-                        {% else %}
-                        <a href="{% url 'mark_order_delivered' order.id %}" class="btn-deliver-action">Mark Delivered</a>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% empty %}
-                <tr class="empty-row">
-                    <td colspan="8" class="text-center text-muted py-4">No in-process delivery orders found.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+<!-- In-Process Table -->
+<div class="do-panel">
+  <div class="do-panel-header">
+    <span class="do-panel-title">Delivery Orders (In Process) <span style="font-weight:500;color:oklch(48% 0.06 54);">({{ in_delivery_orders|length }})</span></span>
+  </div>
+  <div class="table-responsive">
+    <table class="do-table sortable-table">
+      <thead>
+        <tr>
+          <th class="sortable-header" data-sort-type="number">Order #<span class="sort-indicator">↕</span></th>
+          <th class="sortable-header" data-sort-type="text">Customer<span class="sort-indicator">↕</span></th>
+          <th class="sortable-header" data-sort-type="text">Delivery Contact<span class="sort-indicator">↕</span></th>
+          <th class="sortable-header" data-sort-type="text">Courier / Tracking<span class="sort-indicator">↕</span></th>
+          <th class="sortable-header" data-sort-type="text">Status<span class="sort-indicator">↕</span></th>
+          <th class="sortable-header" data-sort-type="number">Amount<span class="sort-indicator">↕</span></th>
+          <th class="sortable-header" data-sort-type="number">Assigned<span class="sort-indicator">↕</span></th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in in_delivery_orders %}
+        <tr{% if order.id in unpaid_ids %} class="row-unpaid"{% endif %}>
+          <td data-sort="{{ order.id }}">
+            <a href="{% url 'admin_order_detail' order.id %}" style="color:#ff9933;font-weight:700;text-decoration:none;">#{{ order.id }}</a>
+            {% if order.id in unpaid_ids %}<span class="badge-unpaid">UNPAID</span>{% endif %}
+          </td>
+          <td>{{ order.customer_label }}<br><span style="font-size:.75rem;color:oklch(48% 0.06 54);">{{ order.full_name }}</span></td>
+          <td>{{ order.phone_number }}</td>
+          <td>
+            <form method="post" action="{% url 'update_order_tracking' order.id %}" class="d-inline-block w-100">
+              {% csrf_token %}
+              <div class="input-group input-group-sm">
+                <input type="text" name="tracking_number" class="form-control form-control-sm" placeholder="Enter tracking #" value="{{ order.tracking_number|default:'' }}" maxlength="100">
+                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Save tracking number">✓</button>
+              </div>
+            </form>
+          </td>
+          <td>
+            {% if order.status == 'ready_for_delivery' %}<span class="status-badge status-ready">{{ order.get_status_display }}</span>
+            {% elif order.status == 'out_for_delivery' %}<span class="status-badge status-out">{{ order.get_status_display }}</span>
+            {% else %}<span class="status-badge status-delivered">{{ order.get_status_display }}</span>{% endif %}
+          </td>
+          <td data-sort="{{ order.total_amount }}" style="font-weight:700;color:#ff9933;">RM {{ order.total_amount|floatformat:2 }}</td>
+          <td data-sort="{% if order.delivery_assigned_at %}{{ order.delivery_assigned_at|date:'U' }}{% else %}0{% endif %}" style="font-size:.78rem;color:oklch(48% 0.06 54);">
+            {% if order.delivery_assigned_at %}{{ order.delivery_assigned_at|date:'M d, Y H:i' }}{% else %}-{% endif %}
+          </td>
+          <td>
+            {% if order.status == 'ready_for_delivery' %}
+              {% if order.tracking_number %}
+              <a href="{% url 'mark_order_out_for_delivery' order.id %}" class="btn-brand-action">Out for Delivery</a>
+              {% else %}
+              <button class="btn-brand-action" disabled title="Enter a tracking number first">Out for Delivery</button>
+              <small class="d-block" style="font-size:.7rem;color:oklch(43% 0.1 22);">Tracking # required</small>
+              {% endif %}
+            {% else %}
+            <a href="{% url 'mark_order_delivered' order.id %}" class="btn-deliver-action">Mark Delivered</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr class="empty-row">
+          <td colspan="8" style="text-align:center;color:oklch(48% 0.06 54);padding:2.5rem 1rem;background:oklch(99.5% 0.006 60);">No in-process delivery orders found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <!-- Delivered Orders Table -->
-<div class="content-card">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="fw-bold mb-0" style="color:oklch(52% 0.03 60);font-weight:600;">Delivered Orders ({{ delivered_orders|length }})</h5>
-    </div>
-
-    <div class="table-responsive">
-        <table class="table table-hover align-middle sortable-table delivered-table">
-            <thead>
-                <tr>
-                    <th class="sortable-header" data-sort-type="number">Order #<span class="sort-indicator">↕</span></th>
-                    <th class="sortable-header" data-sort-type="text">Customer<span class="sort-indicator">↕</span></th>
-                    <th class="sortable-header" data-sort-type="text">Delivery Contact<span class="sort-indicator">↕</span></th>
-                    <th class="sortable-header" data-sort-type="text">Courier / Tracking<span class="sort-indicator">↕</span></th>
-                    <th class="sortable-header" data-sort-type="text">Status<span class="sort-indicator">↕</span></th>
-                    <th class="sortable-header" data-sort-type="number">Amount<span class="sort-indicator">↕</span></th>
-                    <th class="sortable-header" data-sort-type="number">Assigned<span class="sort-indicator">↕</span></th>
-                    <th class="sortable-header" data-sort-type="text">Actions<span class="sort-indicator">↕</span></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for order in delivered_orders %}
-                <tr{% if order.id in unpaid_ids %} class="row-unpaid"{% endif %}>
-                    <td data-sort="{{ order.id }}">
-                        <a href="{% url 'admin_order_detail' order.id %}">#{{ order.id }}</a>
-                        {% if order.id in unpaid_ids %}<span class="badge-unpaid">UNPAID</span>{% endif %}
-                    </td>
-                    <td>{{ order.customer_label }}<br>{{ order.full_name }}</td>
-                    <td>{{ order.phone_number }}</td>
-                    <td>
-                        {% if order.courier_name %}<strong>{{ order.courier_name }}</strong><br>{% endif %}
-                        {% if order.tracking_number %}{{ order.tracking_number }}{% else %}<span class="text-muted">No tracking</span>{% endif %}
-                    </td>
-                    <td>
-                        <span class="status-badge status-delivered">{{ order.get_status_display }}</span>
-                    </td>
-                    <td data-sort="{{ order.total_amount }}">{{ order.total_amount|floatformat:2 }}</td>
-                    <td data-sort="{% if order.delivery_assigned_at %}{{ order.delivery_assigned_at|date:'U' }}{% else %}0{% endif %}">{% if order.delivery_assigned_at %}{{ order.delivery_assigned_at|date:'M d, Y H:i' }}{% else %}-{% endif %}</td>
-                    <td><span class="text-muted">Completed</span></td>
-                </tr>
-                {% empty %}
-                <tr class="empty-row">
-                    <td colspan="8" class="text-center text-muted py-4">No delivered orders found.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+<div class="do-panel">
+  <div class="do-panel-header">
+    <span class="do-panel-title" style="color:oklch(48% 0.06 54);font-weight:600;">Delivered Orders <span style="font-weight:500;">({{ delivered_orders|length }})</span></span>
+  </div>
+  <div class="table-responsive">
+    <table class="do-table delivered sortable-table">
+      <thead>
+        <tr>
+          <th class="sortable-header" data-sort-type="number">Order #<span class="sort-indicator">↕</span></th>
+          <th class="sortable-header" data-sort-type="text">Customer<span class="sort-indicator">↕</span></th>
+          <th class="sortable-header" data-sort-type="text">Delivery Contact<span class="sort-indicator">↕</span></th>
+          <th class="sortable-header" data-sort-type="text">Courier / Tracking<span class="sort-indicator">↕</span></th>
+          <th class="sortable-header" data-sort-type="text">Status<span class="sort-indicator">↕</span></th>
+          <th class="sortable-header" data-sort-type="number">Amount<span class="sort-indicator">↕</span></th>
+          <th class="sortable-header" data-sort-type="number">Assigned<span class="sort-indicator">↕</span></th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in delivered_orders %}
+        <tr{% if order.id in unpaid_ids %} class="row-unpaid"{% endif %}>
+          <td data-sort="{{ order.id }}">
+            <a href="{% url 'admin_order_detail' order.id %}">#{{ order.id }}</a>
+            {% if order.id in unpaid_ids %}<span class="badge-unpaid">UNPAID</span>{% endif %}
+          </td>
+          <td>{{ order.customer_label }}<br><span style="font-size:.75rem;">{{ order.full_name }}</span></td>
+          <td>{{ order.phone_number }}</td>
+          <td>
+            {% if order.courier_name %}<strong>{{ order.courier_name }}</strong><br>{% endif %}
+            {% if order.tracking_number %}{{ order.tracking_number }}{% else %}<span style="color:oklch(58% 0.02 54);">No tracking</span>{% endif %}
+          </td>
+          <td><span class="status-badge status-delivered">{{ order.get_status_display }}</span></td>
+          <td data-sort="{{ order.total_amount }}">{{ order.total_amount|floatformat:2 }}</td>
+          <td data-sort="{% if order.delivery_assigned_at %}{{ order.delivery_assigned_at|date:'U' }}{% else %}0{% endif %}" style="font-size:.78rem;">
+            {% if order.delivery_assigned_at %}{{ order.delivery_assigned_at|date:'M d, Y H:i' }}{% else %}-{% endif %}
+          </td>
+          <td style="color:oklch(58% 0.02 54);font-size:.78rem;">Completed</td>
+        </tr>
+        {% empty %}
+        <tr class="empty-row">
+          <td colspan="8" style="text-align:center;color:oklch(48% 0.06 54);padding:2.5rem 1rem;background:oklch(99.5% 0.006 60);">No delivered orders found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <script nonce="{{ request.csp_nonce }}">
 document.addEventListener('DOMContentLoaded', function () {
-    const tables = document.querySelectorAll('.sortable-table');
+  var tables = document.querySelectorAll('.sortable-table');
 
-    function getCellValue(cell, sortType) {
-        const raw = (cell.dataset.sort !== undefined ? cell.dataset.sort : cell.textContent).trim();
-        if (sortType === 'number') {
-            const parsed = parseFloat(raw);
-            return Number.isNaN(parsed) ? -Infinity : parsed;
-        }
-        return raw.toLowerCase();
+  function getCellValue(cell, sortType) {
+    var raw = (cell.dataset.sort !== undefined ? cell.dataset.sort : cell.textContent).trim();
+    if (sortType === 'number') {
+      var parsed = parseFloat(raw);
+      return Number.isNaN(parsed) ? -Infinity : parsed;
     }
+    return raw.toLowerCase();
+  }
 
-    tables.forEach(function (table) {
-        const headers = table.querySelectorAll('thead .sortable-header');
-        const tbody = table.querySelector('tbody');
+  tables.forEach(function (table) {
+    var headers = table.querySelectorAll('thead .sortable-header');
+    var tbody   = table.querySelector('tbody');
 
-        headers.forEach(function (header, index) {
-            header.addEventListener('click', function () {
-                const currentDir = header.dataset.sortDirection === 'asc' ? 'asc' : 'desc';
-                const nextDir = currentDir === 'asc' ? 'desc' : 'asc';
-                const sortType = header.dataset.sortType || 'text';
+    headers.forEach(function (header, index) {
+      header.addEventListener('click', function () {
+        var currentDir = header.dataset.sortDirection === 'asc' ? 'asc' : 'desc';
+        var nextDir    = currentDir === 'asc' ? 'desc' : 'asc';
+        var sortType   = header.dataset.sortType || 'text';
 
-                headers.forEach(function (h) {
-                    h.classList.remove('sort-asc', 'sort-desc');
-                    h.dataset.sortDirection = '';
-                });
+        headers.forEach(function (h) { h.classList.remove('sort-asc', 'sort-desc'); h.dataset.sortDirection = ''; });
+        header.dataset.sortDirection = nextDir;
+        header.classList.add(nextDir === 'asc' ? 'sort-asc' : 'sort-desc');
 
-                header.dataset.sortDirection = nextDir;
-                header.classList.add(nextDir === 'asc' ? 'sort-asc' : 'sort-desc');
-
-                const rows = Array.from(tbody.querySelectorAll('tr')).filter(function (row) {
-                    return !row.classList.contains('empty-row');
-                });
-
-                rows.sort(function (a, b) {
-                    const aCell = a.children[index];
-                    const bCell = b.children[index];
-                    const aVal = getCellValue(aCell, sortType);
-                    const bVal = getCellValue(bCell, sortType);
-
-                    if (aVal < bVal) {
-                        return nextDir === 'asc' ? -1 : 1;
-                    }
-                    if (aVal > bVal) {
-                        return nextDir === 'asc' ? 1 : -1;
-                    }
-                    return 0;
-                });
-
-                rows.forEach(function (row) {
-                    tbody.appendChild(row);
-                });
-            });
+        var rows = Array.from(tbody.querySelectorAll('tr')).filter(function (r) { return !r.classList.contains('empty-row'); });
+        rows.sort(function (a, b) {
+          var aVal = getCellValue(a.children[index], sortType);
+          var bVal = getCellValue(b.children[index], sortType);
+          if (aVal < bVal) return nextDir === 'asc' ? -1 : 1;
+          if (aVal > bVal) return nextDir === 'asc' ? 1 : -1;
+          return 0;
         });
+        rows.forEach(function (row) { tbody.appendChild(row); });
+      });
     });
+  });
 });
 </script>
 {% endblock %}

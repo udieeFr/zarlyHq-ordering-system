@@ -56,9 +56,13 @@ def log_order_event(order, status, actor=None, note=''):
 
 
 @sales_admin_required
+@ratelimit(key='user', rate='5/m', method='POST', block=False)
 def sudo_confirm(request):
     """Step-up authentication — re-enter password to access sensitive pages."""
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many attempts. Please wait before trying again.')
+            return render(request, 'admins/sudo_confirm.html', {'sudo_duration_minutes': SUDO_DURATION // 60})
         password = request.POST.get('password', '')
         if request.user.check_password(password):
             grant_sudo(request)
@@ -241,16 +245,16 @@ def manager_analytics_view(request):
     # --- Order volume ---
     orders_today = Order.objects.filter(created_at__date=today).exclude(status='rejected').count()
     orders_week  = Order.objects.filter(created_at__gte=week_ago).exclude(status='rejected').count()
-    status_breakdown = {
-        'pending':             Order.objects.filter(status='pending').count(),
-        'pending_payment':     Order.objects.filter(status='pending_payment').count(),
-        'approved':            Order.objects.filter(status='approved').count(),
-        'prepared':            Order.objects.filter(status='prepared').count(),
-        'ready_for_delivery':  Order.objects.filter(status='ready_for_delivery').count(),
-        'out_for_delivery':    Order.objects.filter(status='out_for_delivery').count(),
-        'delivered':           Order.objects.filter(status='delivered').count(),
-        'rejected':            Order.objects.filter(status='rejected').count(),
-    }
+    # Single aggregate query replaces 8 individual count() calls
+    _status_rows = (
+        Order.objects
+        .values('status')
+        .annotate(n=Count('id'))
+    )
+    status_breakdown = {row['status']: row['n'] for row in _status_rows}
+    for _s in ('pending', 'pending_payment', 'approved', 'prepared',
+               'ready_for_delivery', 'out_for_delivery', 'delivered', 'rejected'):
+        status_breakdown.setdefault(_s, 0)
     total_orders = sum(v for k, v in status_breakdown.items() if k != 'rejected')
     delivered_count = status_breakdown['delivered']
     delivery_rate = round((delivered_count / total_orders * 100) if total_orders > 0 else 0, 1)
@@ -269,9 +273,13 @@ def manager_analytics_view(request):
     top_customers = CustomerProfile.objects.select_related('user').order_by('-total_spent')[:5]
     total_customers = CustomerProfile.objects.count()
 
-    # --- Complaints ---
-    pending_complaints  = Complaint.objects.filter(status='pending').count()
-    resolved_complaints = Complaint.objects.filter(status='resolved').count()
+    # --- Complaints — single aggregate instead of two counts ---
+    _complaint_counts = {
+        row['status']: row['n']
+        for row in Complaint.objects.values('status').annotate(n=Count('id'))
+    }
+    pending_complaints  = _complaint_counts.get('pending', 0)
+    resolved_complaints = _complaint_counts.get('resolved', 0)
     recent_complaints   = Complaint.objects.select_related('order', 'customer').order_by('-created_at')[:5]
 
     # --- Audit log preview ---
@@ -327,6 +335,7 @@ def manager_analytics_view(request):
         'orders_week': orders_week,
         'status_breakdown': status_breakdown,
         'total_orders': total_orders,
+        'delivered_count': delivered_count,
         'delivery_rate': delivery_rate,
         # Top products
         'top_products': list(top_products),
@@ -343,6 +352,16 @@ def manager_analytics_view(request):
         # Refunds
         'pending_refunds_count': pending_refunds_count,
         'recent_refunds': recent_refunds,
+        # Page views
+        'pv_today': pv_today,
+        'pv_week': pv_week,
+        'pv_unique_week': pv_unique_week,
+        'top_pages': list(top_pages),
+        # Retention
+        'conversion_rate': conversion_rate,
+        'repeat_rate': repeat_rate,
+        'new_customers_week': new_customers_week,
+        'returning_customers_week': returning_customers_week,
     })
 
 # --- INVENTORY MANAGEMENT (STAGED CHANGES) ---
@@ -369,9 +388,12 @@ def inventory_list(request):
     })
 
 @sales_admin_required
+@ratelimit(key='user', rate='120/m', method='POST', block=False)
 def stage_stock_update(request, product_id):
     """Automatically saves a proposed stock change to the session via AJAX."""
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            return JsonResponse({'status': 'error', 'message': 'Too many requests.'}, status=429)
         new_stock = request.POST.get('stock')
         staging = request.session.get('stock_staging', {})
         if new_stock is not None:
@@ -384,8 +406,12 @@ def stage_stock_update(request, product_id):
     return redirect('inventory_list')
 
 @sales_admin_required
+@ratelimit(key='user', rate='10/m', method='POST', block=False)
 def confirm_stock_changes(request):
     """Applies all staged changes from the session to the actual database."""
+    if getattr(request, 'limited', False):
+        messages.error(request, 'Too many requests. Please wait before applying changes.')
+        return redirect('inventory_list')
     staging = request.session.get('stock_staging', {})
     if request.method == 'POST' and staging:
         updated_count = 0
@@ -403,16 +429,24 @@ def confirm_stock_changes(request):
     return redirect('inventory_list')
 
 @sales_admin_required
+@ratelimit(key='user', rate='10/m', block=False)
 def clear_stock_staging(request):
     """Clears the staging area without saving changes."""
+    if getattr(request, 'limited', False):
+        messages.error(request, 'Too many requests. Please slow down.')
+        return redirect('inventory_list')
     request.session['stock_staging'] = {}
     messages.info(request, "All pending changes have been cleared.")
     return redirect('inventory_list')
 
 @manager_required
+@ratelimit(key='user', rate='10/m', method='POST', block=False)
 def add_product(request):
     """Add a new product to the menu. Manager-only."""
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many requests. Please wait before adding another product.')
+            return redirect('inventory_list')
         name = request.POST.get('name', '').strip()
         price = request.POST.get('price')
         stock = request.POST.get('stock', 0)
@@ -448,11 +482,15 @@ def add_product(request):
     })
 
 @manager_required
+@ratelimit(key='user', rate='20/m', method='POST', block=False)
 def edit_product(request, product_id):
     """Edit an existing product — price, name, stock, category, allergies. Manager-only."""
     product = get_object_or_404(Product, id=product_id)
 
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many requests. Please wait before editing again.')
+            return redirect('inventory_list')
         before = {
             'name': product.name,
             'price': str(product.price),
@@ -495,8 +533,12 @@ def edit_product(request, product_id):
 
 @manager_required
 @sudo_required
+@ratelimit(key='user', rate='10/m', method='POST', block=False)
 def delete_product(request, product_id):
     """Delete a product. POST only, manager-only."""
+    if getattr(request, 'limited', False):
+        messages.error(request, 'Too many requests. Please wait before deleting again.')
+        return redirect('inventory_list')
     product = get_object_or_404(Product, id=product_id)
     if request.method == 'POST':
         snapshot = {
@@ -514,10 +556,14 @@ def delete_product(request, product_id):
 
 
 @manager_required
+@ratelimit(key='user', rate='20/m', method='POST', block=False)
 def manage_categories(request):
     """Add, rename, or delete product categories. Manager-only."""
     from customers.models import Category as Cat
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many requests. Please slow down.')
+            return redirect('manage_categories')
         action = request.POST.get('action')
         if action == 'add':
             name = request.POST.get('name', '').strip()
@@ -560,11 +606,15 @@ def _get_walkin_user():
 
 
 @sales_admin_required
+@ratelimit(key='user', rate='20/m', method='POST', block=False)
 def admin_create_order(request):
     """Manually enter an order — for a registered customer or a walk-in."""
     from customers.models import User as CustomerUser
 
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many requests. Please wait before creating another order.')
+            return redirect('admin_create_order')
         is_walk_in = request.POST.get('is_walk_in') == '1'
 
         if is_walk_in:
@@ -669,9 +719,12 @@ def admin_create_order(request):
 # --- DASHBOARD AND ORDERS ---
 
 @sales_admin_required
+@ratelimit(key='user', rate='30/m', method='POST', block=False)
 def save_internal_note(request, order_id):
     if request.method != 'POST':
         return JsonResponse({'ok': False}, status=405)
+    if getattr(request, 'limited', False):
+        return JsonResponse({'ok': False, 'error': 'Too many requests.'}, status=429)
     order = get_object_or_404(Order, id=order_id)
     order.internal_note = request.POST.get('note', '').strip()
     order.save(update_fields=['internal_note'])
@@ -890,8 +943,14 @@ def pending_payment_orders_list(request):
     })
 
 @sales_admin_required
+@ratelimit(key='user', rate='60/m', method='POST', block=False)
 def approve_pending_payment(request, order_id):
     """Approve an awaiting-payment order when payment is confirmed."""
+    if request.method != 'POST':
+        return redirect('pending_payment_orders_list')
+    if getattr(request, 'limited', False):
+        messages.error(request, 'Too many requests. Please slow down.')
+        return redirect('pending_payment_orders_list')
     order = get_object_or_404(Order, id=order_id, status='pending_payment')
 
     if not order_has_confirmed_payment(order):
@@ -911,8 +970,12 @@ def approve_pending_payment(request, order_id):
     return redirect('pending_payment_orders_list')
 
 @sales_admin_required
+@ratelimit(key='user', rate='60/m', method='POST', block=False)
 def reject_pending_payment(request, order_id):
     """Reject payment proof and move order back to pending for re-upload."""
+    if getattr(request, 'limited', False):
+        messages.error(request, 'Too many requests. Please slow down.')
+        return redirect('pending_payment_orders_list')
     order = get_object_or_404(Order, id=order_id, status='pending_payment')
     
     rejection_reason = request.POST.get('rejection_reason', '').strip()
@@ -970,7 +1033,7 @@ def reject_pending_payment(request, order_id):
                 fail_silently=True,
             )
         except Exception as e:
-            print(f"Error sending rejection email: {e}")
+            logger.warning("Rejection email failed for order %s: %s", order.id, e)
     
     messages.success(request, f"Order #{order.id} payment proof rejected. Customer notified.")
     return redirect('pending_payment_orders_list')
@@ -987,7 +1050,8 @@ def print_order_summary(request, order_id):
             response['Content-Disposition'] = f'inline; filename="order_{order.id}_invoice.pdf"'
             return response
     except Exception as e:
-        messages.error(request, f"Error generating invoice: {str(e)}")
+        logger.error("Invoice generation failed for order %s: %s", order_id, e, exc_info=True)
+        messages.error(request, "Could not generate the invoice. Please try again or contact support.")
         return redirect('admin_order_detail', order_id=order_id)
 
 @sales_admin_required
@@ -1117,10 +1181,14 @@ def prep_group_detail(request, group_id):
     })
 
 @sales_admin_required
+@ratelimit(key='user', rate='30/m', method='POST', block=False)
 def mark_prep_group_ready(request, group_id):
     """Mark an entire prep group as ready for delivery."""
     prep_group = get_object_or_404(PrepGroup, group_id=group_id)
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many requests. Please slow down.')
+            return redirect('prep_group_detail', group_id=prep_group.group_id)
         courier_name = request.POST.get('courier_name', '').strip() or None
         tracking_number = request.POST.get('tracking_number', '').strip() or None
         orders = prep_group.orders.filter(status='prepared')
@@ -1163,8 +1231,12 @@ def mark_prep_group_ready(request, group_id):
     return redirect('prep_group_detail', group_id=prep_group.group_id)
 
 @sales_admin_required
+@ratelimit(key='user', rate='60/m', block=False)
 def mark_order_out_for_delivery(request, order_id):
     """Move a single order from ready_for_delivery to out_for_delivery."""
+    if getattr(request, 'limited', False):
+        messages.error(request, 'Too many requests. Please slow down.')
+        return redirect('delivery_orders_list')
     order = get_object_or_404(Order, id=order_id, status='ready_for_delivery')
     order.status = 'out_for_delivery'
     order.save()
@@ -1182,8 +1254,12 @@ def mark_order_out_for_delivery(request, order_id):
     return redirect('delivery_orders_list')
 
 @sales_admin_required
+@ratelimit(key='user', rate='60/m', block=False)
 def mark_order_delivered(request, order_id):
     """Mark a single order as delivered."""
+    if getattr(request, 'limited', False):
+        messages.error(request, 'Too many requests. Please slow down.')
+        return redirect('delivery_orders_list')
     order = get_object_or_404(Order, id=order_id, status='out_for_delivery')
     order.status = 'delivered'
     order.delivered_at = timezone.now()
@@ -1265,11 +1341,15 @@ def delivery_orders_list(request):
     })
 
 @sales_admin_required
+@ratelimit(key='user', rate='30/m', method='POST', block=False)
 def update_order_tracking(request, order_id):
     """Update tracking number for an order in delivery."""
     order = get_object_or_404(Order, id=order_id, status__in=['ready_for_delivery', 'out_for_delivery'])
-    
+
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many requests. Please slow down.')
+            return redirect('delivery_orders_list')
         tracking_number = request.POST.get('tracking_number', '').strip()
         if tracking_number:
             old_tn = order.tracking_number
@@ -1285,9 +1365,13 @@ def update_order_tracking(request, order_id):
     return redirect('delivery_orders_list')
 
 @sales_admin_required
+@ratelimit(key='user', rate='30/m', method='POST', block=False)
 def mark_orders_prepared(request):
     """Mark selected orders as prepared and create a prep group."""
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many requests. Please slow down.')
+            return redirect('approved_orders_list')
         order_ids = request.POST.getlist('order_ids')
         if not order_ids:
             messages.error(request, "No orders selected.")
@@ -1349,11 +1433,15 @@ def set_pending_payment(request, order_id):
     return redirect('sales_admin_dashboard')
 
 @sales_admin_required
+@ratelimit(key='user', rate='30/m', method='POST', block=False)
 def force_approve_unpaid(request, order_id):
     """Move a pending_payment order to approved without confirmed payment.
     Order is tagged unpaid — staff must collect payment on delivery.
     """
     if request.method != 'POST':
+        return redirect('admin_order_detail', order_id=order_id)
+    if getattr(request, 'limited', False):
+        messages.error(request, 'Too many requests. Please slow down.')
         return redirect('admin_order_detail', order_id=order_id)
     order = get_object_or_404(Order, id=order_id, status='pending_payment')
     order.status = 'approved'
@@ -1374,9 +1462,13 @@ def force_approve_unpaid(request, order_id):
     return redirect('approved_orders_list')
 
 @sales_admin_required
+@ratelimit(key='user', rate='10/m', method='POST', block=False)
 def bulk_accept_orders(request):
     """Accepts multiple pending or awaiting payment orders in one action."""
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many requests. Please slow down.')
+            return redirect('sales_admin_dashboard')
         order_ids = request.POST.getlist('order_ids')
         # Accept both pending and pending_payment orders
         pending_orders = Order.objects.filter(id__in=order_ids, status__in=['pending', 'pending_payment'])
@@ -1404,9 +1496,13 @@ def bulk_accept_orders(request):
     return redirect('sales_admin_dashboard')
 
 @sales_admin_required
+@ratelimit(key='user', rate='10/m', method='POST', block=False)
 def bulk_reject_orders(request):
     """Rejects multiple pending or awaiting payment orders in one action."""
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many requests. Please slow down.')
+            return redirect('sales_admin_dashboard')
         from admins.models import RejectionReason, RejectedOrder
         from admins.notification_utils import notify_rejection_to_customer
         
@@ -1448,12 +1544,12 @@ def bulk_reject_orders(request):
                 try:
                     notify_rejection_to_customer(rejected_order_record, send_email=True)
                 except Exception as e:
-                    print(f"Error notifying customer for order {order.id}: {str(e)}")
+                    logger.warning("Rejection email failed for order %s: %s", order.id, e)
                 try:
                     from admins.refund_utils import process_refund
                     process_refund(order, source='order_rejection', request=request)
                 except Exception as e:
-                    print(f"Error processing refund for order {order.id}: {str(e)}")
+                    logger.error("Refund processing failed for order %s: %s", order.id, e, exc_info=True)
 
             rejected_count += 1
 
@@ -1464,11 +1560,17 @@ def bulk_reject_orders(request):
     return redirect('sales_admin_dashboard')
 
 @sales_admin_required
+@ratelimit(key='user', rate='60/m', method='POST', block=False)
 def approve_order(request, order_id):
     """
     Approves a pending order. If payment is confirmed, moves to 'approved' status.
     If payment is not yet confirmed, moves to 'pending_payment' (awaiting payment list).
     """
+    if request.method != 'POST':
+        return redirect('sales_admin_dashboard')
+    if getattr(request, 'limited', False):
+        messages.error(request, 'Too many requests. Please slow down.')
+        return redirect('sales_admin_dashboard')
     order = get_object_or_404(Order, id=order_id)
 
     if order_has_confirmed_payment(order):
@@ -1477,7 +1579,8 @@ def approve_order(request, order_id):
             finalize_order_approval(order, request.user, request=request)
             messages.success(request, f"Order #{order.id} Approved and Digitally Signed.")
         except Exception as e:
-            messages.error(request, f"Error signing document: {str(e)}")
+            logger.error("Document signing failed for order %s: %s", order_id, e, exc_info=True)
+            messages.error(request, "Failed to sign the invoice. Please try again or contact support.")
     else:
         # Payment not yet received - move to awaiting payment list
         order.status = 'pending_payment'
@@ -1489,13 +1592,17 @@ def approve_order(request, order_id):
 
 
 @sales_admin_required
+@ratelimit(key='user', rate='60/m', method='POST', block=False)
 def reject_order(request, order_id):
     """Rejects a single order while saving administrative reasoning."""
     from admins.models import RejectionReason, RejectedOrder
     from admins.notification_utils import notify_rejection_to_customer
-    
+
     order = get_object_or_404(Order, id=order_id)
     if request.method != 'POST':
+        return redirect('admin_order_detail', order_id=order.id)
+    if getattr(request, 'limited', False):
+        messages.error(request, 'Too many requests. Please slow down.')
         return redirect('admin_order_detail', order_id=order.id)
     
     rejection_reason_id = request.POST.get('rejection_reason_id')
@@ -1533,7 +1640,8 @@ def reject_order(request, order_id):
             notify_rejection_to_customer(rejected_order_record, send_email=True)
             messages.warning(request, f"Order #{order.id} Rejected and customer notified via email.")
         except Exception as e:
-            messages.warning(request, f"Order #{order.id} Rejected but failed to send email: {str(e)}")
+            logger.warning("Rejection email failed for order %s: %s", order.id, e)
+            messages.warning(request, f"Order #{order.id} Rejected. (Notification email could not be sent.)")
 
     log_audit(request, 'order_rejected', target=order,
               description=f"Order #{order.id} rejected",
@@ -1649,10 +1757,14 @@ def admin_complaint_detail(request, complaint_id):
     })
 
 @sales_admin_required
+@ratelimit(key='user', rate='30/m', method='POST', block=False)
 def resolve_complaint(request, complaint_id):
     """Applies resolution action to a complaint."""
     complaint = get_object_or_404(Complaint, id=complaint_id)
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many requests. Please slow down.')
+            return redirect('admin_complaint_detail', complaint_id=complaint.id)
         action = request.POST.get('action_taken')
         if action:
             complaint.action_taken = action
@@ -1692,6 +1804,7 @@ def resolve_complaint(request, complaint_id):
 
 
 @sales_admin_required
+@ratelimit(key='user', rate='30/m', method='POST', block=False)
 def admin_complaint_messages(request, complaint_id):
     """Poll for or send support chat messages (admin side)."""
     from admins.chat_crypto import encrypt_message, decrypt_message
@@ -1724,6 +1837,8 @@ def admin_complaint_messages(request, complaint_id):
         return JsonResponse({'messages': msgs, 'locked': complaint.status == 'resolved'})
 
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            return JsonResponse({'error': 'Too many messages. Please slow down.'}, status=429)
         if complaint.status == 'resolved':
             return JsonResponse({'error': 'Chat is locked'}, status=403)
         body = request.POST.get('body', '').strip()
@@ -1774,7 +1889,9 @@ def audit_log_list(request):
         logs = logs.filter(
             Q(description__icontains=search_query) |
             Q(ip_address__icontains=search_query) |
-            Q(actor__username__icontains=search_query)
+            Q(actor__username__icontains=search_query) |
+            Q(target_id__iexact=search_query) |
+            Q(metadata__customer__icontains=search_query)
         )
 
     try:
@@ -1832,11 +1949,15 @@ def refund_list(request):
 
 @manager_required
 @sudo_required
+@ratelimit(key='user', rate='20/m', method='POST', block=False)
 def mark_refund_processed(request, refund_id):
     """Mark a manual/failed refund as completed after the manager does the bank transfer."""
     from admins.models import Refund
 
     if request.method != 'POST':
+        return redirect('refund_list')
+    if getattr(request, 'limited', False):
+        messages.error(request, 'Too many requests. Please slow down.')
         return redirect('refund_list')
 
     refund = get_object_or_404(Refund, id=refund_id)
@@ -1914,6 +2035,7 @@ def customers_crm_list(request):
 
 
 @manager_required
+@ratelimit(key='user', rate='20/m', method='POST', block=False)
 def customer_crm_detail(request, user_id):
     """Detail view of a single customer for CRM purposes."""
     from customers.models import CustomerProfile, User
@@ -1922,6 +2044,9 @@ def customer_crm_detail(request, user_id):
     profile.recalculate()
 
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many requests. Please slow down.')
+            return redirect('customer_crm_detail', user_id=customer.id)
         profile.admin_notes = request.POST.get('admin_notes', '').strip()
         profile.save(update_fields=['admin_notes', 'updated_at'])
         messages.success(request, "Customer notes saved.")
@@ -1949,10 +2074,14 @@ def email_template_list(request):
 
 
 @manager_required
+@ratelimit(key='user', rate='10/m', method='POST', block=False)
 def email_template_create(request):
     """Manager: create a new email template."""
     from admins.models import EmailTemplate
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many requests. Please wait before creating another template.')
+            return redirect('email_template_list')
         name      = request.POST.get('name', '').strip()
         subject   = request.POST.get('subject', '').strip()
         body_html = request.POST.get('body_html', '').strip()
@@ -1970,11 +2099,15 @@ def email_template_create(request):
 
 
 @manager_required
+@ratelimit(key='user', rate='20/m', method='POST', block=False)
 def email_template_edit(request, template_id):
     """Manager: edit an existing email template."""
     from admins.models import EmailTemplate
     tmpl = get_object_or_404(EmailTemplate, id=template_id)
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many requests. Please slow down.')
+            return redirect('email_template_list')
         tmpl.name      = request.POST.get('name', tmpl.name).strip()
         tmpl.subject   = request.POST.get('subject', tmpl.subject).strip()
         tmpl.body_html = request.POST.get('body_html', tmpl.body_html).strip()
@@ -1985,11 +2118,15 @@ def email_template_edit(request, template_id):
 
 
 @manager_required
+@ratelimit(key='user', rate='10/m', method='POST', block=False)
 def email_template_delete(request, template_id):
     """Manager: delete an email template."""
     from admins.models import EmailTemplate
     tmpl = get_object_or_404(EmailTemplate, id=template_id)
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many requests. Please slow down.')
+            return redirect('email_template_list')
         name = tmpl.name
         tmpl.delete()
         messages.success(request, f'Template "{name}" deleted.')
@@ -1997,6 +2134,7 @@ def email_template_delete(request, template_id):
 
 
 @sales_admin_required
+@ratelimit(key='user', rate='3/h', method='POST', block=False)
 def campaign_compose(request):
     """
     Sales admin: select customers and a template, then preview before sending.
@@ -2010,6 +2148,9 @@ def campaign_compose(request):
     templates = EmailTemplate.objects.filter(is_active=True)
 
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many campaign sends. Please wait before sending another campaign.')
+            return redirect('campaign_compose')
         customer_ids  = request.POST.getlist('customer_ids')
         template_id   = request.POST.get('template_id')
         campaign_name = request.POST.get('campaign_name', '').strip()
@@ -2197,10 +2338,13 @@ def sales_report(request):
 # ---------------------------------------------------------------------------
 
 @manager_required
+@ratelimit(key='user', rate='60/m', method='POST', block=False)
 def toggle_product_availability(request, product_id):
     """AJAX POST — flip a product's is_available flag."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
+    if getattr(request, 'limited', False):
+        return JsonResponse({'error': 'Too many requests.'}, status=429)
     product = get_object_or_404(Product, id=product_id)
     product.is_available = not product.is_available
     product.save(update_fields=['is_available'])
@@ -2215,10 +2359,13 @@ def toggle_product_availability(request, product_id):
 # ---------------------------------------------------------------------------
 
 @sales_admin_required
+@ratelimit(key='user', rate='60/m', method='POST', block=False)
 def toggle_order_priority(request, order_id):
     """AJAX POST — flip an order's is_priority flag."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
+    if getattr(request, 'limited', False):
+        return JsonResponse({'error': 'Too many requests.'}, status=429)
     order = get_object_or_404(Order, id=order_id)
     order.is_priority = not order.is_priority
     order.save(update_fields=['is_priority'])
@@ -2228,10 +2375,13 @@ def toggle_order_priority(request, order_id):
 
 
 @manager_required
+@ratelimit(key='user', rate='30/m', method='POST', block=False)
 def toggle_customer_vip(request, user_id):
     """AJAX POST — flip a customer profile's is_vip flag."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
+    if getattr(request, 'limited', False):
+        return JsonResponse({'error': 'Too many requests.'}, status=429)
     from customers.models import CustomerProfile
     from customers.models import User as CustomerUser
     customer = get_object_or_404(CustomerUser, id=user_id)
@@ -2240,6 +2390,7 @@ def toggle_customer_vip(request, user_id):
     profile.save(update_fields=['is_vip'])
     log_audit(request, 'order_approved', target=profile,
               description=f"Customer '{customer.username}' VIP status set to {profile.is_vip} by {request.user.username}")
+    return JsonResponse({'is_vip': profile.is_vip})
 
 
 # ---------------------------------------------------------------------------
@@ -2247,6 +2398,7 @@ def toggle_customer_vip(request, user_id):
 # ---------------------------------------------------------------------------
 
 @sales_admin_required
+@ratelimit(key='user', rate='10/h', method='POST', block=False)
 def admin_profile(request):
     from django.contrib.auth import update_session_auth_hash
     from .models import RejectedOrder
@@ -2256,6 +2408,9 @@ def admin_profile(request):
     show_pw_form = False
 
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many requests. Please wait before updating your profile again.')
+            return redirect('admin_profile')
         action = request.POST.get('action')
 
         if action == 'update_profile':
@@ -2267,6 +2422,8 @@ def admin_profile(request):
             return redirect('admin_profile')
 
         if action == 'change_password':
+            from django.contrib.auth.password_validation import validate_password
+            from django.core.exceptions import ValidationError as DjangoValidationError
             current = request.POST.get('current_password', '')
             new_pw = request.POST.get('new_password', '')
             confirm_pw = request.POST.get('confirm_password', '')
@@ -2274,18 +2431,22 @@ def admin_profile(request):
             if not user.check_password(current):
                 messages.error(request, 'Current password is incorrect.')
                 show_pw_form = True
-            elif len(new_pw) < 8:
-                messages.error(request, 'New password must be at least 8 characters.')
-                show_pw_form = True
             elif new_pw != confirm_pw:
                 messages.error(request, 'Passwords do not match.')
                 show_pw_form = True
             else:
-                user.set_password(new_pw)
-                user.save()
-                update_session_auth_hash(request, user)
-                messages.success(request, 'Password changed successfully.')
-                return redirect('admin_profile')
+                try:
+                    validate_password(new_pw, user)
+                except DjangoValidationError as ve:
+                    for msg in ve.messages:
+                        messages.error(request, msg)
+                    show_pw_form = True
+                else:
+                    user.set_password(new_pw)
+                    user.save()
+                    update_session_auth_hash(request, user)
+                    messages.success(request, 'Password changed successfully.')
+                    return redirect('admin_profile')
 
     approved_total = user.approved_orders.count()
     approved_week = user.approved_orders.filter(approved_at__gte=week_ago).count()
@@ -2304,6 +2465,7 @@ def admin_profile(request):
 
 
 @manager_required
+@ratelimit(key='user', rate='10/h', method='POST', block=False)
 def manager_profile(request):
     from django.contrib.auth import update_session_auth_hash
     from .models import RejectedOrder, EmailCampaign
@@ -2313,6 +2475,9 @@ def manager_profile(request):
     show_pw_form = False
 
     if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many requests. Please wait before updating your profile again.')
+            return redirect('manager_profile')
         action = request.POST.get('action')
 
         if action == 'update_profile':
@@ -2324,24 +2489,30 @@ def manager_profile(request):
             return redirect('manager_profile')
 
         if action == 'change_password':
+            from django.contrib.auth.password_validation import validate_password
+            from django.core.exceptions import ValidationError as DjangoValidationError
             current = request.POST.get('current_password', '')
             new_pw = request.POST.get('new_password', '')
             confirm_pw = request.POST.get('confirm_password', '')
             if not user.check_password(current):
                 messages.error(request, 'Current password is incorrect.')
                 show_pw_form = True
-            elif len(new_pw) < 8:
-                messages.error(request, 'New password must be at least 8 characters.')
-                show_pw_form = True
             elif new_pw != confirm_pw:
                 messages.error(request, 'Passwords do not match.')
                 show_pw_form = True
             else:
-                user.set_password(new_pw)
-                user.save()
-                update_session_auth_hash(request, user)
-                messages.success(request, 'Password changed successfully.')
-                return redirect('manager_profile')
+                try:
+                    validate_password(new_pw, user)
+                except DjangoValidationError as ve:
+                    for msg in ve.messages:
+                        messages.error(request, msg)
+                    show_pw_form = True
+                else:
+                    user.set_password(new_pw)
+                    user.save()
+                    update_session_auth_hash(request, user)
+                    messages.success(request, 'Password changed successfully.')
+                    return redirect('manager_profile')
 
     approved_total = user.approved_orders.count()
     approved_week = user.approved_orders.filter(approved_at__gte=week_ago).count()

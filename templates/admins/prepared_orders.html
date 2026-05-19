@@ -3,113 +3,188 @@
 {% block page_title %}Prepared Orders{% endblock %}
 
 {% block content %}
-<!-- Page Header -->
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&display=swap');
+
+  .page-header h1 {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 1.9rem; font-weight: 400; letter-spacing: -0.02em;
+    color: oklch(16% 0.04 52); margin-bottom: 0.2rem;
+  }
+
+  .po-panel {
+    background: oklch(97% 0.016 62);
+    border-radius: 1rem;
+    border: 1px solid oklch(91% 0.03 62);
+    box-shadow: 0 4px 24px oklch(70% 0.15 57 / 0.08);
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+  }
+  .po-panel-header {
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid oklch(89% 0.03 62);
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;
+  }
+  .po-panel-title { font-size: 0.88rem; font-weight: 800; color: oklch(18% 0.04 52); letter-spacing: -.01em; margin: 0; }
+  .po-panel-body  { padding: 1.1rem 1.25rem; }
+
+  .po-table { width: 100%; font-size: 0.82rem; border-collapse: collapse; }
+  .po-table th {
+    font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em;
+    color: oklch(42% 0.06 52); padding: 0.55rem 1rem;
+    background: oklch(93% 0.022 62); border-bottom: 1px solid oklch(88% 0.03 62); white-space: nowrap;
+  }
+  .po-table td { padding: 0.72rem 1rem; border-bottom: 1px solid oklch(91% 0.025 62); color: oklch(22% 0.04 52); vertical-align: middle; background: oklch(99.5% 0.006 60); }
+  .po-table tr:last-child td { border-bottom: none; }
+  .po-table tr:hover td { background: oklch(97% 0.022 62); }
+  .po-table tr.row-prepared td { background: oklch(97% 0.04 148 / 0.5); }
+  .po-table tr.row-prepared:hover td { background: oklch(96% 0.05 148 / 0.5); }
+
+  .group-link { color: oklch(16% 0.04 52); font-weight: 700; text-decoration: none; font-family: ui-monospace, monospace; font-size: 0.78rem; }
+  .group-link:hover { color: #ff9933; }
+
+  .badge-unpaid-tag {
+    display: inline-block; font-size: 0.62rem; font-weight: 800;
+    padding: 0.1rem 0.42rem; border-radius: 4px;
+    background: oklch(93% 0.09 52); color: oklch(28% 0.16 46);
+    vertical-align: middle; letter-spacing: 0.3px;
+  }
+
+  .btn-filter {
+    background: #ff9933; color: oklch(13% 0.04 52); font-weight: 700; font-size: 0.82rem;
+    border: none; padding: 0.375rem 0.875rem; border-radius: 6px; cursor: pointer; font-family: inherit;
+  }
+  .btn-filter:hover { background: oklch(70% 0.2 54); }
+
+  .btn-print-prep {
+    font-size: 0.75rem; font-weight: 700; padding: 0.3rem 0.75rem; border-radius: 6px; cursor: pointer;
+    border: 1.5px solid oklch(76% 0.05 62); color: oklch(38% 0.06 52);
+    background: oklch(97% 0.016 62); font-family: inherit;
+    transition: background .15s;
+  }
+  .btn-print-prep:hover { background: oklch(94% 0.022 62); }
+</style>
+
 <div class="page-header">
-    <h1>Order Preparation</h1>
-    <p>Groups of orders that have been prepared together</p>
+  <h1>Order Preparation</h1>
+  <p>Groups of orders that have been prepared together.</p>
 </div>
 
-<!-- Navigation -->
-<div class="mb-4">
-    <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
-    <a href="{% url 'approved_orders_list' %}" class="btn btn-outline-primary">View Approved Orders</a>
-    <a href="{% url 'delivery_orders_list' %}" class="btn btn-outline-success">Delivery Orders</a>
+<div class="mb-4 d-flex gap-2 flex-wrap">
+  <a href="{% url 'sales_admin_dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
+  <a href="{% url 'approved_orders_list' %}" class="btn btn-outline-secondary">Approved Orders</a>
+  <a href="{% url 'delivery_orders_list' %}" class="btn btn-outline-secondary">Delivery Orders</a>
 </div>
 
-<!-- Filters and Search -->
-<div class="content-card mb-4">
-    <form method="get" class="row g-3">
-        <div class="col-md-4">
-            <label for="q" class="form-label">Search</label>
-            <input type="text" name="q" id="q" value="{{ search_query }}" class="form-control" placeholder="Order #, customer, phone">
-        </div>
-        <div class="col-md-2">
-            <label for="days" class="form-label">Days since created</label>
-            <input type="number" name="days" id="days" value="{{ days_filter }}" class="form-control" placeholder="e.g. 1">
-        </div>
-        <div class="col-md-2">
-            <label for="count" class="form-label">Limit results</label>
-            <input type="number" name="count" id="count" value="{{ order_count_filter }}" class="form-control" placeholder="e.g. 50">
-        </div>
-        <div class="col-md-2">
-            <label for="order_by" class="form-label">Sort by</label>
-            <select name="order_by" id="order_by" class="form-select">
-                <option value="-created_at" {% if order_by == '-created_at' %}selected{% endif %}>Newest first</option>
-                <option value="created_at" {% if order_by == 'created_at' %}selected{% endif %}>Oldest first</option>
-                <option value="-total_orders" {% if order_by == '-total_orders' %}selected{% endif %}>Most orders</option>
-                <option value="total_orders" {% if order_by == '-total_orders' %}selected{% endif %}>Fewest orders</option>
-                <option value="-total_amount" {% if order_by == '-total_amount' %}selected{% endif %}>Highest amount</option>
-                <option value="total_amount" {% if order_by == 'total_amount' %}selected{% endif %}>Lowest amount</option>
-            </select>
-        </div>
-        <div class="col-md-2 d-flex align-items-end">
-            <button type="submit" class="btn btn-primary me-2">Filter</button>
-            <a href="{% url 'prepared_orders_list' %}" class="btn btn-outline-secondary">Reset</a>
-        </div>
+<!-- Filters -->
+<div class="po-panel">
+  <div class="po-panel-header">
+    <span class="po-panel-title">Filter</span>
+  </div>
+  <div class="po-panel-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label" style="font-size:.78rem;font-weight:600;color:oklch(48% 0.06 54);margin-bottom:.3rem;">Search</label>
+        <input type="text" name="q" value="{{ search_query }}" class="form-control form-control-sm" placeholder="Order #, customer, phone">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" style="font-size:.78rem;font-weight:600;color:oklch(48% 0.06 54);margin-bottom:.3rem;">Days since created</label>
+        <input type="number" name="days" value="{{ days_filter }}" class="form-control form-control-sm" placeholder="e.g. 1">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" style="font-size:.78rem;font-weight:600;color:oklch(48% 0.06 54);margin-bottom:.3rem;">Limit results</label>
+        <input type="number" name="count" value="{{ order_count_filter }}" class="form-control form-control-sm" placeholder="e.g. 50">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" style="font-size:.78rem;font-weight:600;color:oklch(48% 0.06 54);margin-bottom:.3rem;">Sort</label>
+        <select name="order_by" class="form-select form-select-sm">
+          <option value="-created_at" {% if order_by == '-created_at' %}selected{% endif %}>Newest first</option>
+          <option value="created_at" {% if order_by == 'created_at' %}selected{% endif %}>Oldest first</option>
+          <option value="-total_orders" {% if order_by == '-total_orders' %}selected{% endif %}>Most orders</option>
+          <option value="total_orders" {% if order_by == '-total_orders' %}selected{% endif %}>Fewest orders</option>
+          <option value="-total_amount" {% if order_by == '-total_amount' %}selected{% endif %}>Highest amount</option>
+          <option value="total_amount" {% if order_by == 'total_amount' %}selected{% endif %}>Lowest amount</option>
+        </select>
+      </div>
+      <div class="col-md-2 d-flex gap-2">
+        <button type="submit" class="btn-filter btn btn-sm">Filter</button>
+        <a href="{% url 'prepared_orders_list' %}" class="btn btn-sm btn-outline-secondary">Reset</a>
+      </div>
     </form>
-</div>
-
-<!-- Prepared Orders Table -->
-<div class="content-card">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="fw-bold mb-0">Order Preparation ({{ prep_groups|length }})</h5>
-        <small class="text-muted">Click group ID to view details</small>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-hover align-middle">
-            <thead class="table-light">
-                <tr>
-                    <th>Preparation ID</th>
-                    <th>Created</th>
-                    <th>Orders</th>
-                    <th>Total Amount</th>
-                    <th>Created By</th>
-                    <th class="text-end">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for group in prep_groups %}
-                <tr class="table-success">
-                    <td>
-                        <a href="{% url 'prep_group_detail' group.group_id %}" class="text-decoration-none fw-bold">
-                            {{ group.group_id }}
-                        </a>
-                        {% if group.pk in unpaid_group_ids %}<span class="badge ms-1" style="background:#f59e0b;color:#000;font-size:.65rem;">UNPAID</span>{% endif %}
-                    </td>
-                    <td>
-                        <div>{{ group.created_at|date:"d M Y" }}</div>
-                        <small class="text-muted">{{ group.created_at|date:"H:i" }}</small>
-                    </td>
-                    <td class="fw-bold">{{ group.total_orders }}</td>
-                    <td class="fw-bold">RM {{ group.total_amount }}</td>
-                    <td>
-                        {% if group.created_by %}
-                            {{ group.created_by.username }}
-                        {% else %}
-                            System
-                        {% endif %}
-                    </td>
-                    <td class="text-end">
-                        <div class="btn-group" role="group">
-                            <a href="{% url 'prep_group_detail' group.group_id %}" class="btn btn-sm btn-outline-dark">View Details</a>
-                            <button onclick="printGroup('{{ group.group_id }}')" class="btn btn-sm btn-outline-primary">Print Preparation List</button>
-                        </div>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="6" class="text-center text-muted py-4">No order preparation groups found.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+  </div>
 </div>
 
 <script nonce="{{ request.csp_nonce }}">
-function printGroup(groupId) {
-    const url = `/dashboard/prep-group/${groupId}/`;
-    window.open(url, '_blank');
-}
+(function () {
+  var form = document.querySelector('form[method="get"]');
+  if (!form) return;
+  var delay;
+  function submit() { form.submit(); }
+  function debounced() { clearTimeout(delay); delay = setTimeout(submit, 600); }
+  form.querySelectorAll('select').forEach(function(el) { el.addEventListener('change', submit); });
+  form.querySelectorAll('input[type="text"], input[type="number"]').forEach(function(el) { el.addEventListener('input', debounced); });
+})();
+</script>
+
+<!-- Prepared Groups Table -->
+<div class="po-panel">
+  <div class="po-panel-header">
+    <span class="po-panel-title">Order Preparation <span style="font-weight:500;color:oklch(48% 0.06 54);">({{ prep_groups|length }})</span></span>
+    <span style="font-size:.75rem;color:oklch(48% 0.06 54);">Click group ID to view details</span>
+  </div>
+  <div class="table-responsive">
+    <table class="po-table">
+      <thead>
+        <tr>
+          <th>Preparation ID</th>
+          <th>Created</th>
+          <th>Orders</th>
+          <th>Total Amount</th>
+          <th>Created By</th>
+          <th style="text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for group in prep_groups %}
+        <tr class="row-prepared">
+          <td>
+            <a href="{% url 'prep_group_detail' group.group_id %}" class="group-link">{{ group.group_id }}</a>
+            {% if group.pk in unpaid_group_ids %}<span class="badge-unpaid-tag ms-1">UNPAID</span>{% endif %}
+          </td>
+          <td>
+            <span style="font-size:.82rem;color:oklch(22% 0.04 52);">{{ group.created_at|date:"d M Y" }}</span>
+            <br><span style="font-size:.75rem;color:oklch(48% 0.06 54);">{{ group.created_at|date:"H:i" }}</span>
+          </td>
+          <td style="font-weight:700;">{{ group.total_orders }}</td>
+          <td style="font-weight:700;color:#ff9933;">RM {{ group.total_amount }}</td>
+          <td style="font-size:.82rem;color:oklch(42% 0.06 52);">
+            {% if group.created_by %}{{ group.created_by.username }}{% else %}System{% endif %}
+          </td>
+          <td style="text-align:right;white-space:nowrap;">
+            <a href="{% url 'prep_group_detail' group.group_id %}" class="btn btn-sm btn-outline-secondary me-1">View Details</a>
+            <button type="button" class="btn-print-prep js-print-group" data-group-id="{{ group.group_id }}">Print List</button>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" style="text-align:center;color:oklch(48% 0.06 54);padding:2.5rem 1rem;background:oklch(99.5% 0.006 60);">No order preparation groups found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script nonce="{{ request.csp_nonce }}">
+(function () {
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.js-print-group');
+    if (!btn) return;
+    window.open('/dashboard/prep-group/' + btn.dataset.groupId + '/', '_blank');
+  });
+})();
 </script>
 {% endblock %}

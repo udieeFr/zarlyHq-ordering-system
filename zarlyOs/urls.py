@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.shortcuts import redirect, render
 from admins.views import unified_login, logout_view, dashboard_home, admin_login, customer_login, custom_login
-from customers.views import stripe_webhook, home as customer_home_view
+from customers.views import stripe_webhook, home as customer_home_view, customer_signup
 from django.conf import settings
 from django.conf.urls.static import static
 
@@ -63,6 +63,7 @@ urlpatterns = [
     
     # Unified Authentication (New)
     path('login/', unified_login, name='login'),
+    path('signup/', customer_signup, name='customer_signup'),
     path('logout/', logout_view, name='logout'),
     path('home/', dashboard_home, name='dashboard_home'),
 

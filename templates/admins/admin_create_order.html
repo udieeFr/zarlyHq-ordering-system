@@ -3,6 +3,75 @@
 {% block page_title %}Create Order{% endblock %}
 
 {% block content %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&display=swap');
+
+  .page-header h1 {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 1.9rem; font-weight: 400; letter-spacing: -0.02em;
+    color: oklch(16% 0.04 52); margin-bottom: 0.2rem;
+  }
+
+  .co-panel {
+    background: oklch(97% 0.016 62);
+    border-radius: 1rem;
+    border: 1px solid oklch(91% 0.03 62);
+    box-shadow: 0 4px 24px oklch(70% 0.15 57 / 0.08);
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+  }
+  .co-panel-body { padding: 1.25rem; }
+  .co-panel-title { font-size: 0.88rem; font-weight: 800; color: oklch(18% 0.04 52); letter-spacing: -.01em; margin: 0 0 1rem; }
+
+  .co-table { width: 100%; font-size: 0.82rem; border-collapse: collapse; }
+  .co-table th {
+    font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em;
+    color: oklch(42% 0.06 52); padding: 0.45rem 0.75rem;
+    background: oklch(93% 0.022 62); border-bottom: 1px solid oklch(88% 0.03 62);
+  }
+  .co-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid oklch(91% 0.025 62); vertical-align: middle; background: oklch(99.5% 0.006 60); }
+  .co-table tr:last-child td { border-bottom: none; }
+
+  .mode-label {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.75rem 1rem; border-radius: 8px; cursor: pointer;
+    border: 1.5px solid oklch(88% 0.025 62); background: oklch(99.5% 0.006 60);
+    transition: border-color .15s, background .15s;
+  }
+  .mode-label:has(input:checked),
+  .mode-label.active {
+    border-color: #ff9933; background: oklch(97% 0.04 65);
+  }
+
+  .status-choice {
+    display: flex; align-items: flex-start; gap: 0.5rem;
+    padding: 0.75rem 1rem; border-radius: 8px; cursor: pointer;
+    border: 1.5px solid oklch(88% 0.025 62); background: oklch(99.5% 0.006 60); margin-bottom: 0.5rem;
+    transition: border-color .15s, background .15s;
+  }
+  .status-choice:last-child { margin-bottom: 0; }
+  .status-choice:has(input:checked),
+  .status-choice.active { border-color: #ff9933; background: oklch(97% 0.04 65); }
+  .status-choice-title { font-size: 0.84rem; font-weight: 700; color: oklch(16% 0.04 52); }
+  .status-choice-desc  { font-size: 0.75rem; color: oklch(48% 0.06 54); }
+
+  .btn-add-item {
+    font-size: 0.75rem; font-weight: 700; padding: 0.3rem 0.75rem; border-radius: 6px; cursor: pointer;
+    border: 1.5px solid oklch(76% 0.05 62); color: oklch(38% 0.06 52);
+    background: oklch(97% 0.016 62); font-family: inherit; transition: background .15s;
+  }
+  .btn-add-item:hover { background: oklch(94% 0.022 62); }
+
+  .btn-create {
+    background: #ff9933; color: oklch(13% 0.04 52); border: none;
+    padding: 0.8rem 1.5rem; border-radius: 8px; font-size: 0.88rem; font-weight: 700;
+    width: 100%; cursor: pointer; font-family: inherit; transition: background .15s;
+  }
+  .btn-create:hover { background: oklch(70% 0.2 54); }
+
+  .grand-total { font-size: 1.15rem; font-weight: 900; color: #ff9933; }
+</style>
+
 <div class="page-header">
   <h1>Create Order</h1>
   <p>Manually enter an order on behalf of a customer.</p>
@@ -16,250 +85,302 @@
   {% csrf_token %}
   <div class="row g-4">
 
-    <!-- Left column: customer + items -->
+    <!-- Left column -->
     <div class="col-lg-7">
 
       <!-- Customer -->
-      <div class="content-card mb-4">
-        <h6 class="fw-bold mb-3">Customer</h6>
+      <div class="co-panel">
+        <div class="co-panel-body">
+          <div class="co-panel-title">Customer</div>
 
-        <!-- Walk-in toggle -->
-        <div class="btn-group w-100 mb-3" role="group">
-          <input type="radio" class="btn-check" name="is_walk_in" id="modeRegistered" value="0" checked autocomplete="off">
-          <label class="btn btn-outline-primary" for="modeRegistered">Registered Customer</label>
-
-          <input type="radio" class="btn-check" name="is_walk_in" id="modeWalkin" value="1" autocomplete="off">
-          <label class="btn btn-outline-secondary" for="modeWalkin">Walk-in (No Account)</label>
-        </div>
-
-        <!-- Registered customer dropdown -->
-        <div id="registeredSection">
-          <select name="customer_id" class="form-select" id="customerSelect">
-            <option value="">— Select a customer —</option>
-            {% for c in customers %}
-            <option value="{{ c.id }}">{{ c.username }}{% if c.get_full_name %} ({{ c.get_full_name }}){% endif %} — {{ c.email }}</option>
-            {% endfor %}
-          </select>
-        </div>
-
-        <!-- Walk-in fields -->
-        <div id="walkinSection" style="display:none;">
-          <div class="mb-2">
-            <label class="form-label small fw-bold">Walk-in Name <span class="text-danger">*</span></label>
-            <input type="text" name="walkin_name" id="walkinName" class="form-control" placeholder="Customer name">
+          <!-- Walk-in toggle -->
+          <div class="d-flex gap-2 mb-3">
+            <label class="mode-label flex-fill" id="modeRegisteredLabel">
+              <input type="radio" name="is_walk_in" id="modeRegistered" value="0" checked style="accent-color:#ff9933;">
+              <span style="font-size:.84rem;font-weight:600;color:oklch(22% 0.04 52);">Registered Customer</span>
+            </label>
+            <label class="mode-label flex-fill" id="modeWalkinLabel">
+              <input type="radio" name="is_walk_in" id="modeWalkin" value="1" style="accent-color:#ff9933;">
+              <span style="font-size:.84rem;font-weight:600;color:oklch(22% 0.04 52);">Walk-in (No Account)</span>
+            </label>
           </div>
-          <div class="mb-0">
-            <label class="form-label small fw-bold">Walk-in Phone</label>
-            <input type="text" name="walkin_phone" class="form-control" placeholder="e.g. 0123456789">
+
+          <!-- Registered -->
+          <div id="registeredSection">
+            <select name="customer_id" class="form-select form-select-sm" id="customerSelect">
+              <option value="">— Select a customer —</option>
+              {% for c in customers %}
+              <option value="{{ c.id }}">{{ c.username }}{% if c.get_full_name %} ({{ c.get_full_name }}){% endif %} — {{ c.email }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Walk-in -->
+          <div id="walkinSection" style="display:none;">
+            <div class="mb-2">
+              <label class="form-label" style="font-size:.78rem;font-weight:700;color:oklch(48% 0.06 54);">Walk-in Name <span style="color:oklch(43% 0.1 22);">*</span></label>
+              <input type="text" name="walkin_name" id="walkinName" class="form-control form-control-sm" placeholder="Customer name">
+            </div>
+            <div>
+              <label class="form-label" style="font-size:.78rem;font-weight:700;color:oklch(48% 0.06 54);">Walk-in Phone</label>
+              <input type="text" name="walkin_phone" class="form-control form-control-sm" placeholder="e.g. 0123456789">
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Order Items -->
-      <div class="content-card mb-4">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h6 class="fw-bold mb-0">Items</h6>
-          <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRow()">+ Add Item</button>
-        </div>
-        <table class="table table-sm align-middle" id="itemsTable">
-          <thead class="table-light">
-            <tr>
-              <th>Product</th>
-              <th class="text-center" style="width:120px;">Qty</th>
-              <th class="text-end" style="width:110px;">Subtotal</th>
-              <th style="width:40px;"></th>
-            </tr>
-          </thead>
-          <tbody id="itemsBody">
-            <!-- rows added by JS -->
-          </tbody>
-        </table>
-        <div class="text-end mt-2">
-          <span class="text-muted small">Total: </span>
-          <strong class="fs-5" id="grandTotal">RM 0.00</strong>
+      <div class="co-panel">
+        <div class="co-panel-body">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+            <div class="co-panel-title" style="margin:0;">Items</div>
+            <button type="button" class="btn-add-item" id="addItemBtn">+ Add Item</button>
+          </div>
+          <div class="table-responsive">
+            <table class="co-table" id="itemsTable">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th style="width:110px;text-align:center;">Qty</th>
+                  <th style="width:100px;text-align:right;">Subtotal</th>
+                  <th style="width:36px;"></th>
+                </tr>
+              </thead>
+              <tbody id="itemsBody"></tbody>
+            </table>
+          </div>
+          <div style="text-align:right;margin-top:.75rem;">
+            <span style="font-size:.82rem;color:oklch(48% 0.06 54);">Total: </span>
+            <span class="grand-total" id="grandTotal">RM 0.00</span>
+          </div>
         </div>
       </div>
 
       <!-- Order Notes -->
-      <div class="content-card mb-4">
-        <h6 class="fw-bold mb-3">Order Notes</h6>
-        <textarea name="order_notes" class="form-control" rows="2" placeholder="Special instructions, dietary notes…"></textarea>
+      <div class="co-panel">
+        <div class="co-panel-body">
+          <div class="co-panel-title">Order Notes</div>
+          <textarea name="order_notes" class="form-control form-control-sm" rows="2" placeholder="Special instructions, dietary notes…"></textarea>
+        </div>
       </div>
     </div>
 
-    <!-- Right column: delivery + status -->
+    <!-- Right column -->
     <div class="col-lg-5">
-      <div class="content-card mb-4">
-        <h6 class="fw-bold mb-3">Delivery Details</h6>
-        <div class="mb-2">
-          <label class="form-label small fw-bold">Receiver Name</label>
-          <input type="text" name="full_name" class="form-control" placeholder="Leave blank to use account name">
-        </div>
-        <div class="mb-2">
-          <label class="form-label small fw-bold">Phone</label>
-          <input type="text" name="phone_number" class="form-control" placeholder="e.g. 0123456789">
-        </div>
-        <div class="mb-2">
-          <label class="form-label small fw-bold">Street Address</label>
-          <input type="text" name="street_address" class="form-control" placeholder="No. 10, Jalan…">
-        </div>
-        <div class="row g-2 mb-2">
-          <div class="col-6">
-            <label class="form-label small fw-bold">City</label>
-            <input type="text" name="city" class="form-control">
+      <div class="co-panel">
+        <div class="co-panel-body">
+          <div class="co-panel-title">Delivery Details</div>
+          <div class="mb-2">
+            <label class="form-label" style="font-size:.78rem;font-weight:700;color:oklch(48% 0.06 54);">Receiver Name</label>
+            <input type="text" name="full_name" class="form-control form-control-sm" placeholder="Leave blank to use account name">
           </div>
-          <div class="col-6">
-            <label class="form-label small fw-bold">State</label>
-            <input type="text" name="state" class="form-control">
+          <div class="mb-2">
+            <label class="form-label" style="font-size:.78rem;font-weight:700;color:oklch(48% 0.06 54);">Phone</label>
+            <input type="text" name="phone_number" class="form-control form-control-sm" placeholder="e.g. 0123456789">
           </div>
-        </div>
-        <div class="mb-0">
-          <label class="form-label small fw-bold">Postcode</label>
-          <input type="text" name="postcode" class="form-control" style="max-width:120px;">
+          <div class="mb-2">
+            <label class="form-label" style="font-size:.78rem;font-weight:700;color:oklch(48% 0.06 54);">Street Address</label>
+            <input type="text" name="street_address" class="form-control form-control-sm" placeholder="No. 10, Jalan…">
+          </div>
+          <div class="row g-2 mb-2">
+            <div class="col-6">
+              <label class="form-label" style="font-size:.78rem;font-weight:700;color:oklch(48% 0.06 54);">City</label>
+              <input type="text" name="city" class="form-control form-control-sm">
+            </div>
+            <div class="col-6">
+              <label class="form-label" style="font-size:.78rem;font-weight:700;color:oklch(48% 0.06 54);">State</label>
+              <input type="text" name="state" class="form-control form-control-sm">
+            </div>
+          </div>
+          <div>
+            <label class="form-label" style="font-size:.78rem;font-weight:700;color:oklch(48% 0.06 54);">Postcode</label>
+            <input type="text" name="postcode" class="form-control form-control-sm" style="max-width:110px;">
+          </div>
         </div>
       </div>
 
-      <div class="content-card mb-4">
-        <h6 class="fw-bold mb-3">Initial Status</h6>
-        <div class="d-grid gap-2">
-          <label class="d-flex align-items-start gap-2 p-3 border rounded-3 cursor-pointer" style="cursor:pointer;">
-            <input type="radio" name="initial_status" value="pending" checked class="mt-1">
+      <div class="co-panel">
+        <div class="co-panel-body">
+          <div class="co-panel-title">Initial Status</div>
+          <label class="status-choice">
+            <input type="radio" name="initial_status" value="pending" checked style="accent-color:#ff9933;margin-top:2px;">
             <div>
-              <div class="fw-bold">Pending Review</div>
-              <div class="text-muted small">Saved as a new order — admin team reviews next.</div>
+              <div class="status-choice-title">Pending Review</div>
+              <div class="status-choice-desc">Saved as a new order — admin team reviews next.</div>
             </div>
           </label>
-          <label class="d-flex align-items-start gap-2 p-3 border rounded-3" style="cursor:pointer;">
-            <input type="radio" name="initial_status" value="pending_payment" class="mt-1">
+          <label class="status-choice">
+            <input type="radio" name="initial_status" value="pending_payment" style="accent-color:#ff9933;margin-top:2px;">
             <div>
-              <div class="fw-bold">Awaiting Payment</div>
-              <div class="text-muted small">Skip review — customer still needs to pay.</div>
+              <div class="status-choice-title">Awaiting Payment</div>
+              <div class="status-choice-desc">Skip review — customer still needs to pay.</div>
             </div>
           </label>
-          <label class="d-flex align-items-start gap-2 p-3 border rounded-3" style="cursor:pointer;">
-            <input type="radio" name="initial_status" value="approved" class="mt-1">
+          <label class="status-choice">
+            <input type="radio" name="initial_status" value="approved" style="accent-color:#ff9933;margin-top:2px;">
             <div>
-              <div class="fw-bold">Approved Immediately</div>
-              <div class="text-muted small">Mark as approved right away — skips the review queue.</div>
+              <div class="status-choice-title">Approved Immediately</div>
+              <div class="status-choice-desc">Mark as approved right away — skips the review queue.</div>
             </div>
           </label>
         </div>
       </div>
 
-      <button type="submit" class="btn btn-primary fw-bold w-100 py-3"
-              onclick="return validateForm()">
-        Create Order
-      </button>
+      <button type="submit" class="btn-create" id="submitBtn">Create Order</button>
     </div>
   </div>
 </form>
 
+{% endblock %}
+
+{% block extra_scripts %}
 <script nonce="{{ request.csp_nonce }}">
-const PRODUCTS = [
-  {% for p in products %}
-  { id: {{ p.id }}, name: "{{ p.name|escapejs }}", price: {{ p.price }}, stock: {{ p.stock }}, category: "{{ p.category.name|escapejs }}" }{% if not forloop.last %},{% endif %}
-  {% endfor %}
-];
+(function () {
+  var PRODUCTS = [
+    {% for p in products %}
+    { id: {{ p.id }}, name: "{{ p.name|escapejs }}", price: {{ p.price }}, stock: {{ p.stock }}, category: "{{ p.category.name|escapejs }}" }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ];
 
-let rowCount = 0;
+  var rowCount = 0;
 
-function buildProductOptions(selectedId) {
-  let html = '<option value="">— choose product —</option>';
-  let lastCat = '';
-  PRODUCTS.forEach(p => {
-    if (p.category !== lastCat) {
-      if (lastCat) html += '</optgroup>';
-      html += `<optgroup label="${p.category}">`;
-      lastCat = p.category;
-    }
-    html += `<option value="${p.id}" data-price="${p.price}" data-stock="${p.stock}"
-      ${p.id == selectedId ? 'selected' : ''}>${p.name} — RM ${parseFloat(p.price).toFixed(2)} (${p.stock} left)</option>`;
-  });
-  if (lastCat) html += '</optgroup>';
-  return html;
-}
-
-function addRow(productId, qty) {
-  rowCount++;
-  const tbody = document.getElementById('itemsBody');
-  const tr = document.createElement('tr');
-  tr.id = `row-${rowCount}`;
-  tr.innerHTML = `
-    <td>
-      <select name="product_id[]" class="form-select form-select-sm product-sel" onchange="onProductChange(this, ${rowCount})" required>
-        ${buildProductOptions(productId || '')}
-      </select>
-    </td>
-    <td>
-      <input type="number" name="quantity[]" id="qty-${rowCount}" value="${qty || 1}" min="1"
-             class="form-control form-control-sm text-center" onchange="recalcTotal()">
-    </td>
-    <td class="text-end fw-bold" id="sub-${rowCount}">RM 0.00</td>
-    <td><button type="button" class="btn btn-sm text-danger p-0" onclick="removeRow(${rowCount})">✕</button></td>`;
-  tbody.appendChild(tr);
-  if (productId) onProductChange(tr.querySelector('.product-sel'), rowCount);
-  recalcTotal();
-}
-
-function onProductChange(sel, id) {
-  const opt = sel.options[sel.selectedIndex];
-  const price = parseFloat(opt.dataset.price) || 0;
-  const qty = parseInt(document.getElementById(`qty-${id}`).value) || 1;
-  const max = parseInt(opt.dataset.stock) || 999;
-  document.getElementById(`qty-${id}`).max = max;
-  document.getElementById(`sub-${id}`).textContent = `RM ${(price * qty).toFixed(2)}`;
-  recalcTotal();
-}
-
-function recalcTotal() {
-  let total = 0;
-  document.querySelectorAll('#itemsBody tr').forEach(tr => {
-    const id = tr.id.split('-')[1];
-    const sel = tr.querySelector('.product-sel');
-    const qty = parseInt(document.getElementById(`qty-${id}`)?.value) || 0;
-    const price = parseFloat(sel?.options[sel.selectedIndex]?.dataset.price) || 0;
-    const sub = price * qty;
-    document.getElementById(`sub-${id}`).textContent = `RM ${sub.toFixed(2)}`;
-    total += sub;
-  });
-  document.getElementById('grandTotal').textContent = `RM ${total.toFixed(2)}`;
-}
-
-function removeRow(id) {
-  document.getElementById(`row-${id}`).remove();
-  recalcTotal();
-}
-
-function validateForm() {
-  const isWalkin = document.getElementById('modeWalkin').checked;
-  if (isWalkin) {
-    if (!document.getElementById('walkinName').value.trim()) {
-      alert('Please enter a name for the walk-in customer.');
-      return false;
-    }
-  } else {
-    if (!document.getElementById('customerSelect').value) {
-      alert('Please select a customer.');
-      return false;
-    }
+  function buildProductOptions(selectedId) {
+    var html = '<option value="">— choose product —</option>';
+    var lastCat = '';
+    PRODUCTS.forEach(function(p) {
+      if (p.category !== lastCat) {
+        if (lastCat) html += '</optgroup>';
+        html += '<optgroup label="' + p.category + '">';
+        lastCat = p.category;
+      }
+      html += '<option value="' + p.id + '" data-price="' + p.price + '" data-stock="' + p.stock + '"' +
+              (p.id == selectedId ? ' selected' : '') + '>' +
+              p.name + ' — RM ' + parseFloat(p.price).toFixed(2) + ' (' + p.stock + ' left)</option>';
+    });
+    if (lastCat) html += '</optgroup>';
+    return html;
   }
-  if (document.querySelectorAll('#itemsBody tr').length === 0) {
-    alert('Please add at least one item.');
-    return false;
+
+  function recalcTotal() {
+    var total = 0;
+    document.querySelectorAll('#itemsBody tr').forEach(function(tr) {
+      var id = tr.id.split('-')[1];
+      var sel = tr.querySelector('.product-sel');
+      var qtyEl = document.getElementById('qty-' + id);
+      var qty = parseInt(qtyEl ? qtyEl.value : 0) || 0;
+      var price = parseFloat(sel && sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].dataset.price : 0) || 0;
+      var sub = price * qty;
+      var subEl = document.getElementById('sub-' + id);
+      if (subEl) subEl.textContent = 'RM ' + sub.toFixed(2);
+      total += sub;
+    });
+    document.getElementById('grandTotal').textContent = 'RM ' + total.toFixed(2);
   }
-  return true;
-}
 
-// Toggle walk-in / registered sections
-document.querySelectorAll('input[name="is_walk_in"]').forEach(radio => {
-  radio.addEventListener('change', function () {
-    const walkin = this.value === '1';
-    document.getElementById('walkinSection').style.display = walkin ? '' : 'none';
-    document.getElementById('registeredSection').style.display = walkin ? 'none' : '';
+  function onProductChange(sel, id) {
+    var opt = sel.options[sel.selectedIndex];
+    var price = parseFloat(opt.dataset.price) || 0;
+    var qtyEl = document.getElementById('qty-' + id);
+    var qty = parseInt(qtyEl.value) || 1;
+    var max = parseInt(opt.dataset.stock) || 999;
+    qtyEl.max = max;
+    document.getElementById('sub-' + id).textContent = 'RM ' + (price * qty).toFixed(2);
+    recalcTotal();
+  }
+
+  function addRow(productId, qty) {
+    rowCount++;
+    var tbody = document.getElementById('itemsBody');
+    var tr = document.createElement('tr');
+    tr.id = 'row-' + rowCount;
+
+    var tdProd = document.createElement('td');
+    var sel = document.createElement('select');
+    sel.name = 'product_id[]';
+    sel.className = 'form-select form-select-sm product-sel';
+    sel.required = true;
+    sel.innerHTML = buildProductOptions(productId || '');
+    sel.dataset.rowId = rowCount;
+    tdProd.appendChild(sel);
+
+    var tdQty = document.createElement('td');
+    tdQty.style.textAlign = 'center';
+    var qtyInput = document.createElement('input');
+    qtyInput.type = 'number'; qtyInput.name = 'quantity[]'; qtyInput.id = 'qty-' + rowCount;
+    qtyInput.value = qty || 1; qtyInput.min = 1;
+    qtyInput.className = 'form-control form-control-sm text-center';
+    qtyInput.style.width = '80px'; qtyInput.style.margin = '0 auto';
+    qtyInput.dataset.rowId = rowCount;
+    tdQty.appendChild(qtyInput);
+
+    var tdSub = document.createElement('td');
+    tdSub.id = 'sub-' + rowCount; tdSub.textContent = 'RM 0.00';
+    tdSub.style.textAlign = 'right'; tdSub.style.fontWeight = '700';
+
+    var tdDel = document.createElement('td');
+    var delBtn = document.createElement('button');
+    delBtn.type = 'button'; delBtn.className = 'js-remove-row btn btn-sm p-0';
+    delBtn.style.color = 'oklch(43% 0.1 22)'; delBtn.textContent = '✕';
+    delBtn.dataset.rowId = rowCount;
+    tdDel.appendChild(delBtn);
+
+    tr.appendChild(tdProd); tr.appendChild(tdQty); tr.appendChild(tdSub); tr.appendChild(tdDel);
+    tbody.appendChild(tr);
+
+    if (productId) onProductChange(sel, rowCount);
+    recalcTotal();
+  }
+
+  /* Event delegation for dynamic table rows */
+  document.getElementById('itemsBody').addEventListener('change', function(e) {
+    var sel = e.target.closest('.product-sel');
+    if (sel) onProductChange(sel, sel.dataset.rowId);
+    var qty = e.target.closest('input[type="number"]');
+    if (qty) recalcTotal();
   });
-});
 
-// Start with one empty row
-addRow();
+  document.getElementById('itemsBody').addEventListener('click', function(e) {
+    var btn = e.target.closest('.js-remove-row');
+    if (!btn) return;
+    document.getElementById('row-' + btn.dataset.rowId).remove();
+    recalcTotal();
+  });
+
+  document.getElementById('addItemBtn').addEventListener('click', function() { addRow(); });
+
+  /* Walk-in / registered toggle */
+  document.querySelectorAll('input[name="is_walk_in"]').forEach(function(radio) {
+    radio.addEventListener('change', function() {
+      var walkin = this.value === '1';
+      document.getElementById('walkinSection').style.display = walkin ? '' : 'none';
+      document.getElementById('registeredSection').style.display = walkin ? 'none' : '';
+    });
+  });
+
+  /* Form validation on submit */
+  document.getElementById('orderForm').addEventListener('submit', function(e) {
+    var isWalkin = document.getElementById('modeWalkin').checked;
+    if (isWalkin) {
+      if (!document.getElementById('walkinName').value.trim()) {
+        e.preventDefault();
+        alert('Please enter a name for the walk-in customer.');
+        return;
+      }
+    } else {
+      if (!document.getElementById('customerSelect').value) {
+        e.preventDefault();
+        alert('Please select a customer.');
+        return;
+      }
+    }
+    if (document.querySelectorAll('#itemsBody tr').length === 0) {
+      e.preventDefault();
+      alert('Please add at least one item.');
+    }
+  });
+
+  /* Start with one empty row */
+  addRow();
+})();
 </script>
 {% endblock %}

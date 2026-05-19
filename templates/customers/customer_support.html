@@ -557,10 +557,17 @@
     thread.scrollTop = thread.scrollHeight;
   }
 
+  const handleExpiry = r => {
+    if (r.status !== 401) return r.json();
+    r.json().then(d => { window.location.href = d.redirect || '/login/customer/'; });
+    return null;
+  };
+
   function poll() {
     if (!messagesUrl) return;
     const url = lastSeen ? messagesUrl + '?since=' + encodeURIComponent(lastSeen) : messagesUrl;
-    fetch(url).then(r => r.json()).then(data => {
+    fetch(url).then(handleExpiry).then(data => {
+      if (!data) return;
       if (!hasMessages && data.messages.length === 0 && emptyEl) {
         emptyEl.textContent = 'No messages yet. Start the conversation.';
       }
@@ -588,7 +595,7 @@
       method: 'POST',
       headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
       body: 'body=' + encodeURIComponent(body),
-    }).then(r => r.json()).then(data => { if (data.ok) poll(); });
+    }).then(handleExpiry).then(data => { if (data && data.ok) poll(); });
   }
 
   window.openChatDrawer = function (btn) {

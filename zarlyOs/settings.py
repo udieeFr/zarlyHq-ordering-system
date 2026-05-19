@@ -55,6 +55,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'zarlyOs.middleware.SessionTimeoutMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'admins.middleware.PageViewMiddleware',
 ]
@@ -170,16 +171,39 @@ STRIPE_WEBHOOK_TOLERANCE = 300  # Accept webhooks within 5 minutes of creation
 SUPPORT_CHAT_KEY = os.getenv('SUPPORT_CHAT_KEY', '')
 
 # ============================================================================
-# CACHE (used by django-ratelimit)
-# In production, replace with Redis: django_redis or django.core.cache.backends.redis.RedisCache
+# CACHE (django-ratelimit + session storage)
+#
+# Production: set REDIS_URL=redis://:<password>@<host>:6379/0 in .env
+#   pip install django-redis
+#
+# Development: leave REDIS_URL unset — falls back to LocMemCache (single-worker only).
 # ============================================================================
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+_REDIS_URL = os.getenv('REDIS_URL', '')
+
+if _REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': _REDIS_URL,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'SOCKET_CONNECT_TIMEOUT': 5,
+                'SOCKET_TIMEOUT': 5,
+                # Degrade gracefully on Redis unavailability rather than 500-ing
+                'IGNORE_EXCEPTIONS': True,
+            },
+            'KEY_PREFIX': 'zarly',
+        }
     }
-}
-# Silence ratelimit's strict backend check — LocMemCache works fine for single-worker dev
-SILENCED_SYSTEM_CHECKS = ['django_ratelimit.E003', 'django_ratelimit.W001']
+else:
+    # Dev / single-worker fallback — ratelimit counts are not shared across workers
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        }
+    }
+    # Silence ratelimit's strict backend check for local dev only
+    SILENCED_SYSTEM_CHECKS = ['django_ratelimit.E003', 'django_ratelimit.W001']
 
 # ============================================================================
 # SECURITY HEADERS
@@ -189,6 +213,22 @@ X_FRAME_OPTIONS = 'DENY'                # Clickjacking protection
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 SESSION_COOKIE_HTTPONLY = True          # Block JS access to session cookie
 CSRF_COOKIE_HTTPONLY = True             # Block JS access to CSRF cookie
+
+# ============================================================================
+# SESSION EXPIRY
+# ============================================================================
+# Sessions expire 1 hour after the last request (inactivity-based, not absolute).
+# SESSION_SAVE_EVERY_REQUEST resets the cookie expiry on every request so the
+# clock only counts down during genuine inactivity.
+# SessionTimeoutMiddleware enforces the same limit server-side regardless of
+# whether the client honours the cookie max-age.
+#
+# Expired session rows accumulate in the DB — clean them up periodically:
+#   python manage.py clearsessions
+# (add to cron: 0 * * * *  cd /app && python manage.py clearsessions)
+SESSION_COOKIE_AGE = 3600              # Cookie max-age: 1 hour
+SESSION_SAVE_EVERY_REQUEST = True      # Refresh expiry on every request
+SESSION_INACTIVITY_TIMEOUT = 3600      # Server-side inactivity limit (seconds)
 
 # Enable these in production (HTTPS required):
 # SECURE_SSL_REDIRECT = not DEBUG

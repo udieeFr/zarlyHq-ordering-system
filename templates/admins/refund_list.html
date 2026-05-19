@@ -5,108 +5,114 @@
 
 {% block content %}
 <style>
-  :root {
-    --zarly-orange: #ff9933;
-    --zarly-navy:   #0f172a;
-    --soft-radius:  1rem;
-    --soft-shadow:  0 4px 24px rgba(15,23,42,.08), 0 1.5px 6px rgba(15,23,42,.04);
-    --soft-shadow-lg: 0 20px 60px rgba(15,23,42,.12);
-  }
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&display=swap');
 
-  .page-hero {
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #1f2937 100%);
-    border-radius: var(--soft-radius);
-    padding: 1.5rem 2rem;
-    margin-bottom: 1.5rem;
-    box-shadow: var(--soft-shadow-lg);
-    position: relative; overflow: hidden;
+  .page-header h1 {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 1.9rem; font-weight: 400; letter-spacing: -0.02em;
+    color: oklch(16% 0.04 52); margin-bottom: 0.2rem;
   }
-  .page-hero::before {
-    content:''; position:absolute; top:-60px; right:-60px;
-    width:200px; height:200px; border-radius:50%;
-    background:radial-gradient(circle,rgba(255,153,51,.22) 0%,transparent 70%);
-    pointer-events:none;
-  }
-  .page-hero-title { font-size:1.5rem; font-weight:900; letter-spacing:-.04em; color:#fff; position:relative; }
-  .page-hero-title span { color: var(--zarly-orange); }
-  .page-hero-sub { color:rgba(255,255,255,.6); font-size:.88rem; position:relative; margin-top:.3rem; }
 
   .soft-card {
-    background: #fff; border-radius: var(--soft-radius);
-    box-shadow: var(--soft-shadow); margin-bottom: 1.5rem; overflow: hidden;
+    background: oklch(97% 0.016 62);
+    border-radius: 1rem;
+    border: 1px solid oklch(91% 0.03 62);
+    box-shadow: 0 4px 24px oklch(70% 0.15 57 / 0.08);
+    overflow: hidden;
+    margin-bottom: 1.25rem;
   }
   .soft-card-header {
-    padding: 1.1rem 1.4rem .75rem; border-bottom: 1px solid #f1f5f9;
-    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem;
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid oklch(89% 0.03 62);
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;
   }
-  .soft-card-title { font-size:.88rem; font-weight:800; color:#0f172a; letter-spacing:-.01em; }
+  .soft-card-title { font-size: 0.88rem; font-weight: 800; color: oklch(18% 0.04 52); letter-spacing: -.01em; margin: 0; }
   .soft-card-body  { padding: 1.2rem 1.4rem; }
   .soft-card-body.p0 { padding: 0; }
 
-  .soft-table { width:100%; font-size:.82rem; border-collapse:collapse; }
-  .soft-table th { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#64748b; padding:.65rem 1rem; background:#f8fafc; border-bottom:1px solid #e2e8f0; }
-  .soft-table td { padding:.7rem 1rem; border-bottom:1px solid #f1f5f9; color:#1e293b; vertical-align:middle; }
-  .soft-table tr:last-child td { border-bottom:none; }
-  .soft-table tr:hover td { background:#fafbfc; }
-
-  .filter-bar { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
-  .filter-pill {
-    font-size:.75rem; font-weight:600; padding:.35rem .9rem; border-radius:999px;
-    border:1.5px solid #e2e8f0; color:#475569; text-decoration:none; transition:all .15s;
+  .soft-table { width: 100%; font-size: 0.82rem; border-collapse: collapse; }
+  .soft-table th {
+    font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .07em; color: oklch(42% 0.06 52);
+    padding: 0.55rem 1rem; background: oklch(93% 0.022 62);
+    border-bottom: 1px solid oklch(88% 0.03 62); white-space: nowrap;
   }
-  .filter-pill:hover, .filter-pill.active { background:var(--zarly-orange); color:#fff; border-color:var(--zarly-orange); }
+  .soft-table td { padding: 0.72rem 1rem; border-bottom: 1px solid oklch(91% 0.025 62); color: oklch(22% 0.04 52); vertical-align: middle; background: oklch(99.5% 0.006 60); }
+  .soft-table tr:last-child td { border-bottom: none; }
+  .soft-table tr:hover td { background: oklch(97% 0.022 62); }
 
-  .status-badge { display:inline-block; font-size:.68rem; font-weight:700; padding:.15rem .5rem; border-radius:999px; }
-  .badge-succeeded { background:#ecfdf5; color:#065f46; }
-  .badge-manual    { background:#fffbeb; color:#92400e; }
-  .badge-failed    { background:#fef2f2; color:#991b1b; }
-  .badge-pending   { background:#f1f5f9; color:#475569; }
+  .filter-bar { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
+  .filter-pill {
+    font-size: 0.75rem; font-weight: 600; padding: 0.3rem 0.875rem; border-radius: 999px;
+    border: 1.5px solid oklch(84% 0.04 62); color: oklch(42% 0.06 52);
+    text-decoration: none; transition: all .15s;
+    background: oklch(99.5% 0.006 60);
+  }
+  .filter-pill:hover { border-color: oklch(16% 0.04 52); color: oklch(16% 0.04 52); }
+  .filter-pill.active { background: oklch(16% 0.04 52); border-color: oklch(16% 0.04 52); color: oklch(93% 0.012 62); }
 
-  .source-badge { display:inline-block; font-size:.65rem; font-weight:700; padding:.12rem .42rem; border-radius:6px; background:#f1f5f9; color:#475569; }
+  .status-badge { display: inline-block; font-size: 0.68rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 999px; }
+  .badge-succeeded { background: oklch(93% 0.07 148); color: oklch(28% 0.1 148); }
+  .badge-manual    { background: oklch(93% 0.09 68); color: oklch(30% 0.12 60); }
+  .badge-failed    { background: oklch(93% 0.06 22); color: oklch(30% 0.12 22); }
+  .badge-pending   { background: oklch(93% 0.022 62); color: oklch(42% 0.06 52); }
+
+  .source-badge {
+    display: inline-block; font-size: 0.65rem; font-weight: 700; padding: 0.12rem 0.42rem;
+    border-radius: 6px; background: oklch(93% 0.022 62); color: oklch(42% 0.06 52);
+  }
 
   .action-btn {
-    display:inline-flex; align-items:center; gap:.3rem;
-    font-size:.75rem; font-weight:700; padding:.35rem .75rem; border-radius:8px;
-    border:none; cursor:pointer; transition:all .15s;
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    font-size: 0.75rem; font-weight: 700; padding: 0.35rem 0.75rem; border-radius: 8px;
+    border: none; cursor: pointer; transition: background .15s, transform .1s;
   }
-  .btn-process { background:linear-gradient(135deg,#10b981,#059669); color:#fff; }
-  .btn-process:hover { background:linear-gradient(135deg,#059669,#047857); color:#fff; }
+  .btn-process {
+    background: #ff9933; color: oklch(13% 0.04 52);
+  }
+  .btn-process:hover { background: oklch(70% 0.2 54); transform: translateY(-1px); }
 
-  /* Modal overlay */
   .modal-overlay {
-    display:none; position:fixed; inset:0; background:rgba(15,23,42,.6);
-    z-index:9999; align-items:center; justify-content:center;
+    display: none; position: fixed; inset: 0; background: oklch(14% 0.045 52 / 0.7);
+    z-index: 9999; align-items: center; justify-content: center;
   }
-  .modal-overlay.open { display:flex; }
+  .modal-overlay.open { display: flex; }
   .modal-box {
-    background:#fff; border-radius:var(--soft-radius); padding:2rem; max-width:480px; width:90%;
-    box-shadow:var(--soft-shadow-lg);
+    background: oklch(99.5% 0.006 60); border-radius: 1rem; padding: 2rem; max-width: 480px; width: 90%;
+    box-shadow: 0 20px 60px oklch(14% 0.045 52 / 0.2);
+    border: 1px solid oklch(91% 0.03 62);
   }
-  .modal-title { font-size:1.1rem; font-weight:800; color:#0f172a; margin-bottom:1.25rem; }
-  .modal-field { margin-bottom:1rem; }
-  .modal-label { font-size:.78rem; font-weight:700; color:#475569; margin-bottom:.3rem; display:block; }
+  .modal-title { font-size: 1.1rem; font-weight: 800; color: oklch(16% 0.04 52); margin-bottom: 1.25rem; }
+  .modal-field { margin-bottom: 1rem; }
+  .modal-label { font-size: 0.78rem; font-weight: 700; color: oklch(48% 0.06 54); margin-bottom: 0.3rem; display: block; }
   .modal-input {
-    width:100%; padding:.55rem .75rem; border:1.5px solid #e2e8f0; border-radius:8px;
-    font-size:.85rem; color:#0f172a; outline:none; transition:border .15s;
+    width: 100%; padding: 0.55rem 0.75rem; border: 1.5px solid oklch(84% 0.04 62); border-radius: 8px;
+    font-size: 0.85rem; color: oklch(16% 0.04 52); outline: none; transition: border .15s;
+    background: oklch(99.5% 0.006 60);
   }
-  .modal-input:focus { border-color:var(--zarly-orange); }
-  .modal-actions { display:flex; gap:.75rem; justify-content:flex-end; margin-top:1.5rem; }
-  .btn-cancel { background:#f1f5f9; color:#475569; border:none; padding:.5rem 1.1rem; border-radius:8px; font-size:.82rem; font-weight:600; cursor:pointer; }
-  .btn-confirm { background:linear-gradient(135deg,#10b981,#059669); color:#fff; border:none; padding:.5rem 1.1rem; border-radius:8px; font-size:.82rem; font-weight:700; cursor:pointer; }
+  .modal-input:focus { border-color: #ff9933; box-shadow: 0 0 0 3px oklch(70% 0.15 55 / .14); }
+  .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem; }
+  .btn-cancel {
+    background: oklch(93% 0.022 62); color: oklch(42% 0.06 52); border: 1.5px solid oklch(84% 0.04 62);
+    padding: 0.5rem 1.1rem; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer;
+  }
+  .btn-confirm {
+    background: #ff9933; color: oklch(13% 0.04 52); border: none;
+    padding: 0.5rem 1.1rem; border-radius: 8px; font-size: 0.82rem; font-weight: 700; cursor: pointer;
+    transition: background .15s;
+  }
+  .btn-confirm:hover { background: oklch(70% 0.2 54); }
 
   .alert-banner {
-    display:flex; align-items:center; gap:.75rem;
-    background:#fffbeb; border:1.5px solid #f59e0b; color:#92400e;
-    border-radius:10px; padding:.9rem 1.2rem; margin-bottom:1.25rem;
-    font-size:.83rem; font-weight:500;
+    display: flex; align-items: center; gap: 0.75rem;
+    background: oklch(96% 0.045 72); border: 1.5px solid oklch(78% 0.12 68); color: oklch(28% 0.1 60);
+    border-radius: 10px; padding: 0.9rem 1.2rem; margin-bottom: 1.25rem; font-size: 0.83rem; font-weight: 500;
   }
-  .alert-banner .ab-icon { font-size:1.1rem; }
 </style>
 
-<!-- Hero -->
-<div class="page-hero">
-  <div class="page-hero-title">💸 <span>Refund</span> Management</div>
-  <div class="page-hero-sub">Review and process manual refunds — Stripe auto-refunds are handled automatically</div>
+<div class="page-header">
+  <h1>Refund Management</h1>
+  <p>Review and process manual refunds — Stripe auto-refunds are handled automatically.</p>
 </div>
 
 {% if messages %}
@@ -120,7 +126,7 @@
 
 {% if pending_manual_count %}
 <div class="alert-banner">
-  <span class="ab-icon">⚠️</span>
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
   <span><strong>{{ pending_manual_count }} refund{{ pending_manual_count|pluralize }} need manual processing.</strong> These are bank transfer / DuitNow orders — please transfer funds and mark as processed below.</span>
 </div>
 {% endif %}
@@ -160,7 +166,7 @@
             <a href="{% url 'admin_order_detail' r.order.id %}" style="color:#ff9933;font-weight:600;text-decoration:none;">#{{ r.order.id }}</a>
           </td>
           <td>{{ r.order.customer_label }}</td>
-          <td style="font-weight:800;color:#0f172a;">RM {{ r.amount|floatformat:2 }}</td>
+          <td style="font-weight:800;color:oklch(16% 0.04 52);">RM {{ r.amount|floatformat:2 }}</td>
           <td><span class="source-badge">{{ r.get_source_display }}</span></td>
           <td>
             {% if r.status == 'succeeded' %}
@@ -173,23 +179,26 @@
               <span class="status-badge badge-pending">{{ r.get_status_display }}</span>
             {% endif %}
           </td>
-          <td style="color:#94a3b8;font-size:.75rem;white-space:nowrap;">{{ r.created_at|date:"d M Y H:i" }}</td>
-          <td style="color:#64748b;">
+          <td style="font-size:.75rem;color:oklch(48% 0.06 54);white-space:nowrap;">{{ r.created_at|date:"d M Y H:i" }}</td>
+          <td style="color:oklch(42% 0.06 52);">
             {% if r.processed_by %}{{ r.processed_by.username }}{% else %}—{% endif %}
           </td>
           <td>
             {% if r.status == 'manual' or r.status == 'failed' or r.status == 'pending' %}
-            <button class="action-btn btn-process"
-                    onclick="openModal({{ r.id }}, '{{ r.order.id }}', '{{ r.amount }}', '{{ r.order.customer_label }}')">
-              ✅ Process
+            <button class="action-btn btn-process js-process-btn"
+                    data-refund-id="{{ r.id }}"
+                    data-order-id="{{ r.order.id }}"
+                    data-amount="{{ r.amount }}"
+                    data-customer="{{ r.order.customer_label|escapejs }}">
+              Process
             </button>
             {% else %}
-            <span style="color:#94a3b8;font-size:.75rem;">{{ r.processed_at|date:"d M H:i"|default:"—" }}</span>
+            <span style="color:oklch(58% 0.02 54);font-size:.75rem;">{{ r.processed_at|date:"d M H:i"|default:"—" }}</span>
             {% endif %}
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:2rem;">No refunds found{% if status_filter %} with status "{{ status_filter }}"{% endif %}.</td></tr>
+        <tr><td colspan="9" style="text-align:center;color:oklch(48% 0.06 54);padding:2rem;background:oklch(99.5% 0.006 60);">No refunds found{% if status_filter %} with status "{{ status_filter }}"{% endif %}.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -200,7 +209,7 @@
 <div class="modal-overlay" id="processModal">
   <div class="modal-box">
     <div class="modal-title">Mark Refund as Processed</div>
-    <p style="font-size:.83rem;color:#64748b;margin-bottom:1.25rem;">
+    <p style="font-size:.83rem;color:oklch(48% 0.06 54);margin-bottom:1.25rem;">
       Confirm that you have manually transferred <strong id="modalAmount"></strong> to
       <strong id="modalCustomer"></strong> for Order <strong id="modalOrder"></strong>.
     </p>
@@ -215,7 +224,7 @@
         <textarea name="notes" class="modal-input" rows="2" placeholder="e.g. Transferred via Maybank2u at 3:45pm"></textarea>
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button type="button" class="btn-cancel" id="modalCancelBtn">Cancel</button>
         <button type="submit" class="btn-confirm">Confirm — Refund Processed</button>
       </div>
     </form>
@@ -226,7 +235,8 @@
 
 {% block extra_scripts %}
 <script nonce="{{ request.csp_nonce }}">
-  const baseUrl = "{% url 'mark_refund_processed' 0 %}".replace('/0/', '/');
+(function () {
+  var baseUrl = "{% url 'mark_refund_processed' 0 %}".replace('/0/', '/');
 
   function openModal(refundId, orderId, amount, customer) {
     document.getElementById('modalAmount').textContent   = 'RM ' + amount;
@@ -240,8 +250,17 @@
     document.getElementById('processModal').classList.remove('open');
   }
 
-  document.getElementById('processModal').addEventListener('click', function(e) {
+  document.getElementById('modalCancelBtn').addEventListener('click', closeModal);
+
+  document.getElementById('processModal').addEventListener('click', function (e) {
     if (e.target === this) closeModal();
   });
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.js-process-btn');
+    if (!btn) return;
+    openModal(btn.dataset.refundId, btn.dataset.orderId, btn.dataset.amount, btn.dataset.customer);
+  });
+})();
 </script>
 {% endblock %}
