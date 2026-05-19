@@ -18,6 +18,8 @@ def make_customer(username='cust1', email=None, password='Pass123!ZZ', verified=
         password=password,
         role='customer',
     )
+    user.email_verified = verified
+    user.save(update_fields=['email_verified'])
     return user
 
 
@@ -86,3 +88,19 @@ class TestOtpUtils:
     def test_mask_email_short_local(self):
         from customers.otp_utils import mask_email
         assert mask_email('ab@test.com') == 'a*@t***.com'
+
+
+# ── Model field ───────────────────────────────────────────────────────────────
+
+class TestEmailVerifiedField:
+
+    def test_new_user_defaults_to_unverified(self):
+        user = make_customer('new_unverified')
+        assert user.email_verified is False
+
+    def test_can_set_verified_true(self):
+        user = make_customer('set_verified')
+        user.email_verified = True
+        user.save(update_fields=['email_verified'])
+        user.refresh_from_db()
+        assert user.email_verified is True
