@@ -14,3 +14,4 @@ staticfiles/
 htmlcov/
 docs/
 coverage.xml
+.env.prod
