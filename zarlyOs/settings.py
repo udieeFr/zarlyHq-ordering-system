@@ -89,12 +89,12 @@ WSGI_APPLICATION = 'zarlyOs.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME', 'zarly_db'),
-        'USER': os.getenv('DB_USER', 'zarly_user'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'supersecret123'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5433'),
+        'ENGINE': os.getenv('DATABASE_ENGINE', 'django.db.backends.postgresql'),
+        'NAME': os.getenv('DATABASE_NAME', 'zarlydb'),
+        'USER': os.getenv('DATABASE_USER', 'zarlyuser'),
+        'PASSWORD': os.getenv('DATABASE_PASSWORD', 'zarlypass123'),
+        'HOST': os.getenv('DATABASE_HOST', 'localhost'),
+        'PORT': os.getenv('DATABASE_PORT', '5432'),
         'CONN_MAX_AGE': 60,
     }
 }

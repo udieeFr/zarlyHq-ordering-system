@@ -1,17 +1,85 @@
-version: "3.9"
+version: '3.9'
 
 services:
   db:
-    image: postgres:latest # Uses the latest stable PostgreSQL (17+ in 2026)
-    restart: always
+    image: postgres:17
+    container_name: zarlyos-db
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: zarly_db # Database name
-      POSTGRES_USER: zarly_user # Username
-      POSTGRES_PASSWORD: supersecret123 # Change this to a strong password!
+      POSTGRES_DB: ${DB_NAME:-zarlyos}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
     volumes:
-      - postgres_data:/var/lib/postgresql # Saves data even if container stops
+      - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5433:5432" # Makes DB accessible from your computer
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zarlyos-network
+
+  django:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zarlyos-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DEBUG: ${DEBUG:-False}
+      SECRET_KEY: ${SECRET_KEY}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost}
+      DB_NAME: ${DB_NAME:-zarlyos}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      DB_HOST: db
+      DB_PORT: "5432"
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      FERNET_KEY: ${FERNET_KEY}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
+    volumes:
+      - ./staticfiles:/app/staticfiles
+      - ./media:/app/media
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/start/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - zarlyos-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: zarlyos-web
+    restart: unless-stopped
+    depends_on:
+      - django
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./staticfiles:/app/staticfiles:ro
+      - ./media:/app/media:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    networks:
+      - zarlyos-network
+
+networks:
+  zarlyos-network:
+    driver: bridge
 
 volumes:
   postgres_data:

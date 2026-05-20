@@ -183,18 +183,10 @@ All customer views now use `@customer_required`. Decorator enforces `role == 'cu
 
 ### MEDIUM
 
-#### M1 — No Rate Limiting on Password Change ⬜ Open
-**Complexity: Low**
+#### M1 — No Rate Limiting on Password Change ✅ Fixed
+**Complexity: Low** | **Fixed: 2026-05-20**
 
-`customer_profile` handles password changes but has no POST rate limit. An attacker with a valid session could brute-force the current password field without lockout.
-
-**Fix:**
-```python
-@customer_required
-@ratelimit(key='user', rate='10/h', method='POST', block=True)
-def customer_profile(request):
-    ...
-```
+`customer_profile` already had `@ratelimit(key='user', rate='10/h', method='POST', block=True)` applied, limiting the password change form to 10 POST requests per hour per user.
 
 ---
 
@@ -344,7 +336,7 @@ Manual `if request.user.is_authenticated` check instead of decorator. Inconsiste
 | H5 | File upload: PDF MIME not validated | High | Medium | ✅ Fixed |
 | NEW-1 | Stored XSS in support chat bubbles | High | Low | ✅ Fixed |
 | NEW-2 | Missing `@customer_required` on all views | High | Low | ✅ Fixed |
-| M1 | No rate limit on password change | Medium | Low | ⬜ Open |
+| M1 | No rate limit on password change | Medium | Low | ✅ Fixed |
 | M2 | Unguarded `int(quantity)` → 500 + debug leak | Medium | Low | ✅ Fixed |
 | M3 | Error detail disclosure to users | Medium | Low | ✅ Fixed |
 | M4 | `verify_receipt` exposes customer data publicly | Medium | Low | ✅ Fixed |
@@ -382,5 +374,5 @@ Manual `if request.user.is_authenticated` check instead of decorator. Inconsiste
 11. `[x]` M4 — Audit `verify_receipt` template for data exposure ✅ 2026-05-20
 12. `[x]` M6 — Truncate unbounded POST text fields server-side ✅ 2026-05-19
 13. `[x]` M7 — Bounds-check lat/lng values ✅ 2026-05-19
-14. `[ ]` M1 — Rate-limit password change endpoint
+14. `[x]` M1 — Rate-limit password change endpoint ✅ (already covered by `customer_profile` 10/h)
 15. `[ ]` L1 / L2 / L3 — Minor cleanup

@@ -1001,7 +1001,7 @@ def customer_orders(request):
     previous_orders = Order.objects.filter(
         customer=request.user,
         status__in=previous_statuses
-    ).prefetch_related('items__product').order_by('-created_at')
+    ).prefetch_related('items__product').order_by('-created_at')[:50]
 
     completed_orders = Order.objects.filter(
         customer=request.user, status__in=['approved', 'delivered']
@@ -1071,7 +1071,7 @@ def customer_orders(request):
 def customer_support(request):
     complaints = Complaint.objects.filter(
         customer=request.user
-    ).select_related('order').order_by('-created_at')
+    ).select_related('order').order_by('-created_at')[:100]
 
     eligible_orders = Order.objects.filter(
         customer=request.user,
@@ -1178,12 +1178,22 @@ def verify_receipt(request, order_id):
       2. Recompute SHA-256 of the signed PDF file on disk.
       3. Compare with the stored hash — mismatch means the file was tampered.
       4. Use PyHanko to validate the embedded PKCS#7 signature (intact + signer identity).
+
+    Result is cached for 24 hours — a signed receipt is immutable.
     """
+    from django.core.cache import cache
+
     if getattr(request, 'limited', False):
         return render(request, 'customers/verify_receipt.html', {
             'order_id': order_id,
             'status': 'rate_limited',
         })
+
+    cache_key = f'receipt_verify:{order_id}'
+    cached_result = cache.get(cache_key)
+    if cached_result is not None:
+        return render(request, 'customers/verify_receipt.html', cached_result)
+
     try:
         sig_record = DigitalSignature.objects.only(
             'order_id', 'signature_hash', 'timestamp', 'pdf_path'
@@ -1252,6 +1262,10 @@ def verify_receipt(request, order_id):
         logger.error("PyHanko signature validation failed for order %s: %s", order_id, e, exc_info=True)
         result['hash_match'] = True  # Hash was fine; signature layer failed
         result['status'] = 'sig_error'
+
+    # Cache successful (non-error) results — receipt content never changes after signing
+    if result.get('status') in ('valid', 'tampered', 'no_signature', 'sig_error'):
+        cache.set(cache_key, result, 60 * 60 * 24)
 
     log_audit(request, 'receipt_verified', target=sig_record,
               description=f"Receipt verification check on Order #{order_id}",

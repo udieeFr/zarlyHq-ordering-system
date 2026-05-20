@@ -460,13 +460,17 @@ def add_product(request):
                 'allergies': Allergy.objects.all(),
             })
 
+        img = request.FILES.get('image') or None
+        if img and img.size > 5 * 1024 * 1024:
+            messages.error(request, 'Product image must be under 5 MB.')
+            return redirect('inventory_list')
         product = Product.objects.create(
             name=name,
             price=price,
             stock=stock,
             weight_grams=weight_grams,
             category_id=category_id,
-            image=request.FILES.get('image') or None,
+            image=img,
         )
         product.allergies.set(request.POST.getlist('allergies'))
 
@@ -505,7 +509,11 @@ def edit_product(request, product_id):
         if category_id:
             product.category_id = category_id
         if request.FILES.get('image'):
-            product.image = request.FILES['image']
+            img = request.FILES['image']
+            if img.size > 5 * 1024 * 1024:
+                messages.error(request, 'Product image must be under 5 MB.')
+                return redirect('inventory_list')
+            product.image = img
         elif request.POST.get('clear_image'):
             product.image = None
         product.save()
@@ -1469,7 +1477,7 @@ def bulk_accept_orders(request):
         if getattr(request, 'limited', False):
             messages.error(request, 'Too many requests. Please slow down.')
             return redirect('sales_admin_dashboard')
-        order_ids = request.POST.getlist('order_ids')
+        order_ids = request.POST.getlist('order_ids')[:20]   # cap: each triggers a PyHanko signing call
         # Accept both pending and pending_payment orders
         pending_orders = Order.objects.filter(id__in=order_ids, status__in=['pending', 'pending_payment'])
         approved_count = 0

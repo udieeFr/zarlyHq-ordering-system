@@ -149,3 +149,87 @@ class TestSignupOtpUtils:
         new = generate_and_cache_signup_otp('resend@example.com')
         assert verify_signup_otp('resend@example.com', old) == 'invalid'
         assert verify_signup_otp('resend@example.com', new) == 'ok'
+
+
+# ── Signup view (AJAX, JSON responses) ────────────────────────────────────────
+
+class TestCustomerSignupView:
+
+    def setup_method(self):
+        self.client = Client()
+
+    def test_get_renders_signup_page(self):
+        res = self.client.get(reverse('customer_signup'))
+        assert res.status_code == 200
+        assert b'signup' in res.content.lower() or b'Join' in res.content
+
+    def test_post_returns_json_on_validation_error(self):
+        res = self.client.post(reverse('customer_signup'), {
+            'username': 'ab',
+            'email': 'bad',
+            'password': '123',
+            'password_confirm': '456',
+        })
+        assert res.status_code == 200
+        data = res.json()
+        assert data['status'] == 'error'
+        assert 'username' in data['errors']
+
+    def test_post_duplicate_username_returns_error(self):
+        make_customer('taken')
+        res = self.client.post(reverse('customer_signup'), {
+            'username': 'taken',
+            'email': 'newemail@test.com',
+            'password': 'Pass123!',
+            'password_confirm': 'Pass123!',
+        })
+        data = res.json()
+        assert data['status'] == 'error'
+        assert 'username' in data['errors']
+
+    def test_post_duplicate_email_returns_error(self):
+        make_customer('uniqueuser', email='taken@test.com')
+        res = self.client.post(reverse('customer_signup'), {
+            'username': 'newuser',
+            'email': 'taken@test.com',
+            'password': 'Pass123!',
+            'password_confirm': 'Pass123!',
+        })
+        data = res.json()
+        assert data['status'] == 'error'
+        assert 'email' in data['errors']
+
+    def test_valid_post_returns_otp_sent_and_stores_session(self):
+        res = self.client.post(reverse('customer_signup'), {
+            'username': 'newuser',
+            'email': 'newuser@test.com',
+            'password': 'Pass123!ZZ',
+            'password_confirm': 'Pass123!ZZ',
+        })
+        data = res.json()
+        assert data['status'] == 'otp_sent'
+        assert 'masked_email' in data
+        assert '*' in data['masked_email']
+        # Session should hold pending registration
+        session = self.client.session
+        assert 'pending_signup' in session
+        assert session['pending_signup']['email'] == 'newuser@test.com'
+
+    def test_valid_post_does_not_create_user_yet(self):
+        self.client.post(reverse('customer_signup'), {
+            'username': 'notcreated',
+            'email': 'notcreated@test.com',
+            'password': 'Pass123!ZZ',
+            'password_confirm': 'Pass123!ZZ',
+        })
+        assert not User.objects.filter(username='notcreated').exists()
+
+    def test_valid_post_stores_otp_in_cache(self):
+        from django.core.cache import cache
+        self.client.post(reverse('customer_signup'), {
+            'username': 'cacheuser',
+            'email': 'cacheuser@test.com',
+            'password': 'Pass123!ZZ',
+            'password_confirm': 'Pass123!ZZ',
+        })
+        assert cache.get('signup_otp:cacheuser@test.com') is not None
