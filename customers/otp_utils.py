@@ -73,3 +73,48 @@ def send_verification_email(user, otp):
         )
     except Exception as e:
         logger.warning(f'Could not send verification email to {user.email}: {e}')
+
+
+def _signup_cache_key(email):
+    return f'signup_otp:{email}'
+
+
+def generate_and_cache_signup_otp(email):
+    """Generate a 6-digit OTP cached by email address (no user required)."""
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    cache.set(_signup_cache_key(email), code, OTP_TTL)
+    return code
+
+
+def verify_signup_otp(email, submitted_code):
+    """
+    Verify a signup OTP keyed by email.
+    Returns: 'ok' | 'invalid' | 'expired'
+    Deletes cache on correct submission.
+    """
+    key = _signup_cache_key(email)
+    stored = cache.get(key)
+    if stored is None:
+        return 'expired'
+    if stored != submitted_code:
+        return 'invalid'
+    cache.delete(key)
+    return 'ok'
+
+
+def send_signup_verification_email(username, email, otp):
+    """Send OTP to an unregistered email address (no User object needed)."""
+    try:
+        body = render_to_string('emails/email_verification.html', {
+            'username': username,
+            'otp': otp,
+        })
+        send_mail(
+            subject='Your ZarlyHQ verification code',
+            message=f'Your verification code is: {otp}. It expires in 5 minutes.',
+            from_email=None,
+            recipient_list=[email],
+            html_message=body,
+        )
+    except Exception as e:
+        logger.warning(f'Could not send verification email to {email}: {e}')

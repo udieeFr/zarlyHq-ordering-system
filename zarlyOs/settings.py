@@ -95,8 +95,14 @@ DATABASES = {
         'PASSWORD': os.getenv('DB_PASSWORD', 'supersecret123'),
         'HOST': os.getenv('DB_HOST', 'localhost'),
         'PORT': os.getenv('DB_PORT', '5433'),
+        'CONN_MAX_AGE': 60,
     }
 }
+
+# Upload and field limits — prevent parser-flooding via large POST bodies or field counts
+DATA_UPLOAD_MAX_MEMORY_SIZE  = 5 * 1024 * 1024   # 5 MB (matches payment proof cap)
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 100               # default 1000 is too permissive
+FILE_UPLOAD_MAX_MEMORY_SIZE  = 5 * 1024 * 1024   # 5 MB
 
 
 # Password validation
@@ -162,6 +168,17 @@ STRIPE_CURRENCY = os.getenv('STRIPE_CURRENCY', 'MYR')
 # For localhost testing: use ngrok or Stripe CLI to tunnel webhooks
 # Stripe CLI: stripe listen --forward-to localhost:8000/menu/stripe/webhook/
 STRIPE_WEBHOOK_TOLERANCE = 300  # Accept webhooks within 5 minutes of creation
+
+# ============================================================================
+# EMAIL
+# ============================================================================
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', '')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@zarlybigfood.com')
 
 # ============================================================================
 # SUPPORT CHAT

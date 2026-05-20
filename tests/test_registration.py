@@ -104,3 +104,48 @@ class TestEmailVerifiedField:
         user.save(update_fields=['email_verified'])
         user.refresh_from_db()
         assert user.email_verified is True
+
+
+# ── Signup OTP (email-keyed, no user required) ────────────────────────────────
+
+class TestSignupOtpUtils:
+
+    def test_generate_signup_otp_returns_six_digit_string(self):
+        from customers.otp_utils import generate_and_cache_signup_otp
+        code = generate_and_cache_signup_otp('user@example.com')
+        assert len(code) == 6
+        assert code.isdigit()
+
+    def test_signup_otp_stored_in_cache_by_email(self):
+        from customers.otp_utils import generate_and_cache_signup_otp
+        from django.core.cache import cache
+        code = generate_and_cache_signup_otp('cache@example.com')
+        assert cache.get('signup_otp:cache@example.com') == code
+
+    def test_verify_signup_otp_ok_on_correct_code(self):
+        from customers.otp_utils import generate_and_cache_signup_otp, verify_signup_otp
+        code = generate_and_cache_signup_otp('ok@example.com')
+        assert verify_signup_otp('ok@example.com', code) == 'ok'
+
+    def test_verify_signup_otp_deletes_cache_on_success(self):
+        from customers.otp_utils import generate_and_cache_signup_otp, verify_signup_otp
+        from django.core.cache import cache
+        code = generate_and_cache_signup_otp('del@example.com')
+        verify_signup_otp('del@example.com', code)
+        assert cache.get('signup_otp:del@example.com') is None
+
+    def test_verify_signup_otp_invalid_on_wrong_code(self):
+        from customers.otp_utils import generate_and_cache_signup_otp, verify_signup_otp
+        generate_and_cache_signup_otp('wrong@example.com')
+        assert verify_signup_otp('wrong@example.com', '000000') == 'invalid'
+
+    def test_verify_signup_otp_expired_when_no_cache(self):
+        from customers.otp_utils import verify_signup_otp
+        assert verify_signup_otp('ghost@example.com', '123456') == 'expired'
+
+    def test_resend_overwrites_old_signup_otp(self):
+        from customers.otp_utils import generate_and_cache_signup_otp, verify_signup_otp
+        old = generate_and_cache_signup_otp('resend@example.com')
+        new = generate_and_cache_signup_otp('resend@example.com')
+        assert verify_signup_otp('resend@example.com', old) == 'invalid'
+        assert verify_signup_otp('resend@example.com', new) == 'ok'
