@@ -15,3 +15,4 @@ htmlcov/
 docs/
 coverage.xml
 .env.prod
+docker-compose.override.yml

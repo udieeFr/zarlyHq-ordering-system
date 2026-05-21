@@ -160,7 +160,7 @@
             {% for item in inventory_data %}
             <tr class="{% if item.has_change %}row-staging{% endif %}" id="row-{{ item.product.id }}">
                 <td class="ps-4 fw-bold">{{ item.product.name }}</td>
-                <td><span class="cat-badge">{{ item.product.category.name }}</span></td>
+                <td><span class="cat-badge">{{ item.product.category }}</span></td>
                 <td class="text-end price-cell">RM {{ item.product.price }}</td>
                 <td class="text-center">{{ item.product.stock }}</td>
                 <td>

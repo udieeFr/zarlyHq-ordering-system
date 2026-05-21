@@ -43,11 +43,12 @@
 
         <div class="mb-3">
           <label class="form-label fw-bold">Category</label>
-          <select name="category" class="form-select" required>
+          <input type="text" name="category" class="form-control" list="category-list" value="{{ product.category }}" required>
+          <datalist id="category-list">
             {% for cat in categories %}
-            <option value="{{ cat.id }}" {% if cat.id == product.category_id %}selected{% endif %}>{{ cat.name }}</option>
+            <option value="{{ cat }}">
             {% endfor %}
-          </select>
+          </datalist>
         </div>
 
         <div class="mb-3">

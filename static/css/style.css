@@ -2077,7 +2077,8 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 0.4rem;
+  margin-top: auto;
+  padding-top: 0.4rem;
 }
 
 .pcard-price {

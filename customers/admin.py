@@ -1,9 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User, Product, Category, Allergy, Favourite, CustomerProfile
+from .models import User, Product, Allergy, Favourite, CustomerProfile
 
 
-admin.site.register(Category)
 admin.site.register(Allergy)
 
 

@@ -163,6 +163,7 @@
 .od-tbl td:last-child   { text-align: right; font-weight: 600; }
 .od-tbl tbody tr:last-child td { border-bottom: none; }
 .od-qty { display: inline-block; background: oklch(92% 0.03 62); border-radius: 4px; padding: .08rem .38rem; font-size: .74rem; font-weight: 700; }
+.od-bundle-badge { display: inline-block; margin-left: .35rem; font-size: .62rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #ff9933; background: oklch(70% 0.18 55 / 0.12); border: 1px solid oklch(70% 0.18 55 / 0.25); border-radius: 999px; padding: .08rem .4rem; vertical-align: middle; }
 .od-tbl tfoot td {
   padding-top: .55rem; border-top: 1.5px solid oklch(88% 0.045 64);
   border-bottom: none; font-size: .88rem; font-weight: 700;
@@ -334,7 +335,10 @@
             <tbody>
               {% for item in order.items.all %}
               <tr>
-                <td class="fw-medium">{{ item.product.name }}</td>
+                <td class="fw-medium">
+                  {{ item.product.name }}
+                  {% if item.is_bundle %}<span class="od-bundle-badge">Bundle</span>{% endif %}
+                </td>
                 <td><span class="od-qty">×{{ item.quantity }}</span></td>
                 <td>RM {{ item.subtotal }}</td>
               </tr>

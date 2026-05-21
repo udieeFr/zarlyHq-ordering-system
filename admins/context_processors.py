@@ -1,6 +1,6 @@
 def unread_notifications(request):
     """Inject notification counts for authenticated users into every template."""
-    if not request.user.is_authenticated:
+    if not hasattr(request, 'user') or not request.user.is_authenticated:
         return {'unread_notification_count': 0}
 
     role = getattr(request.user, 'role', None)

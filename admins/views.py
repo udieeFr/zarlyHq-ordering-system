@@ -24,7 +24,7 @@ from customers.auth_utils import (
     get_user_dashboard_url
 )
 import os
-from customers.models import Product, Category, Allergy
+from customers.models import Product, Allergy
 
 def is_sales_admin(user):
     """Checks if the user has administrative permissions."""
@@ -451,12 +451,12 @@ def add_product(request):
         price = request.POST.get('price')
         stock = request.POST.get('stock', 0)
         weight_grams = request.POST.get('weight_grams') or None
-        category_id = request.POST.get('category')
+        category = request.POST.get('category', '').strip()
 
-        if not name or not price or not category_id:
+        if not name or not price or not category:
             messages.error(request, "Name, price, and category are required.")
             return render(request, 'admins/add_product.html', {
-                'categories': Category.objects.all(),
+                'categories': Product.objects.exclude(category='').values_list('category', flat=True).distinct().order_by('category'),
                 'allergies': Allergy.objects.all(),
             })
 
@@ -469,19 +469,19 @@ def add_product(request):
             price=price,
             stock=stock,
             weight_grams=weight_grams,
-            category_id=category_id,
+            category=category,
             image=img,
         )
         product.allergies.set(request.POST.getlist('allergies'))
 
         log_audit(request, 'product_added', target=product,
                   description=f"Product '{name}' added to menu",
-                  metadata={'price': str(price), 'stock': int(stock), 'category_id': int(category_id)})
+                  metadata={'price': str(price), 'stock': int(stock), 'category': category})
         messages.success(request, f"Product '{name}' added successfully.")
         return redirect('inventory_list')
 
     return render(request, 'admins/add_product.html', {
-        'categories': Category.objects.all(),
+        'categories': Product.objects.exclude(category='').values_list('category', flat=True).distinct().order_by('category'),
         'allergies': Allergy.objects.all(),
     })
 
@@ -499,15 +499,15 @@ def edit_product(request, product_id):
             'name': product.name,
             'price': str(product.price),
             'stock': product.stock,
-            'category_id': product.category_id,
+            'category': product.category,
         }
         product.name = request.POST.get('name', product.name).strip()
         product.price = request.POST.get('price', product.price)
         product.stock = request.POST.get('stock', product.stock)
         product.weight_grams = request.POST.get('weight_grams', product.weight_grams)
-        category_id = request.POST.get('category')
-        if category_id:
-            product.category_id = category_id
+        category = request.POST.get('category', '').strip()
+        if category:
+            product.category = category
         if request.FILES.get('image'):
             img = request.FILES['image']
             if img.size > 5 * 1024 * 1024:
@@ -522,7 +522,7 @@ def edit_product(request, product_id):
             'name': product.name,
             'price': str(product.price),
             'stock': product.stock,
-            'category_id': product.category_id,
+            'category': product.category,
         }
         changes = {k: {'before': before[k], 'after': after[k]} for k in before if before[k] != after[k]}
         log_audit(request, 'product_edited', target=product,
@@ -533,7 +533,7 @@ def edit_product(request, product_id):
 
     return render(request, 'admins/edit_product.html', {
         'product': product,
-        'categories': Category.objects.all(),
+        'categories': Product.objects.exclude(category='').values_list('category', flat=True).distinct().order_by('category'),
         'allergies': Allergy.objects.all(),
         'selected_allergies': list(product.allergies.values_list('id', flat=True)),
     })
@@ -553,49 +553,40 @@ def delete_product(request, product_id):
             'name': product.name,
             'price': str(product.price),
             'stock': product.stock,
-            'category': product.category.name if product.category else None,
+            'category': product.category,
         }
         product.delete()
         log_audit(request, 'product_deleted', target=None,
                   description=f"Product '{snapshot['name']}' permanently deleted from menu",
                   metadata=snapshot)
-        messages.success(request, f"'{name}' deleted from the menu.")
+        messages.success(request, f"'{snapshot['name']}' deleted from the menu.")
     return redirect('inventory_list')
 
 
 @manager_required
 @ratelimit(key='user', rate='20/m', method='POST', block=False)
 def manage_categories(request):
-    """Add, rename, or delete product categories. Manager-only."""
-    from customers.models import Category as Cat
+    """Rename product categories across all products. Manager-only."""
     if request.method == 'POST':
         if getattr(request, 'limited', False):
             messages.error(request, 'Too many requests. Please slow down.')
             return redirect('manage_categories')
         action = request.POST.get('action')
-        if action == 'add':
-            name = request.POST.get('name', '').strip()
-            if name:
-                Cat.objects.get_or_create(name=name)
-                messages.success(request, f"Category '{name}' added.")
-        elif action == 'rename':
-            cat_id = request.POST.get('category_id')
+        if action == 'rename':
+            old_name = request.POST.get('category_name', '').strip()
             new_name = request.POST.get('name', '').strip()
-            if cat_id and new_name:
-                Cat.objects.filter(id=cat_id).update(name=new_name)
-                messages.success(request, f"Category renamed to '{new_name}'.")
-        elif action == 'delete':
-            cat_id = request.POST.get('category_id')
-            if cat_id:
-                cat = get_object_or_404(Cat, id=cat_id)
-                if cat.products.exists():
-                    messages.error(request, f"Cannot delete '{cat.name}' — it still has products assigned to it.")
-                else:
-                    cat.delete()
-                    messages.success(request, "Category deleted.")
+            if old_name and new_name:
+                updated = Product.objects.filter(category=old_name).update(category=new_name)
+                messages.success(request, f"Renamed '{old_name}' → '{new_name}' on {updated} product(s).")
         return redirect('manage_categories')
 
-    categories = Cat.objects.annotate(product_count=Count('products')).order_by('name')
+    categories = (
+        Product.objects
+        .exclude(category='')
+        .values('category')
+        .annotate(product_count=Count('id'))
+        .order_by('category')
+    )
     return render(request, 'admins/manage_categories.html', {'categories': categories})
 
 
@@ -694,6 +685,8 @@ def admin_create_order(request):
                 order=order,
                 product=item['product'],
                 quantity=item['quantity'],
+                unit_price=item['product'].price,
+                is_bundle=False,
                 subtotal=item['subtotal'],
             )
             item['product'].stock -= item['quantity']
@@ -2098,7 +2091,7 @@ def email_template_create(request):
                 name=name, subject=subject, body_html=body_html,
                 created_by=request.user,
             )
-            log_audit(request, 'inventory_updated', target=t,
+            log_audit(request, 'email_template_created', target=t,
                       description=f'Email template "{t.name}" created')
             messages.success(request, f'Template "{t.name}" created.')
             return redirect('email_template_list')
@@ -2179,7 +2172,7 @@ def campaign_compose(request):
 
         results = blast_campaign(customers_qs, tmpl, campaign, sender=request.user)
 
-        log_audit(request, 'inventory_updated', target=campaign,
+        log_audit(request, 'campaign_sent', target=campaign,
                   description=f'Campaign "{campaign_name}" sent — {campaign.sent_count} sent, '
                               f'{campaign.skipped_count} skipped, {campaign.failed_count} failed',
                   metadata={'sent': campaign.sent_count, 'skipped': campaign.skipped_count,
@@ -2271,7 +2264,7 @@ def sales_report(request):
     top_products = (
         OrderItem.objects
         .filter(order__approved_at__gte=since, order__status__in=['approved', 'delivered'])
-        .values('product__name', 'product__category__name')
+        .values('product__name', 'product__category')
         .annotate(qty=Sum('quantity'), revenue=Sum('subtotal'))
         .order_by('-revenue')[:10]
     )
@@ -2280,7 +2273,7 @@ def sales_report(request):
     category_revenue = (
         OrderItem.objects
         .filter(order__approved_at__gte=since, order__status__in=['approved', 'delivered'])
-        .values('product__category__name')
+        .values('product__category')
         .annotate(revenue=Sum('subtotal'), qty=Sum('quantity'))
         .order_by('-revenue')
     )

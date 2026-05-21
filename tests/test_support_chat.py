@@ -38,8 +38,6 @@ class TestChatCrypto:
 class TestSupportMessageModel:
     def _make_complaint(self):
         from admins.models import Order, Complaint
-        from customers.models import Category
-        Category.objects.get_or_create(name='Chat Test Cat')
         customer = User.objects.create_user(
             username='chatcust', email='chatcust@t.com', password='pass', role='customer'
         )

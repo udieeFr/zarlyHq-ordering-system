@@ -189,6 +189,8 @@ def remake_order(original_order, resolved_by, request=None):
             order=new_order,
             product=item.product,
             quantity=item.quantity,
+            unit_price=item.unit_price,
+            is_bundle=item.is_bundle,
             subtotal=item.subtotal,
         )
 

@@ -130,7 +130,7 @@
                                 <span>{{ item.product.name }}</span>
                                 <span class="text-muted">x{{ item.quantity }}</span>
                             </div>
-                            <div class="small text-muted">RM {{ item.product.price }} each — RM {{ item.subtotal }}</div>
+                            <div class="small text-muted">RM {{ item.unit_price }} each{% if item.is_bundle %} (Bundle){% endif %} — RM {{ item.subtotal }}</div>
                         </li>
                         {% empty %}
                         <li class="list-group-item px-0 py-2 text-muted">No items found for this order.</li>

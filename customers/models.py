@@ -28,12 +28,6 @@ class User(AbstractUser):
         """Check if user is a customer"""
         return self.role == 'customer'
 
-class Category(models.Model):
-    name = models.CharField(max_length=100)
-
-    def __str__(self):
-        return self.name
-
 class Allergy(models.Model):
     name = models.CharField(max_length=100)
 
@@ -42,13 +36,27 @@ class Allergy(models.Model):
 
 class Product(models.Model):
     name = models.CharField(max_length=200)
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name='products')
+    category = models.CharField(max_length=100, blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     weight_grams = models.IntegerField(default=0)
     stock = models.IntegerField(default=0)
     image = models.ImageField(upload_to='products/', null=True, blank=True)
     is_available = models.BooleanField(default=True, db_index=True)
     allergies = models.ManyToManyField(Allergy, blank=True)
+
+    bundle_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    bundle_quantity = models.IntegerField(null=True, blank=True)
+    bundle_weight_grams = models.IntegerField(null=True, blank=True)
+
+    @property
+    def has_bundle(self):
+        return self.bundle_price is not None
+
+    @staticmethod
+    def format_weight(grams):
+        if not grams:
+            return None
+        return f"{grams // 1000}kg" if grams >= 1000 else f"{grams}g"
 
     def __str__(self):
         return self.name

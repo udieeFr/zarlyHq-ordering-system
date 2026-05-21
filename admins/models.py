@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.utils import timezone
 from customers.models import User, Product
@@ -47,6 +48,8 @@ class Order(models.Model):
                                              related_name='delivery_assigned_orders', limit_choices_to={'role__in': ['sales_admin', 'manager']})
     delivered_at = models.DateTimeField(null=True, blank=True)
 
+    internal_note = models.TextField(blank=True, default='')
+
     # Walk-in / manually-created orders
     is_walk_in = models.BooleanField(default=False)
 
@@ -94,18 +97,21 @@ class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
     quantity = models.PositiveIntegerField()
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    is_bundle = models.BooleanField(default=False)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
 
     def save(self, *args, **kwargs):
-        self.subtotal = self.product.price * self.quantity
+        self.subtotal = self.unit_price * self.quantity
         super().save(*args, **kwargs)
 
 class DigitalSignature(models.Model):
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='digital_signature')
-    signature_hash = models.CharField(max_length=64)  
-    pdf_path = models.FileField(upload_to='signed_pdfs/') 
+    signature_hash = models.CharField(max_length=64)
+    pdf_path = models.FileField(upload_to='signed_pdfs/')
     timestamp = models.DateTimeField(auto_now_add=True)
     signature_value = models.TextField(blank=True, default='')
+    verify_token = models.UUIDField(default=uuid.uuid4, unique=True)
 
 
 def upload_payment_proof_to(instance, filename):
@@ -438,6 +444,14 @@ class AuditLog(models.Model):
         ('product_edited', 'Product Edited'),
         ('product_deleted', 'Product Deleted'),
         ('product_availability_toggled', 'Product Availability Toggled'),
+        ('customer_signup', 'Customer Signup'),
+        ('email_verified', 'Email Verified'),
+        ('password_reset', 'Password Reset via OTP'),
+        ('account_deleted', 'Account Self-Deleted'),
+        ('login_rate_limited', 'Login Rate Limited'),
+        ('order_approved_unpaid', 'Order Approved (Collect on Delivery)'),
+        ('campaign_sent', 'Campaign Sent'),
+        ('email_template_created', 'Email Template Created'),
     )
 
     actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,

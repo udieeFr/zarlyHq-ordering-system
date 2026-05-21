@@ -162,7 +162,7 @@
           {% for p in top_products %}
           <tr>
             <td style="font-weight:700;">{{ p.product__name }}</td>
-            <td style="color:oklch(48% 0.06 54);font-size:.78rem;">{{ p.product__category__name }}</td>
+            <td style="color:oklch(48% 0.06 54);font-size:.78rem;">{{ p.product__category }}</td>
             <td style="text-align:right;">{{ p.qty }}</td>
             <td style="text-align:right;font-weight:700;color:#ff9933;">RM {{ p.revenue|floatformat:2 }}</td>
           </tr>
@@ -255,7 +255,7 @@ new Chart(document.getElementById('revenueChart'), {
   }
 });
 
-const catLabels = [{% for c in category_revenue %}"{{ c.product__category__name }}"{% if not forloop.last %},{% endif %}{% endfor %}];
+const catLabels = [{% for c in category_revenue %}"{{ c.product__category }}"{% if not forloop.last %},{% endif %}{% endfor %}];
 const catRevenue = [{% for c in category_revenue %}{{ c.revenue|floatformat:2 }}{% if not forloop.last %},{% endif %}{% endfor %}];
 new Chart(document.getElementById('categoryChart'), {
   type: 'doughnut',

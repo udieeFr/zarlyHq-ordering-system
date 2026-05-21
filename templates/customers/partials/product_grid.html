@@ -27,7 +27,7 @@
         </div>
       {% endif %}
       {% if p.category %}
-        <span class="pcard-cat">{{ p.category.name|slice:":1"|upper }}</span>
+        <span class="pcard-cat">{{ p.category|slice:":1"|upper }}</span>
       {% endif %}
       {% if request.user.is_authenticated %}
         <button class="pcard-fav {% if p.id in favourite_ids %}pcard-fav-on{% endif %}"
@@ -56,13 +56,41 @@
       {% if p.stock > 0 and p.stock <= 5 %}
         <div class="pcard-meta">Only {{ p.stock }} left</div>
       {% endif %}
+
+      <div class="pcard-toggle-area">
+        {% if p.has_bundle %}
+        <div class="pcard-variant-toggle" role="group" aria-label="Choose size">
+          <button type="button" class="pv-btn pv-btn-active"
+                  data-variant="retail"
+                  data-product-id="{{ p.id }}"
+                  data-price="RM {{ p.price }}"
+                  aria-pressed="true">
+            Peket
+            {% if p.weight_grams %}<span class="pv-weight">{{ p.weight_grams }}g</span>{% endif %}
+          </button>
+          <button type="button" class="pv-btn"
+                  data-variant="bundle"
+                  data-product-id="{{ p.id }}"
+                  data-price="RM {{ p.bundle_price }}"
+                  data-bundle-grams="{{ p.bundle_weight_grams|default:0 }}"
+                  data-bundle-qty="{{ p.bundle_quantity|default:0 }}"
+                  aria-pressed="false">
+            Bundle<span class="pv-weight pv-bundle-weight"></span>
+          </button>
+        </div>
+        {% elif p.weight_grams %}
+        <span class="pcard-weight-tag">{{ p.weight_grams }}g</span>
+        {% endif %}
+      </div>
+
       <div class="pcard-foot">
-        <span class="pcard-price">RM {{ p.price }}</span>
+        <span class="pcard-price" data-retail-price="RM {{ p.price }}" data-bundle-price="{% if p.bundle_price %}RM {{ p.bundle_price }}{% endif %}">RM {{ p.price }}</span>
         {% if p.stock > 0 %}
           <form method="post" action="{% url 'add_to_cart' %}" data-cart-form>
             {% csrf_token %}
             <input type="hidden" name="product_id" value="{{ p.id }}">
             <input type="hidden" name="quantity" value="1">
+            <input type="hidden" name="is_bundle" value="0" class="is-bundle-input">
             <button type="submit" class="pcard-add" aria-label="Add {{ p.name }} to cart">+</button>
           </form>
         {% else %}

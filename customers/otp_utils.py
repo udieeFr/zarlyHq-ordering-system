@@ -6,17 +6,23 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-OTP_TTL = 300  # 5 minutes
+OTP_TTL = 300       # 5 minutes
+MAX_ATTEMPTS = 5    # invalidate OTP after this many wrong guesses
 
 
 def _cache_key(user_pk):
     return f'email_otp_{user_pk}'
 
 
+def _attempts_key(user_pk):
+    return f'email_otp_attempts_{user_pk}'
+
+
 def generate_and_cache_otp(user):
     """Generate a cryptographically random 6-digit code and store it in cache."""
     code = f"{secrets.randbelow(1_000_000):06d}"
     cache.set(_cache_key(user.pk), code, OTP_TTL)
+    cache.delete(_attempts_key(user.pk))  # reset attempt counter on new code
     return code
 
 
@@ -24,15 +30,26 @@ def verify_otp(user, submitted_code):
     """
     Check a submitted OTP against the cached value.
     Returns: 'ok' | 'invalid' | 'expired'
-    Deletes the cache entry immediately on correct submission (single-use).
+    Deletes the cache entry on correct submission (single-use) or after MAX_ATTEMPTS.
     """
     key = _cache_key(user.pk)
     stored = cache.get(key)
     if stored is None:
         return 'expired'
+
+    att_key = _attempts_key(user.pk)
+    attempts = (cache.get(att_key) or 0) + 1
+
     if stored != submitted_code:
+        if attempts >= MAX_ATTEMPTS:
+            cache.delete(key)
+            cache.delete(att_key)
+            return 'expired'
+        cache.set(att_key, attempts, OTP_TTL)
         return 'invalid'
+
     cache.delete(key)
+    cache.delete(att_key)
     return 'ok'
 
 
@@ -79,10 +96,15 @@ def _signup_cache_key(email):
     return f'signup_otp:{email}'
 
 
+def _signup_attempts_key(email):
+    return f'signup_otp_attempts:{email}'
+
+
 def generate_and_cache_signup_otp(email):
     """Generate a 6-digit OTP cached by email address (no user required)."""
     code = f"{secrets.randbelow(1_000_000):06d}"
     cache.set(_signup_cache_key(email), code, OTP_TTL)
+    cache.delete(_signup_attempts_key(email))
     return code
 
 
@@ -90,15 +112,26 @@ def verify_signup_otp(email, submitted_code):
     """
     Verify a signup OTP keyed by email.
     Returns: 'ok' | 'invalid' | 'expired'
-    Deletes cache on correct submission.
+    Deletes cache on correct submission or after MAX_ATTEMPTS.
     """
     key = _signup_cache_key(email)
     stored = cache.get(key)
     if stored is None:
         return 'expired'
+
+    att_key = _signup_attempts_key(email)
+    attempts = (cache.get(att_key) or 0) + 1
+
     if stored != submitted_code:
+        if attempts >= MAX_ATTEMPTS:
+            cache.delete(key)
+            cache.delete(att_key)
+            return 'expired'
+        cache.set(att_key, attempts, OTP_TTL)
         return 'invalid'
+
     cache.delete(key)
+    cache.delete(att_key)
     return 'ok'
 
 

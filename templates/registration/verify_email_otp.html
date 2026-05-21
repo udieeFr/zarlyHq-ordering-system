@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block page_title %}Verify Your Email — Zarly BigFood{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center min-vh-100 align-items-center">
+    <div class="col-md-5">
+
+      <div class="card border-0 verify-card">
+        <div class="card-body p-5">
+
+          <!-- Header -->
+          <div class="text-center mb-4">
+            <div class="verify-icon-wrap">✉️</div>
+            <h2 class="fw-bold mb-1" style="letter-spacing:-0.02em;">Check your inbox</h2>
+            <p class="text-muted mb-0" style="font-size:0.875rem;">
+              {% if context == 'checkout' %}
+                Verify your email to place orders
+              {% elif context == 'email_change' %}
+                Verify your new email address
+              {% else %}
+                Confirm your email address to continue
+              {% endif %}
+            </p>
+          </div>
+
+          <!-- Messages -->
+          {% if messages %}
+          {% for message in messages %}
+          <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% else %}info{% endif %} alert-dismissible fade show py-2" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+          {% endfor %}
+          {% endif %}
+
+          <!-- Info strip -->
+          <div class="email-strip mb-4">
+            <span style="font-size:1.1rem;">📨</span>
+            <span>Code sent to <strong>{{ masked_email }}</strong></span>
+          </div>
+
+          <!-- OTP form -->
+          <form method="post" autocomplete="off">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="verify">
+
+            <div class="mb-4">
+              <label for="otp" class="form-label fw-bold small">6-digit code</label>
+              <input type="text" id="otp" name="otp"
+                     class="form-control otp-input"
+                     maxlength="6" pattern="\d{6}"
+                     placeholder="000000"
+                     autocomplete="one-time-code"
+                     inputmode="numeric"
+                     autofocus required>
+              <div class="form-text text-muted mt-1" style="font-size:0.78rem;">
+                The code expires in 5 minutes.
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold mb-3">
+              Verify Email
+            </button>
+          </form>
+
+          <!-- Resend -->
+          <form method="post" class="mb-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="resend">
+            <button type="submit" class="btn btn-outline-secondary w-100 py-2 fw-semibold">
+              Resend Code
+            </button>
+          </form>
+
+          {% if can_skip %}
+          <!-- Skip (signup only) -->
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="skip">
+            <button type="submit" class="btn btn-link w-100 text-muted py-1"
+                    style="font-size:0.82rem;">
+              Skip for now — I'll verify later
+            </button>
+          </form>
+          <p class="text-muted text-center mt-2" style="font-size:0.75rem;">
+            You'll need to verify before placing your first order.
+          </p>
+          {% endif %}
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<style>
+  body { background: linear-gradient(135deg, #fff7ed 0%, #f8fafc 60%, #fff7ed 100%); }
+
+  .verify-card {
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 20px 50px rgb(0 0 0 / 0.08);
+  }
+
+  .verify-icon-wrap {
+    width: 64px; height: 64px;
+    background: linear-gradient(135deg, #ff9933, #e07e1e);
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.75rem;
+    margin: 0 auto 1rem;
+    box-shadow: 0 8px 20px rgba(255, 153, 51, 0.3);
+  }
+
+  .email-strip {
+    background: #fff7ed;
+    border: 1.5px solid #fed7aa;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    display: flex; align-items: center; gap: 0.6rem;
+    font-size: 0.88rem; color: #92400e;
+  }
+
+  .otp-input {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: 0.4em;
+    text-align: center;
+    font-family: 'Courier New', monospace;
+    border-radius: 10px;
+    border: 2px solid #e2e8f0;
+    padding: 0.75rem 1rem;
+  }
+  .otp-input:focus {
+    border-color: #ff9933;
+    box-shadow: 0 0 0 3px rgba(255, 153, 51, 0.18);
+    outline: none;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #ff9933, #e07e1e);
+    border: none; font-weight: 700;
+    box-shadow: 0 4px 14px rgba(255, 153, 51, 0.35);
+    border-radius: 8px;
+  }
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #e07e1e, #c96d10);
+    transform: translateY(-1px);
+  }
+
+  .btn-outline-secondary {
+    border: 1.5px solid #e2e8f0; color: #334155;
+    font-weight: 600; background: #fff;
+    border-radius: 8px;
+  }
+  .btn-outline-secondary:hover {
+    background: #f8fafc; border-color: #ff9933; color: #ff9933;
+  }
+</style>
+{% endblock %}

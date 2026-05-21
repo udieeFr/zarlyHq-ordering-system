@@ -17,23 +17,31 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.shortcuts import redirect, render
+from django.http import HttpResponse
 from admins.views import unified_login, logout_view, dashboard_home, admin_login, customer_login, custom_login
-from customers.views import stripe_webhook, home as customer_home_view, customer_signup
+from customers.views import stripe_webhook, home as customer_home_view, customer_signup, request_password_reset, verify_password_reset
 from django.conf import settings
 from django.conf.urls.static import static
 
 
+def _safe_render(request, template, status):
+    try:
+        return render(request, template, status=status)
+    except Exception:
+        return HttpResponse(f'Error {status}', status=status, content_type='text/plain')
+
+
 def error_400(request, exception=None):
-    return render(request, 'error_pages/400.html', status=400)
+    return _safe_render(request, 'error_pages/400.html', 400)
 
 def error_403(request, exception=None):
-    return render(request, 'error_pages/403.html', status=403)
+    return _safe_render(request, 'error_pages/403.html', 403)
 
 def error_404(request, exception=None):
-    return render(request, 'error_pages/404.html', status=404)
+    return _safe_render(request, 'error_pages/404.html', 404)
 
 def error_500(request):
-    return render(request, 'error_pages/500.html', status=500)
+    return _safe_render(request, 'error_pages/500.html', 500)
 
 handler400 = error_400
 handler403 = error_403
@@ -43,11 +51,12 @@ handler500 = error_500
 def home_redirect(request):
     """Redirect based on user role after accessing root"""
     if request.user.is_authenticated:
-        if request.user.role == 'customer':
+        role = getattr(request.user, 'role', None)
+        if role == 'customer':
             return redirect('customer_home')
-        elif request.user.role == 'manager' or request.user.is_superuser:
+        elif role == 'manager' or request.user.is_superuser:
             return redirect('manager_analytics_view')
-        elif request.user.role == 'sales_admin':
+        elif role == 'sales_admin':
             return redirect('sales_admin_dashboard')
         else:
             return redirect('customer_home')
@@ -69,6 +78,10 @@ urlpatterns = [
 
     # Customer landing page (public)
     path('start/', customer_home_view, name='customer_home'),
+
+    # Password reset (public — no login required)
+    path('password-reset/', request_password_reset, name='request_password_reset'),
+    path('password-reset/verify/', verify_password_reset, name='verify_password_reset'),
     
     # Legacy login URLs (kept for backwards compatibility)
     path('login/admin/', admin_login, name='admin_login'),

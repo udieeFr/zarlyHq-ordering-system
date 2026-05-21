@@ -12,7 +12,7 @@ import threading
 import pytest
 from decimal import Decimal
 from django.contrib.auth import get_user_model
-from customers.models import Product, Category
+from customers.models import Product
 from customers.views import _create_order_atomic
 from admins.models import Order, OrderItem
 
@@ -37,10 +37,9 @@ def customer(db):
 
 @pytest.fixture
 def product(db):
-    cat = Category.objects.create(name='Race Category')
     return Product.objects.create(
         name='Last Nasi Lemak',
-        category=cat,
+        category='Race Category',
         price=Decimal('12.00'),
         stock=5,
     )
@@ -176,10 +175,9 @@ class TestConcurrentOrders:
         Two threads both try to buy the last unit at the same time.
         SELECT FOR UPDATE ensures only one wins; the other gets ValueError.
         """
-        cat = Category.objects.create(name='Concurrent Cat')
         product = Product.objects.create(
             name='Limited Item',
-            category=cat,
+            category='Concurrent Cat',
             price=Decimal('10.00'),
             stock=1,
         )
@@ -219,10 +217,9 @@ class TestConcurrentOrders:
         """
         Three threads compete for 2 units. Stock must never go below 0.
         """
-        cat = Category.objects.create(name='Concurrent Cat 2')
         product = Product.objects.create(
             name='Scarce Item',
-            category=cat,
+            category='Concurrent Cat 2',
             price=Decimal('20.00'),
             stock=2,
         )

@@ -94,6 +94,21 @@
 .crt-unit {
   font-size: 0.75rem;
   color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.crt-bundle-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ff9933;
+  background: oklch(70% 0.18 55 / 0.12);
+  border: 1px solid oklch(70% 0.18 55 / 0.25);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
 }
 
 /* Stepper */
@@ -326,22 +341,24 @@
       <!-- Info -->
       <div class="crt-info">
         <div class="crt-name">{{ item.product.name }}</div>
-        <div class="crt-unit">RM {{ item.product.price }} each</div>
+        <div class="crt-unit">
+          RM {{ item.unit_price }} each
+          {% if item.is_bundle %}<span class="crt-bundle-badge">Bundle</span>{% endif %}
+        </div>
       </div>
 
       <!-- Stepper -->
-      <form method="post" action="{% url 'update_cart' %}" id="form-{{ item.product.id }}">
+      <form method="post" action="{% url 'update_cart' %}" id="form-{{ item.cart_key }}">
         {% csrf_token %}
-        <input type="hidden" name="product_id" value="{{ item.product.id }}">
-        <input type="hidden" name="quantity" id="qty-{{ item.product.id }}" value="{{ item.quantity }}">
+        <input type="hidden" name="cart_key" value="{{ item.cart_key }}">
+        <input type="hidden" name="quantity" id="qty-{{ item.cart_key }}" value="{{ item.quantity }}">
         <div class="crt-stepper">
-          <button type="button" class="crt-step-btn"
-                  data-minus="{{ item.product.id }}"
-                  onclick="changeQty('{{ item.product.id }}', -1, {{ item.product.stock }})"
+          <button type="button" class="crt-step-btn crt-minus"
+                  data-key="{{ item.cart_key }}" data-stock="{{ item.product.stock }}"
                   {% if item.quantity <= 1 %}disabled{% endif %}>−</button>
-          <span class="crt-step-num" id="display-{{ item.product.id }}">{{ item.quantity }}</span>
-          <button type="button" class="crt-step-btn"
-                  onclick="changeQty('{{ item.product.id }}', +1, {{ item.product.stock }})">+</button>
+          <span class="crt-step-num" id="display-{{ item.cart_key }}">{{ item.quantity }}</span>
+          <button type="button" class="crt-step-btn crt-plus"
+                  data-key="{{ item.cart_key }}" data-stock="{{ item.product.stock }}">+</button>
         </div>
       </form>
 
@@ -351,7 +368,7 @@
       <!-- Remove -->
       <form method="post" action="{% url 'remove_from_cart' %}">
         {% csrf_token %}
-        <input type="hidden" name="product_id" value="{{ item.product.id }}">
+        <input type="hidden" name="cart_key" value="{{ item.cart_key }}">
         <button type="submit" class="crt-remove" aria-label="Remove {{ item.product.name }}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true">
@@ -407,10 +424,10 @@
 </div>
 
 <script nonce="{{ request.csp_nonce }}">
-function changeQty(productId, delta, maxStock) {
-  var hidden   = document.getElementById('qty-' + productId);
-  var display  = document.getElementById('display-' + productId);
-  var minusBtn = document.querySelector('[data-minus="' + productId + '"]');
+function changeQty(key, delta, maxStock) {
+  var hidden   = document.getElementById('qty-' + key);
+  var display  = document.getElementById('display-' + key);
+  var minusBtn = document.querySelector('.crt-minus[data-key="' + key + '"]');
   var current  = parseInt(hidden.value);
   var next     = current + delta;
 
@@ -421,10 +438,19 @@ function changeQty(productId, delta, maxStock) {
   display.textContent = next;
   if (minusBtn) minusBtn.disabled = (next <= 1);
 
-  clearTimeout(window['_qt_' + productId]);
-  window['_qt_' + productId] = setTimeout(function() {
-    document.getElementById('form-' + productId).submit();
+  clearTimeout(window['_qt_' + key]);
+  window['_qt_' + key] = setTimeout(function() {
+    document.getElementById('form-' + key).submit();
   }, 600);
 }
+
+document.querySelectorAll('.crt-minus, .crt-plus').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var key   = btn.dataset.key;
+    var stock = parseInt(btn.dataset.stock);
+    var delta = btn.classList.contains('crt-minus') ? -1 : +1;
+    changeQty(key, delta, stock);
+  });
+});
 </script>
 {% endblock %}

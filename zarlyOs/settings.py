@@ -29,7 +29,13 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 
 DEBUG = os.getenv('DEBUG') == 'True'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', 'localhost').split(',') if h.strip()]
+
+CSRF_TRUSTED_ORIGINS = [
+    f'https://{h}' for h in ALLOWED_HOSTS if not h.startswith('.')
+] + [
+    f'http://{h}' for h in ALLOWED_HOSTS if not h.startswith('.')
+]
 
 
 # Application definition

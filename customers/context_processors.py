@@ -3,7 +3,7 @@ from customers.models import Product
 
 
 def cart_context(request):
-    if not request.user.is_authenticated or getattr(request.user, 'role', None) != 'customer':
+    if not hasattr(request, 'user') or not request.user.is_authenticated or getattr(request.user, 'role', None) != 'customer':
         return {}
 
     cart = request.session.get('cart', {})

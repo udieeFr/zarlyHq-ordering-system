@@ -1,0 +1,59 @@
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('admins', '0028_email_verification_audit_actions'),
+    ]
+
+    operations = [
+        migrations.AlterField(
+            model_name='auditlog',
+            name='action_type',
+            field=models.CharField(
+                choices=[
+                    ('order_created', 'Order Created'),
+                    ('order_approved', 'Order Approved'),
+                    ('order_rejected', 'Order Rejected'),
+                    ('order_prepared', 'Order Prepared'),
+                    ('order_ready_for_delivery', 'Marked Ready for Delivery'),
+                    ('order_out_for_delivery', 'Marked Out for Delivery'),
+                    ('order_delivered', 'Order Delivered'),
+                    ('payment_initiated', 'Payment Initiated'),
+                    ('payment_verified', 'Payment Verified'),
+                    ('payment_rejected', 'Payment Rejected'),
+                    ('payment_proof_uploaded', 'Payment Proof Uploaded'),
+                    ('signature_created', 'Digital Signature Created'),
+                    ('receipt_verified', 'Receipt Verification Performed'),
+                    ('complaint_submitted', 'Complaint Submitted'),
+                    ('complaint_resolved', 'Complaint Resolved'),
+                    ('login_success', 'Login Success'),
+                    ('login_failed', 'Login Failed'),
+                    ('logout', 'Logout'),
+                    ('tracking_updated', 'Tracking Number Updated'),
+                    ('inventory_updated', 'Inventory Updated'),
+                    ('product_added', 'Product Added'),
+                    ('refund_issued', 'Refund Issued'),
+                    ('refund_failed', 'Refund Failed'),
+                    ('refund_manual', 'Manual Refund Flagged'),
+                    ('refund_processed', 'Manual Refund Processed'),
+                    ('order_cancelled', 'Order Cancelled by Customer'),
+                    ('support_message_sent', 'Support Message Sent'),
+                    ('product_edited', 'Product Edited'),
+                    ('product_deleted', 'Product Deleted'),
+                    ('product_availability_toggled', 'Product Availability Toggled'),
+                    ('customer_signup', 'Customer Signup'),
+                    ('email_verified', 'Email Verified'),
+                    ('password_reset', 'Password Reset via OTP'),
+                    ('account_deleted', 'Account Self-Deleted'),
+                    ('login_rate_limited', 'Login Rate Limited'),
+                    ('order_approved_unpaid', 'Order Approved (Collect on Delivery)'),
+                    ('campaign_sent', 'Campaign Sent'),
+                    ('email_template_created', 'Email Template Created'),
+                ],
+                db_index=True,
+                max_length=50,
+            ),
+        ),
+    ]

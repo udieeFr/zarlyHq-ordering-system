@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block page_title %}Delete Account — Zarly BigFood{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+
+      {% if messages %}
+      {% for message in messages %}
+      <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% else %}info{% endif %} alert-dismissible fade show mb-3" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      {% if not show_otp_form %}
+      <!-- Step 1: Confirmation -->
+      <div class="card border-0 delete-card">
+        <div class="card-body p-5">
+          <div class="text-center mb-4">
+            <div class="delete-icon-wrap">⚠️</div>
+            <h2 class="fw-bold mb-1" style="letter-spacing:-0.02em;color:#dc2626;">Delete Account</h2>
+            <p class="text-muted mb-0" style="font-size:0.875rem;">This action is permanent and cannot be undone</p>
+          </div>
+
+          <div class="warning-box mb-4">
+            <p class="mb-2 fw-semibold" style="font-size:0.88rem;">Deleting your account will permanently remove:</p>
+            <ul class="mb-0" style="font-size:0.85rem; color:#64748b; padding-left:1.25rem;">
+              <li>Your profile and login access</li>
+              <li>Order history and receipts</li>
+              <li>Favourites and preferences</li>
+              <li>Loyalty tier and points</li>
+            </ul>
+          </div>
+
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="send_otp">
+            <button type="submit" class="btn btn-danger w-100 py-2 fw-bold mb-3">
+              Send Confirmation Code
+            </button>
+          </form>
+
+          <a href="{% url 'customer_profile' %}" class="btn btn-outline-secondary w-100 py-2 fw-semibold">
+            Cancel — Keep My Account
+          </a>
+        </div>
+      </div>
+
+      {% else %}
+      <!-- Step 2: OTP confirmation -->
+      <div class="card border-0 delete-card">
+        <div class="card-body p-5">
+          <div class="text-center mb-4">
+            <div class="delete-icon-wrap">🔐</div>
+            <h2 class="fw-bold mb-1" style="letter-spacing:-0.02em;">Confirm deletion</h2>
+            <p class="text-muted mb-0" style="font-size:0.875rem;">
+              A confirmation code was sent to <strong>{{ masked_email }}</strong>
+            </p>
+          </div>
+
+          <form method="post" autocomplete="off">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="confirm_delete">
+
+            <div class="mb-4">
+              <label for="otp" class="form-label fw-bold small">6-digit confirmation code</label>
+              <input type="text" id="otp" name="otp"
+                     class="form-control otp-input"
+                     maxlength="6" pattern="\d{6}"
+                     placeholder="000000"
+                     autocomplete="one-time-code"
+                     inputmode="numeric"
+                     autofocus required>
+            </div>
+
+            <button type="submit" class="btn btn-danger w-100 py-2 fw-bold mb-3">
+              Permanently Delete My Account
+            </button>
+          </form>
+
+          <a href="{% url 'customer_profile' %}" class="btn btn-outline-secondary w-100 py-2 fw-semibold">
+            Cancel — Keep My Account
+          </a>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+
+<style>
+  body { background: linear-gradient(135deg, #fff7ed 0%, #f8fafc 60%, #fff7ed 100%); }
+
+  .delete-card {
+    border-radius: 16px;
+    border: 1px solid #fecaca;
+    box-shadow: 0 20px 50px rgb(0 0 0 / 0.08);
+  }
+
+  .delete-icon-wrap {
+    width: 64px; height: 64px;
+    background: linear-gradient(135deg, #fee2e2, #fecaca);
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.75rem;
+    margin: 0 auto 1rem;
+  }
+
+  .warning-box {
+    background: #fff7ed;
+    border: 1.5px solid #fed7aa;
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+  }
+
+  .otp-input {
+    font-size: 2rem; font-weight: 800;
+    letter-spacing: 0.4em; text-align: center;
+    font-family: 'Courier New', monospace;
+    border-radius: 10px; border: 2px solid #e2e8f0;
+    padding: 0.75rem 1rem;
+  }
+  .otp-input:focus {
+    border-color: #dc2626;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+    outline: none;
+  }
+
+  .btn-danger {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    border: none; font-weight: 700;
+    box-shadow: 0 4px 14px rgba(220, 38, 38, 0.3);
+    border-radius: 8px;
+  }
+  .btn-danger:hover {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    transform: translateY(-1px);
+  }
+
+  .btn-outline-secondary {
+    border: 1.5px solid #e2e8f0; color: #334155;
+    font-weight: 600; background: #fff;
+    border-radius: 8px;
+  }
+  .btn-outline-secondary:hover {
+    background: #f8fafc; border-color: #94a3b8; color: #334155;
+  }
+</style>
+{% endblock %}

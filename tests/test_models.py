@@ -8,7 +8,7 @@ Real-world: Models are the foundation of your app - if they're broken, everythin
 import pytest
 from django.contrib.auth import get_user_model
 from admins.models import Order, DigitalSignature
-from customers.models import Product, Category
+from customers.models import Product
 
 User = get_user_model()
 
@@ -173,10 +173,9 @@ class TestProductModel:
     
     def test_product_availability_tracking(self):
         """WHAT: Test that stock levels can be tracked and updated"""
-        category = Category.objects.create(name='Limited Items')
         product = Product.objects.create(
             name='Limited Item',
-            category=category,
+            category='Limited Items',
             price=100.00,
             weight_grams=250,
             stock=0  # Out of stock

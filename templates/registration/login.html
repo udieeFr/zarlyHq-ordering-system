@@ -60,9 +60,14 @@
                         </div>
 
                         <!-- Submit Button -->
-                        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold mb-3">
+                        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold mb-2">
                             <span>Sign In</span>
                         </button>
+                        <div class="text-end mb-1">
+                            <a href="{% url 'request_password_reset' %}" class="text-decoration-none" style="font-size:0.8rem;color:#ff9933;">
+                                Forgot password?
+                            </a>
+                        </div>
                     </form>
 
                     <!-- Divider -->

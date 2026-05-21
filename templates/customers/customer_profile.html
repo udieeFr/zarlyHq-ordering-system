@@ -107,6 +107,22 @@
     <p style="color:var(--muted);font-size:.9rem;">Update your account details and preferences.</p>
   </div>
 
+  {% if not request.user.email_verified %}
+  <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+    <div>
+      <p style="margin:0;font-size:.875rem;font-weight:700;color:#92400e;">Email not verified</p>
+      <p style="margin:0;font-size:.8rem;color:#b45309;">You'll need to verify your email before you can place orders.</p>
+    </div>
+    <form method="post" action="{% url 'send_verification_otp' %}">
+      {% csrf_token %}
+      <input type="hidden" name="context" value="profile">
+      <button type="submit" style="background:linear-gradient(135deg,#ff9933,#e07e1e);border:none;color:#fff;font-size:.8rem;font-weight:700;padding:.45rem 1rem;border-radius:8px;cursor:pointer;white-space:nowrap;">
+        Verify Email
+      </button>
+    </form>
+  </div>
+  {% endif %}
+
   <div class="row g-3">
 
     <!-- Left: identity + forms -->
@@ -234,6 +250,22 @@
               <button type="button" class="btn btn-sm btn-outline-secondary" style="font-size:.82rem;" onclick="togglePw()">Cancel</button>
             </div>
           </form>
+        </div>
+      </div>
+
+      <!-- Danger Zone -->
+      <div class="cp-panel" style="border-color:#fecaca;">
+        <div class="cp-panel-header" style="border-color:#fecaca;">
+          <span class="cp-panel-title" style="color:#dc2626;">Danger Zone</span>
+        </div>
+        <div class="cp-panel-body" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+          <div>
+            <p style="margin:0;font-size:.85rem;font-weight:600;color:var(--dark);">Delete account</p>
+            <p style="margin:0;font-size:.78rem;color:var(--muted);">Permanently remove your account and all data.</p>
+          </div>
+          <a href="{% url 'delete_account' %}" class="btn btn-sm btn-outline-danger" style="font-size:.8rem;font-weight:600;white-space:nowrap;">
+            Delete Account
+          </a>
         </div>
       </div>
 

@@ -17,7 +17,7 @@ django.setup()
 import pytest
 from django.contrib.auth import get_user_model
 from admins.models import Order, DigitalSignature
-from customers.models import Product, Category
+from customers.models import Product
 
 User = get_user_model()
 
@@ -94,10 +94,9 @@ def test_product():
     
     Returns: Product object
     """
-    category = Category.objects.create(name='Test Category')
     product = Product.objects.create(
         name='Test Product',
-        category=category,
+        category='Test Category',
         price=50.00,
         weight_grams=500,
         stock=10

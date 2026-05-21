@@ -161,12 +161,11 @@ class TestCartQuantityGuard:
 
     @pytest.fixture(autouse=True)
     def setup(self):
-        from customers.models import Product, Category
+        from customers.models import Product
         self.client = Client()
         self.customer = make_user('qty_cust', 'customer')
-        cat, _ = Category.objects.get_or_create(name='Test')
         self.product = Product.objects.create(
-            name='Test Item', category=cat, price=10, stock=50
+            name='Test Item', category='Test', price=10, stock=50
         )
 
     def test_non_integer_quantity_add_to_cart_returns_200(self):

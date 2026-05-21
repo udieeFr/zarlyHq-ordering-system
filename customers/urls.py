@@ -60,5 +60,10 @@ urlpatterns = [
     path('order/<int:order_id>/rate/', views.rate_order, name='rate_order'),
     path('product/<int:product_id>/review/', views.submit_product_review, name='submit_product_review'),
 
+    # Email Verification
+    path('verify-email/', views.verify_email, name='verify_email'),
+    path('send-verification/', views.send_verification_otp, name='send_verification_otp'),
 
+    # Account Deletion
+    path('account/delete/', views.delete_account, name='delete_account'),
 ]

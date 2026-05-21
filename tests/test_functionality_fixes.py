@@ -37,9 +37,8 @@ def make_delivered_order(customer):
 
 
 def make_product(name='Test Burger', price='10.00', stock=50):
-    from customers.models import Product, Category
-    cat, _ = Category.objects.get_or_create(name='Test')
-    return Product.objects.create(name=name, category=cat, price=Decimal(price), stock=stock)
+    from customers.models import Product
+    return Product.objects.create(name=name, category='Test', price=Decimal(price), stock=stock)
 
 
 # ── FUNC 1 — Cart persistence on login ────────────────────────────────────────

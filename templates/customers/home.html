@@ -488,7 +488,7 @@
       </div>
       <div class="lp-card-body">
         {% if product.category %}
-        <div class="lp-card-cat">{{ product.category.name }}</div>
+        <div class="lp-card-cat">{{ product.category }}</div>
         {% endif %}
         <div class="lp-card-name">{{ product.name }}</div>
         <div class="lp-card-price">RM {{ product.price|floatformat:2 }}</div>

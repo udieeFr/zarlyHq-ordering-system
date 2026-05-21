@@ -8,7 +8,7 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
-from .models import Product, Category, Allergy, Favourite, OrderRating, ProductReview, User
+from .models import Product, Allergy, Favourite, OrderRating, ProductReview, User
 from admins.models import Order, OrderItem, Complaint, Payment, DigitalSignature
 from admins.utils import generate_invoice_pdf  # The PDF generation engine
 from admins.notifications import log_audit, notify, notify_admins
@@ -62,6 +62,15 @@ def customer_signup(request):
         if errors:
             return render(request, 'registration/signup.html', {'errors': errors, 'username': username, 'email': email})
 
+        # Django built-in password validation (common passwords, complexity, etc.)
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        try:
+            validate_password(password)
+        except DjangoValidationError as e:
+            errors['password'] = ' '.join(e.messages)
+            return render(request, 'registration/signup.html', {'errors': errors, 'username': username, 'email': email})
+
         # Create user with customer role
         user = User.objects.create_user(
             username=username,
@@ -70,12 +79,16 @@ def customer_signup(request):
             role='customer'
         )
 
-        # Log the signup
+        # Auto-login, then prompt for email verification (skippable)
+        from django.contrib.auth import login as auth_login
+        from .otp_utils import generate_and_cache_otp, send_verification_email
+        auth_login(request, user)
+        otp = generate_and_cache_otp(user)
+        send_verification_email(user, otp)
+        request.session['verification_context'] = 'signup'
         log_audit(request, 'customer_signup', target=user,
                   description=f"New customer registered: {user.username}", actor=user)
-
-        messages.success(request, f"Account created! Welcome, {username}. You can now log in.")
-        return redirect('login')
+        return redirect('verify_email')
 
     return render(request, 'registration/signup.html')
 
@@ -84,35 +97,46 @@ def get_cart_from_session(request):
     Retrieves the cart from the session, calculates subtotals and totals,
     and cleans up any 'ghost products' that no longer exist in the database.
     Uses a single batch query instead of one query per cart item.
+
+    Cart keys: "<product_id>" for retail, "<product_id>_b" for bundle.
     """
     cart = request.session.get('cart', {})
     if not cart:
         return [], Decimal('0.00')
 
-    # Batch-fetch all products in the cart in one query
+    # Extract numeric product IDs from both retail and bundle keys
+    raw_ids = set()
+    for key in cart.keys():
+        raw_ids.add(key.rstrip('_b').split('_b')[0] if key.endswith('_b') else key)
+
     product_map = {
         str(p.id): p
-        for p in Product.objects.filter(id__in=cart.keys())
+        for p in Product.objects.filter(id__in=raw_ids)
     }
 
     cart_items = []
     total_price = Decimal('0.00')
     ids_to_remove = []
 
-    for product_id, quantity in cart.items():
+    for cart_key, quantity in cart.items():
+        is_bundle = cart_key.endswith('_b')
+        product_id = cart_key[:-2] if is_bundle else cart_key
         product = product_map.get(str(product_id))
         if product is None:
-            ids_to_remove.append(product_id)
+            ids_to_remove.append(cart_key)
             continue
-        subtotal = product.price * quantity
+        unit_price = product.bundle_price if is_bundle and product.bundle_price else product.price
+        subtotal = unit_price * quantity
         cart_items.append({
             'product': product,
             'quantity': quantity,
+            'is_bundle': is_bundle,
+            'unit_price': unit_price,
             'subtotal': subtotal,
+            'cart_key': cart_key,
         })
         total_price += subtotal
 
-    # Session cleanup for ghost products (deleted from DB)
     if ids_to_remove:
         for pid in ids_to_remove:
             del cart[pid]
@@ -129,11 +153,11 @@ def product_list(request):
     products = Product.objects.all()
     
     # 1. Filtering Logic
-    cat_id = request.GET.get('category')
+    cat_filter = request.GET.get('category')
     allergy_id = request.GET.get('allergy')
 
-    if cat_id:
-        products = products.filter(category_id=cat_id)
+    if cat_filter:
+        products = products.filter(category=cat_filter)
 
     if allergy_id:
         products = products.exclude(allergies__id=allergy_id)
@@ -177,7 +201,7 @@ def product_list(request):
         'products': product_page,
         'page_obj': product_page,
         'paginator': paginator,
-        'categories': Category.objects.all(),
+        'categories': Product.objects.exclude(category='').values_list('category', flat=True).distinct().order_by('category'),
         'allergies': Allergy.objects.all(),
         'cart_count': cart_count,
         'cart_total': cart_total,
@@ -419,23 +443,31 @@ def add_to_cart(request):
             return redirect('product_list')
 
         product_id = request.POST.get('product_id')
+        is_bundle = request.POST.get('is_bundle') == '1'
         try:
             quantity = max(1, min(int(request.POST.get('quantity', 1)), 99))
         except (TypeError, ValueError):
             quantity = 1
 
         cart = request.session.get('cart', {})
+        cart_key = f'{product_id}_b' if is_bundle else product_id
 
         try:
             product = Product.objects.get(id=product_id)
-            cart[product_id] = cart.get(product_id, 0) + quantity
+            if is_bundle and not product.has_bundle:
+                if is_ajax:
+                    return JsonResponse({'success': False, 'message': 'Bundle not available for this product.'}, status=400)
+                messages.error(request, 'Bundle not available for this product.')
+                return redirect('product_list')
+            cart[cart_key] = cart.get(cart_key, 0) + quantity
             request.session['cart'] = cart
             request.session.modified = True
 
+            label = 'bundle' if is_bundle else 'item'
             if is_ajax:
                 return JsonResponse({
                     'success': True,
-                    'message': f'{product.name} added to cart!',
+                    'message': f'{product.name} ({label}) added to cart!',
                     'cart_count': sum(cart.values()),
                 })
             messages.success(request, f'{product.name} added to cart.')
@@ -469,7 +501,7 @@ def update_cart(request):
             request.session.modified = True
             return redirect('cart')
 
-        product_id = request.POST.get('product_id')
+        cart_key = request.POST.get('cart_key') or request.POST.get('product_id')
         try:
             quantity = max(0, min(int(request.POST.get('quantity', 0)), 99))
         except (TypeError, ValueError):
@@ -478,9 +510,9 @@ def update_cart(request):
         cart = request.session.get('cart', {})
 
         if quantity > 0:
-            cart[product_id] = quantity
+            cart[cart_key] = quantity
         else:
-            cart.pop(product_id, None)
+            cart.pop(cart_key, None)
 
         request.session['cart'] = cart
         request.session.modified = True
@@ -495,11 +527,11 @@ def remove_from_cart(request):
         if getattr(request, 'limited', False):
             messages.error(request, 'Too many requests. Please slow down.')
             return redirect('cart')
-        product_id = request.POST.get('product_id')
+        cart_key = request.POST.get('cart_key') or request.POST.get('product_id')
         cart = request.session.get('cart', {})
-        
-        if product_id in cart:
-            del cart[product_id]
+
+        if cart_key in cart:
+            del cart[cart_key]
             request.session['cart'] = cart
             request.session.modified = True
             messages.success(request, 'Item removed from cart!')
@@ -509,6 +541,14 @@ def remove_from_cart(request):
 @customer_required
 def checkout(request):
     """Display checkout page with auto-fill from last order and profile."""
+    if not request.user.email_verified:
+        from .otp_utils import generate_and_cache_otp, send_verification_email
+        otp = generate_and_cache_otp(request.user)
+        send_verification_email(request.user, otp)
+        request.session['verification_context'] = 'checkout'
+        messages.warning(request, 'Please verify your email address to place orders.')
+        return redirect('verify_email')
+
     cart_items, total_price = get_cart_from_session(request)
     if not cart_items:
         messages.warning(request, 'Your cart is empty!')
@@ -565,6 +605,8 @@ def _create_order_atomic(user, total_price, cart_items, **order_fields):
                 order=order,
                 product=product,
                 quantity=item['quantity'],
+                unit_price=item['unit_price'],
+                is_bundle=item['is_bundle'],
                 subtotal=item['subtotal'],
             )
             product.stock -= item['quantity']
@@ -583,6 +625,9 @@ def submit_order(request):
     if request.method == 'POST':
         if getattr(request, 'limited', False):
             messages.error(request, 'Too many orders submitted. Please wait a moment before trying again.')
+            return redirect('checkout')
+
+        if not request.user.email_verified:
             return redirect('checkout')
 
         # Idempotency guard: one-time key generated on checkout page load, consumed here.
@@ -1167,48 +1212,74 @@ def awaiting_payment_orders(request):
     })
 
 
+@login_required
+def serve_private_media(request, filepath):
+    """Authenticated file serving for private media via nginx X-Accel-Redirect."""
+    allowed_subdirs = {'payment_proofs', 'signed_pdfs', 'complaint_evidence'}
+    parts = filepath.split('/', 1)
+    if len(parts) != 2 or parts[0] not in allowed_subdirs:
+        raise Http404
+    subdir = parts[0]
+
+    if request.user.role in ('sales_admin', 'manager') or request.user.is_superuser:
+        response = HttpResponse()
+        response['X-Accel-Redirect'] = f'/private-media/{filepath}'
+        del response['Content-Type']
+        return response
+
+    # Customers: verify ownership before serving
+    if subdir == 'payment_proofs':
+        get_object_or_404(Payment, proof_image=filepath, order__customer=request.user)
+    elif subdir == 'signed_pdfs':
+        get_object_or_404(DigitalSignature, pdf_path=filepath, order__customer=request.user)
+    elif subdir == 'complaint_evidence':
+        get_object_or_404(Complaint, evidence_image=filepath, customer=request.user)
+
+    response = HttpResponse()
+    response['X-Accel-Redirect'] = f'/private-media/{filepath}'
+    del response['Content-Type']
+    return response
+
+
 @ratelimit(key='ip', rate='20/m', block=False)
-def verify_receipt(request, order_id):
+def verify_receipt(request, token):
     """
     Public receipt verification endpoint — no login required.
     Verifies that the digitally signed PDF for an order is authentic and unmodified.
 
     Non-repudiation check:
-      1. Retrieve the DigitalSignature record (hash + pdf_path stored at signing time).
+      1. Retrieve the DigitalSignature record via its unique verify_token (UUID).
       2. Recompute SHA-256 of the signed PDF file on disk.
       3. Compare with the stored hash — mismatch means the file was tampered.
       4. Use PyHanko to validate the embedded PKCS#7 signature (intact + signer identity).
 
     Result is cached for 24 hours — a signed receipt is immutable.
+    Token-based lookup prevents sequential order ID enumeration.
     """
     from django.core.cache import cache
 
     if getattr(request, 'limited', False):
         return render(request, 'customers/verify_receipt.html', {
-            'order_id': order_id,
             'status': 'rate_limited',
         })
 
-    cache_key = f'receipt_verify:{order_id}'
+    cache_key = f'receipt_verify:{token}'
     cached_result = cache.get(cache_key)
     if cached_result is not None:
         return render(request, 'customers/verify_receipt.html', cached_result)
 
     try:
         sig_record = DigitalSignature.objects.only(
-            'order_id', 'signature_hash', 'timestamp', 'pdf_path'
-        ).get(order_id=order_id)
+            'order_id', 'signature_hash', 'timestamp', 'pdf_path', 'verify_token'
+        ).get(verify_token=token)
     except DigitalSignature.DoesNotExist:
         return render(request, 'customers/verify_receipt.html', {
-            'order_id': order_id,
             'status': 'not_found',
         })
 
     pdf_path = os.path.join(settings.MEDIA_ROOT, str(sig_record.pdf_path))
-    pdf_download_url = sig_record.pdf_path.url if sig_record.pdf_path else None
     result = {
-        'order_id': order_id,
-        'pdf_download_url': pdf_download_url,
+        'order_id': sig_record.order_id,
         'signed_at': sig_record.timestamp,
         'signer': 'Zarly BigFood Sdn Bhd',
         'stored_hash': sig_record.signature_hash,
@@ -1259,7 +1330,7 @@ def verify_receipt(request, order_id):
         result['status'] = 'valid' if sig_status.intact else 'invalid'
 
     except Exception as e:
-        logger.error("PyHanko signature validation failed for order %s: %s", order_id, e, exc_info=True)
+        logger.error("PyHanko signature validation failed for order %s: %s", sig_record.order_id, e, exc_info=True)
         result['hash_match'] = True  # Hash was fine; signature layer failed
         result['status'] = 'sig_error'
 
@@ -1394,14 +1465,18 @@ def update_profile(request):
     from customers.models import User as UserModel, CustomerProfile
 
     email = data.get('email', '').strip()
+    email_changed = False
     if email and email != user.email:
         if UserModel.objects.filter(email=email).exclude(pk=user.pk).exists():
             return JsonResponse({'success': False, 'error': 'That email is already in use.'})
+        email_changed = True
 
     user.first_name = data.get('first_name', '').strip()
     user.last_name  = data.get('last_name', '').strip()
     if email:
         user.email = email
+        if email_changed:
+            user.email_verified = False
     user.phone_number = data.get('phone_number', '').strip()
     user.save()
 
@@ -1409,6 +1484,17 @@ def update_profile(request):
     profile.default_address  = data.get('default_address', '').strip()
     profile.marketing_opt_in = data.get('marketing_opt_in') in (True, 'true', '1', 'on')
     profile.save()
+
+    if email_changed:
+        from .otp_utils import generate_and_cache_otp, send_signup_verification_email
+        otp = generate_and_cache_otp(user)
+        send_signup_verification_email(user.username, email, otp)
+        request.session['verification_context'] = 'email_change'
+        return JsonResponse({
+            'success': True,
+            'requires_verification': True,
+            'verify_url': '/menu/verify-email/',
+        })
 
     return JsonResponse({'success': True})
 
@@ -1466,16 +1552,26 @@ def customer_profile(request):
             user.last_name = request.POST.get('last_name', '').strip()
             user.phone_number = request.POST.get('phone_number', '').strip()
             email = request.POST.get('email', '').strip()
+            email_changed = False
             if email and email != user.email:
                 if UserModel.objects.filter(email=email).exclude(pk=user.pk).exists():
                     messages.error(request, 'That email is already in use.')
                 else:
                     user.email = email
+                    user.email_verified = False
+                    email_changed = True
             user.save()
             profile.default_address = request.POST.get('default_address', '').strip()
             profile.default_phone = request.POST.get('default_phone', '').strip()
             profile.marketing_opt_in = 'marketing_opt_in' in request.POST
             profile.save()
+            if email_changed:
+                from .otp_utils import generate_and_cache_otp, send_signup_verification_email
+                otp = generate_and_cache_otp(user)
+                send_signup_verification_email(user.username, email, otp)
+                request.session['verification_context'] = 'email_change'
+                messages.info(request, 'Profile saved. Please verify your new email address.')
+                return redirect('verify_email')
             messages.success(request, 'Profile updated.')
             return redirect('customer_profile')
 
@@ -1693,5 +1789,245 @@ def submit_product_review(request, product_id):
         comment=comment,
     )
     return JsonResponse({'ok': True, 'rating': rating_val})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Email Verification
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _verification_redirect(context):
+    from django.urls import reverse
+    mapping = {
+        'checkout': reverse('checkout'),
+        'email_change': reverse('customer_profile'),
+        'profile': reverse('customer_profile'),
+    }
+    return mapping.get(context, reverse('product_list'))
+
+
+@login_required
+@ratelimit(key='user', rate='20/m', method='POST', block=False)
+def verify_email(request):
+    from .otp_utils import (
+        generate_and_cache_otp, verify_otp, mask_email,
+        send_verification_email, send_signup_verification_email,
+    )
+    user = request.user
+    context = request.session.get('verification_context', 'profile')
+
+    if user.email_verified and context != 'email_change':
+        return redirect(_verification_redirect(context))
+
+    if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many attempts. Please wait a moment.')
+            return redirect('verify_email')
+
+        action = request.POST.get('action', 'verify')
+
+        if action == 'skip' and context == 'signup':
+            request.session.pop('verification_context', None)
+            messages.info(request, 'You can verify your email anytime from your profile.')
+            return redirect('product_list')
+
+        if action == 'resend':
+            otp = generate_and_cache_otp(user)
+            send_signup_verification_email(user.username, user.email, otp)
+            messages.success(request, f'A new code was sent to {mask_email(user.email)}.')
+            return redirect('verify_email')
+
+        # action == 'verify'
+        code = request.POST.get('otp', '').strip()
+        result = verify_otp(user, code)
+
+        if result == 'ok':
+            user.email_verified = True
+            user.save(update_fields=['email_verified'])
+            request.session.pop('verification_context', None)
+            log_audit(request, 'email_verified', target=user,
+                      description=f'Email verified: {user.email}', actor=user)
+            messages.success(request, 'Email verified successfully!')
+            return redirect(_verification_redirect(context))
+
+        elif result == 'invalid':
+            messages.error(request, 'Incorrect code. Please try again.')
+        else:
+            messages.error(request, 'Code expired or max attempts reached. Request a new one.')
+
+    return render(request, 'registration/verify_email_otp.html', {
+        'masked_email': mask_email(user.email),
+        'context': context,
+        'can_skip': context == 'signup',
+    })
+
+
+@customer_required
+@ratelimit(key='user', rate='5/h', method='POST', block=False)
+def send_verification_otp(request):
+    """Sends a verification OTP. Used by the profile page 'Verify Now' button."""
+    from .otp_utils import generate_and_cache_otp, send_verification_email, mask_email
+
+    if request.method != 'POST':
+        return redirect('customer_profile')
+
+    if getattr(request, 'limited', False):
+        messages.error(request, 'Too many requests. Please wait before requesting another code.')
+        return redirect('customer_profile')
+
+    request.session['verification_context'] = request.POST.get('context', 'profile')
+    otp = generate_and_cache_otp(request.user)
+    send_verification_email(request.user, otp)
+    messages.success(request, f'Verification code sent to {mask_email(request.user.email)}.')
+    return redirect('verify_email')
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Password Reset (public — no login required)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@ratelimit(key='ip', rate='5/h', method='POST', block=False)
+def request_password_reset(request):
+    if request.user.is_authenticated:
+        return redirect('customer_profile')
+
+    if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many attempts. Please try again later.')
+            return render(request, 'registration/password_reset_request.html')
+
+        from .otp_utils import generate_and_cache_otp, send_verification_email
+        email = request.POST.get('email', '').strip()
+        try:
+            user = User.objects.get(email__iexact=email, role='customer')
+            otp = generate_and_cache_otp(user)
+            send_verification_email(user, otp)
+            request.session['reset_user_pk'] = user.pk
+        except User.DoesNotExist:
+            pass  # silent — no email enumeration
+
+        messages.success(request, 'If that email is registered, a reset code has been sent.')
+        return redirect('verify_password_reset')
+
+    return render(request, 'registration/password_reset_request.html')
+
+
+@ratelimit(key='ip', rate='10/h', method='POST', block=False)
+def verify_password_reset(request):
+    if request.user.is_authenticated:
+        return redirect('customer_profile')
+
+    reset_user_pk = request.session.get('reset_user_pk')
+    if not reset_user_pk:
+        messages.warning(request, 'No active reset session. Please start again.')
+        return redirect('request_password_reset')
+
+    if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many attempts. Please try again later.')
+            return render(request, 'registration/password_reset_verify.html')
+
+        from .otp_utils import verify_otp
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        code = request.POST.get('otp', '').strip()
+        new_pw = request.POST.get('new_password', '')
+        confirm_pw = request.POST.get('confirm_password', '')
+
+        try:
+            user = User.objects.get(pk=reset_user_pk, role='customer')
+        except User.DoesNotExist:
+            request.session.pop('reset_user_pk', None)
+            return redirect('request_password_reset')
+
+        result = verify_otp(user, code)
+
+        if result == 'ok':
+            if new_pw != confirm_pw:
+                messages.error(request, 'Passwords do not match.')
+                return render(request, 'registration/password_reset_verify.html')
+            try:
+                validate_password(new_pw, user)
+            except DjangoValidationError as e:
+                for msg in e.messages:
+                    messages.error(request, msg)
+                return render(request, 'registration/password_reset_verify.html')
+            user.set_password(new_pw)
+            user.save()
+            request.session.pop('reset_user_pk', None)
+            log_audit(request, 'password_reset', target=user,
+                      description=f'Password reset via email OTP for {user.username}', actor=user)
+            messages.success(request, 'Password reset successfully. Please log in.')
+            return redirect('login')
+
+        elif result == 'invalid':
+            messages.error(request, 'Incorrect code. Please try again.')
+        else:
+            messages.error(request, 'Code expired or max attempts reached. Please start again.')
+            request.session.pop('reset_user_pk', None)
+            return redirect('request_password_reset')
+
+    return render(request, 'registration/password_reset_verify.html')
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Account Deletion
+# ─────────────────────────────────────────────────────────────────────────────
+
+@customer_required
+@ratelimit(key='user', rate='5/h', method='POST', block=False)
+def delete_account(request):
+    from .otp_utils import generate_and_cache_otp, send_verification_email, verify_otp, mask_email
+
+    masked = mask_email(request.user.email)
+
+    if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many requests. Please try again later.')
+            return redirect('delete_account')
+
+        action = request.POST.get('action', '')
+
+        if action == 'send_otp':
+            otp = generate_and_cache_otp(request.user)
+            send_verification_email(request.user, otp)
+            request.session['delete_account_pending'] = True
+            return render(request, 'customers/delete_account.html', {
+                'show_otp_form': True,
+                'masked_email': masked,
+            })
+
+        if action == 'confirm_delete':
+            if not request.session.get('delete_account_pending'):
+                messages.error(request, 'Please request a confirmation code first.')
+                return redirect('delete_account')
+
+            code = request.POST.get('otp', '').strip()
+            result = verify_otp(request.user, code)
+
+            if result == 'ok':
+                user = request.user
+                log_audit(request, 'account_deleted', target=user,
+                          description=f'Customer account self-deleted: {user.username}', actor=user)
+                logout(request)
+                user.delete()
+                messages.success(request, 'Your account has been permanently deleted.')
+                return redirect('customer_home')
+
+            elif result == 'invalid':
+                messages.error(request, 'Incorrect code. Please try again.')
+                return render(request, 'customers/delete_account.html', {
+                    'show_otp_form': True,
+                    'masked_email': masked,
+                })
+            else:
+                request.session.pop('delete_account_pending', None)
+                messages.error(request, 'Code expired or max attempts reached. Please start again.')
+                return redirect('delete_account')
+
+    return render(request, 'customers/delete_account.html', {
+        'show_otp_form': False,
+        'masked_email': masked,
+    })
 
 

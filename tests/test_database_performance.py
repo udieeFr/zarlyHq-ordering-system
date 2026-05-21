@@ -19,7 +19,7 @@ from admins.models import (
     AuditLog, Complaint, Notification, Order, OrderItem,
     Payment, PrepGroup, Refund,
 )
-from customers.models import Category, CustomerProfile, Product
+from customers.models import CustomerProfile, Product
 
 User = get_user_model()
 pytestmark = pytest.mark.django_db
@@ -48,15 +48,10 @@ def admin_user():
 
 
 @pytest.fixture
-def category():
-    return Category.objects.create(name='Perf Category')
-
-
-@pytest.fixture
-def product(category):
+def product():
     return Product.objects.create(
         name='Perf Product',
-        category=category,
+        category='Perf Category',
         price=25.00,
         weight_grams=200,
         stock=99,
@@ -134,9 +129,8 @@ class TestCustomerProfileRecalculate:
     ])
     def test_loyalty_tier_thresholds(self, profile, customer, amount, expected_tier):
         """Each tier boundary must map to the correct label."""
-        cat = Category.objects.create(name=f'TierCat_{amount}')
         prod = Product.objects.create(
-            name=f'TierProd_{amount}', category=cat, price=amount, weight_grams=100, stock=1
+            name=f'TierProd_{amount}', category=f'TierCat_{amount}', price=amount, weight_grams=100, stock=1
         )
         Order.objects.create(customer=customer, total_amount=amount, status='approved')
         profile.recalculate()

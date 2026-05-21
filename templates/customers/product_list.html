@@ -38,19 +38,18 @@
   <!-- ── Browse panel ──────────────────────────────────── -->
   <div class="menu-browse-panel">
 
-    <!-- ── Category Cards ───────────────────────────────── -->
+    <!-- ── Category filters ─────────────────────────────── -->
     <div class="categories-section">
-      <div class="categories-scroll">
+      <div class="cat-filter-row">
         <a href="{% url 'product_list' %}" class="cat-card pill {% if not request.GET.category %}pill-active{% endif %}">
           <div class="cat-icon-wrap" style="font-size:0.8rem;font-weight:800;letter-spacing:0.03em;" aria-hidden="true">ALL</div>
           <span class="cat-name">All Menu</span>
         </a>
-        {% for cat in categories %}
-          <a href="?category={{ cat.id }}" class="cat-card pill {% if request.GET.category == cat.id|stringformat:"s" %}pill-active{% endif %}">
-            <div class="cat-icon-wrap" style="font-size:0.8rem;font-weight:800;letter-spacing:0.03em;" aria-hidden="true">{{ cat.name|slice:":1"|upper }}</div>
-            <span class="cat-name">{{ cat.name }}</span>
-          </a>
-        {% endfor %}
+        <div class="cat-pills-wrap">
+          {% for cat in categories %}
+            <a href="?category={{ cat }}" class="cat-pill pill {% if request.GET.category == cat %}pill-active{% endif %}">{{ cat }}</a>
+          {% endfor %}
+        </div>
       </div>
     </div>
 
@@ -62,6 +61,110 @@
   </div>
 
 </div>
+
+<!-- ── Bundle variant toggle styles ───────────────────── -->
+<style>
+  .pcard-toggle-area {
+    min-height: 2.25rem;
+    display: flex;
+    align-items: center;
+    margin: 0.35rem 0 0.1rem;
+  }
+  .pcard-variant-toggle {
+    width: 100%;
+    display: flex;
+    gap: 0.3rem;
+    background: oklch(93% 0.025 64);
+    border-radius: 8px;
+    padding: 0.18rem;
+  }
+  .pv-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    padding: 0.28rem 0.5rem;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: oklch(48% 0.06 54);
+    cursor: pointer;
+    transition: background 0.14s ease-out, color 0.14s ease-out;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+  .pv-btn:hover:not(.pv-btn-active) {
+    background: oklch(97% 0.018 64);
+    color: oklch(28% 0.04 52);
+  }
+  .pv-btn-active {
+    background: #ff9933;
+    color: oklch(13% 0.04 52);
+    box-shadow: 0 1px 4px oklch(70% 0.2 54 / 0.25);
+  }
+  .pv-weight {
+    font-size: 0.65rem;
+    font-weight: 600;
+    opacity: 0.75;
+  }
+  .pv-btn-active .pv-weight {
+    opacity: 0.85;
+  }
+  .pcard-weight-tag {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: oklch(48% 0.06 54);
+    background: oklch(93% 0.025 64);
+    border-radius: 999px;
+    padding: 0.18rem 0.55rem;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── Category filter row ── */
+  .cat-filter-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .cat-pills-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.4rem;
+    max-height: 5rem;
+    overflow: hidden;
+    align-content: center;
+    justify-content: center;
+  }
+  .cat-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.28rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    border: 1.5px solid oklch(86% 0.045 64);
+    background: oklch(98.5% 0.018 65);
+    color: oklch(38% 0.06 52);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.14s ease-out, border-color 0.14s ease-out, color 0.14s ease-out;
+    line-height: 1.6rem;
+  }
+  .cat-pill:hover {
+    border-color: var(--brand-border);
+    background: var(--brand-light);
+    color: var(--brand-dark);
+  }
+  .cat-pill.pill-active {
+    background: #ff9933;
+    border-color: oklch(70% 0.2 54);
+    color: oklch(13% 0.04 52);
+  }
+</style>
 
 <!-- ── Sticky cart FAB ─────────────────────────────────── -->
 <style>
@@ -154,6 +257,14 @@
     toggleBtn.style.color      = hideSoldOut ? '#92400e'  : '#475569';
   });
 
+  function initBundleWeights() {
+    grid.querySelectorAll('[data-variant="bundle"]').forEach(btn => {
+      const w = formatWeight(parseInt(btn.dataset.bundleGrams || 0), parseInt(btn.dataset.bundleQty || 0));
+      const span = btn.querySelector('.pv-bundle-weight');
+      if (span && w) span.textContent = w;
+    });
+  }
+
   async function loadGrid(params) {
     grid.style.opacity = '0.45';
     grid.style.pointerEvents = 'none';
@@ -163,6 +274,7 @@
       const html = await res.text();
       grid.innerHTML = html;
       history.pushState({}, '', url);
+      initBundleWeights();
     } finally {
       grid.style.opacity = '1';
       grid.style.pointerEvents = '';
@@ -229,6 +341,45 @@
     const params = new URLSearchParams(link.getAttribute('href').split('?')[1] || '');
     loadGrid(params);
     window.scrollTo({ top: grid.offsetTop - 80, behavior: 'smooth' });
+  });
+
+  /* ── bundle variant toggle ─────────────────*/
+  function formatWeight(grams, qty) {
+    if (grams >= 1000) return (grams / 1000) + 'kg';
+    if (grams > 0) return grams + 'g';
+    if (qty > 0) return qty + 'x';
+    return '';
+  }
+
+  // Init bundle weight labels on first load
+  initBundleWeights();
+
+  grid.addEventListener('click', e => {
+    const btn = e.target.closest('.pv-btn');
+    if (!btn) return;
+    const toggle = btn.closest('.pcard-variant-toggle');
+    if (!toggle) return;
+
+    const isBundle = btn.dataset.variant === 'bundle';
+    const card = btn.closest('.pcard');
+    const form = card.querySelector('[data-cart-form]');
+    const priceEl = card.querySelector('.pcard-price');
+
+    // Update active state
+    toggle.querySelectorAll('.pv-btn').forEach(b => {
+      b.classList.toggle('pv-btn-active', b === btn);
+      b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+    });
+
+    // Swap price display
+    if (priceEl) {
+      priceEl.textContent = btn.dataset.price;
+    }
+
+    // Update hidden input
+    if (form) {
+      form.querySelector('.is-bundle-input').value = isBundle ? '1' : '0';
+    }
   });
 
   /* ── add to cart (event delegation) ────────*/
