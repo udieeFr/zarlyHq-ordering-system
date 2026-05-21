@@ -42,6 +42,7 @@ class Product(models.Model):
     stock = models.IntegerField(default=0)
     image = models.ImageField(upload_to='products/', null=True, blank=True)
     is_available = models.BooleanField(default=True, db_index=True)
+    is_unlimited_stock = models.BooleanField(default=False)
     allergies = models.ManyToManyField(Allergy, blank=True)
 
     bundle_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
