@@ -282,3 +282,8 @@ CSP_OBJECT_SRC   = ("'none'",)
 CSP_BASE_URI     = ("'self'",)
 CSP_FORM_ACTION  = ("'self'",)
 CSP_INCLUDE_NONCE_IN = ["script-src"]
+
+# ============================================================================
+# INVENTORY
+# ============================================================================
+LOW_STOCK_THRESHOLD = 10  # Products at or below this count show in dashboard warnings
