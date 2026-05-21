@@ -3,8 +3,9 @@ from django.contrib.auth.decorators import login_required
 from customers.auth_utils import customer_required
 from django.contrib.auth import logout, login
 from django.contrib import messages
-from django.http import HttpResponse, JsonResponse  # Required for PDF downloads
+from django.http import Http404, HttpResponse, JsonResponse  # Required for PDF downloads
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.db.models import Q
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
@@ -168,7 +169,7 @@ def product_list(request):
 
     hide_soldout = request.GET.get('hide_soldout') == '1'
     if hide_soldout:
-        products = products.filter(stock__gt=0)
+        products = products.filter(Q(is_unlimited_stock=True) | Q(stock__gt=0))
 
     # 2. Pagination
     paginator = Paginator(products.order_by('name'), 12)
@@ -596,7 +597,7 @@ def _create_order_atomic(user, total_price, cart_items, **order_fields):
         }
         for item in cart_items:
             product = locked_products[item['product'].id]
-            if product.stock < item['quantity']:
+            if not product.is_unlimited_stock and product.stock < item['quantity']:
                 raise ValueError(
                     f"Sorry, '{product.name}' only has {product.stock} unit(s) left. "
                     "Please update your cart and try again."
@@ -609,8 +610,9 @@ def _create_order_atomic(user, total_price, cart_items, **order_fields):
                 is_bundle=item['is_bundle'],
                 subtotal=item['subtotal'],
             )
-            product.stock -= item['quantity']
-            product.save(update_fields=['stock'])
+            if not product.is_unlimited_stock:
+                product.stock -= item['quantity']
+                product.save(update_fields=['stock'])
         return order
 
 
@@ -826,12 +828,18 @@ def order_success(request, order_id):
                     'payment_timing': 'later',
                 }
     
+    try:
+        verify_token = order.digital_signature.verify_token
+    except Exception:
+        verify_token = None
+
     context = {
         'order': order,
         'payment': payment,
+        'verify_token': verify_token,
         **payment_context,
     }
-    
+
     return render(request, 'customers/order_success.html', context)
 
 @login_required
@@ -1339,7 +1347,7 @@ def verify_receipt(request, token):
         cache.set(cache_key, result, 60 * 60 * 24)
 
     log_audit(request, 'receipt_verified', target=sig_record,
-              description=f"Receipt verification check on Order #{order_id}",
+              description=f"Receipt verification check on Order #{sig_record.order_id}",
               metadata={'result_status': result.get('status', 'unknown'),
                         'hash_match': bool(result.get('hash_match', False))})
 
@@ -1415,10 +1423,11 @@ def cancel_order(request, order_id):
 
     reason = (request.POST.get('cancel_reason', '').strip() or 'No reason provided')[:500]
 
-    # Restore stock for each item
+    # Restore stock for each item (skip unlimited-stock products — their stock was never decremented)
     for item in order.items.select_related('product').all():
-        item.product.stock += item.quantity
-        item.product.save(update_fields=['stock'])
+        if not item.product.is_unlimited_stock:
+            item.product.stock += item.quantity
+            item.product.save(update_fields=['stock'])
 
     order.status = 'cancelled'
     order.order_notes = (order.order_notes or '') + f'\n[CANCELLED by customer: {reason}]'
@@ -1515,10 +1524,10 @@ def reorder(request, order_id):
     out_of_stock = []
     for item in order.items.select_related('product').all():
         product = item.product
-        if product.stock < 1:
+        if not product.is_unlimited_stock and product.stock < 1:
             out_of_stock.append(product.name)
             continue
-        qty = min(item.quantity, product.stock)
+        qty = item.quantity if product.is_unlimited_stock else min(item.quantity, product.stock)
         cart[str(product.id)] = cart.get(str(product.id), 0) + qty
 
     request.session['cart'] = cart

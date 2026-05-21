@@ -637,7 +637,7 @@ def admin_create_order(request):
                 if qty < 1:
                     continue
                 product = Product.objects.get(id=pid)
-                if product.stock < qty:
+                if not product.is_unlimited_stock and product.stock < qty:
                     errors.append(f"'{product.name}' only has {product.stock} in stock.")
                     continue
                 subtotal = product.price * qty
@@ -689,8 +689,9 @@ def admin_create_order(request):
                 is_bundle=False,
                 subtotal=item['subtotal'],
             )
-            item['product'].stock -= item['quantity']
-            item['product'].save(update_fields=['stock'])
+            if not item['product'].is_unlimited_stock:
+                item['product'].stock -= item['quantity']
+                item['product'].save(update_fields=['stock'])
 
         log_order_event(order, initial_status, actor=request.user,
                         note=f'Manually created by admin — {"walk-in" if is_walk_in else customer_label}')
@@ -710,7 +711,7 @@ def admin_create_order(request):
         return redirect('admin_order_detail', order_id=order.id)
 
     customers = CustomerUser.objects.filter(role='customer').exclude(username='__walkin__').order_by('username')
-    products = Product.objects.filter(stock__gt=0).select_related('category').order_by('category__name', 'name')
+    products = Product.objects.filter(Q(is_unlimited_stock=True) | Q(stock__gt=0)).order_by('category', 'name')
     return render(request, 'admins/admin_create_order.html', {
         'customers': customers,
         'products': products,
@@ -2212,7 +2213,6 @@ def campaign_history(request):
 # ---------------------------------------------------------------------------
 
 @manager_required
-@sudo_required
 def sales_report(request):
     """Detailed revenue, refund, and product sales analytics with date range filter."""
     import json
@@ -2222,17 +2222,52 @@ def sales_report(request):
     from customers.models import CustomerProfile
 
     # --- Date range ---
-    period = request.GET.get('period', '30')
-    try:
-        days = int(period)
-    except ValueError:
-        days = 30
+    from datetime import date as date_type
     now = timezone.now()
     today = now.date()
-    since = now - timedelta(days=days)
+
+    single_date = request.GET.get('date', '').strip()
+    date_from   = request.GET.get('date_from', '').strip()
+    date_to     = request.GET.get('date_to', '').strip()
+    period      = request.GET.get('period', '').strip()
+
+    # Resolve mode: single day > custom range > preset period > default 30d
+    mode = 'preset'
+    if single_date:
+        try:
+            single_date_obj = date_type.fromisoformat(single_date)
+            since_date = single_date_obj
+            until_date = single_date_obj
+            mode = 'single'
+        except ValueError:
+            single_date = ''
+    if mode != 'single' and date_from and date_to:
+        try:
+            since_date = date_type.fromisoformat(date_from)
+            until_date = date_type.fromisoformat(date_to)
+            if since_date > until_date:
+                since_date, until_date = until_date, since_date
+            mode = 'range'
+        except ValueError:
+            date_from = date_to = ''
+    if mode == 'preset':
+        try:
+            days = int(period) if period else 30
+        except ValueError:
+            days = 30
+        since_date = today - timedelta(days=days - 1)
+        until_date = today
+
+    since = timezone.make_aware(
+        timezone.datetime.combine(since_date, timezone.datetime.min.time())
+    )
+    until = timezone.make_aware(
+        timezone.datetime.combine(until_date, timezone.datetime.max.time())
+    )
+    days = (until_date - since_date).days + 1
 
     completed = Order.objects.filter(status__in=['approved', 'delivered'])
-    in_range  = completed.filter(approved_at__gte=since)
+    in_range  = completed.filter(approved_at__gte=since, approved_at__lte=until)
 
     # --- Revenue summary ---
     rev = in_range.aggregate(
@@ -2254,8 +2289,8 @@ def sales_report(request):
     )
     daily_map = {row['day']: {'rev': float(row['total'] or 0), 'orders': row['orders']} for row in daily_qs}
     chart_labels, chart_revenue, chart_orders = [], [], []
-    for i in range(days - 1, -1, -1):
-        d = today - timedelta(days=i)
+    for i in range(days):
+        d = since_date + timedelta(days=i)
         chart_labels.append(d.strftime('%d %b'))
         chart_revenue.append(daily_map.get(d, {}).get('rev', 0))
         chart_orders.append(daily_map.get(d, {}).get('orders', 0))
@@ -2263,7 +2298,7 @@ def sales_report(request):
     # --- Top products ---
     top_products = (
         OrderItem.objects
-        .filter(order__approved_at__gte=since, order__status__in=['approved', 'delivered'])
+        .filter(order__approved_at__gte=since, order__approved_at__lte=until, order__status__in=['approved', 'delivered'])
         .values('product__name', 'product__category')
         .annotate(qty=Sum('quantity'), revenue=Sum('subtotal'))
         .order_by('-revenue')[:10]
@@ -2272,14 +2307,14 @@ def sales_report(request):
     # --- Category breakdown ---
     category_revenue = (
         OrderItem.objects
-        .filter(order__approved_at__gte=since, order__status__in=['approved', 'delivered'])
+        .filter(order__approved_at__gte=since, order__approved_at__lte=until, order__status__in=['approved', 'delivered'])
         .values('product__category')
         .annotate(revenue=Sum('subtotal'), qty=Sum('quantity'))
         .order_by('-revenue')
     )
 
     # --- Refund analytics ---
-    refunds_qs = Refund.objects.filter(created_at__gte=since)
+    refunds_qs = Refund.objects.filter(created_at__gte=since, created_at__lte=until)
     refund_total  = refunds_qs.filter(status='succeeded').aggregate(t=Sum('amount'))['t'] or 0
     refund_count  = refunds_qs.filter(status='succeeded').count()
     refund_rate   = round((refund_count / orders_count * 100) if orders_count else 0, 1)
@@ -2306,10 +2341,15 @@ def sales_report(request):
     period_choices = {'7 days': 7, '30 days': 30, '90 days': 90, '1 year': 365}
 
     return render(request, 'admins/sales_report.html', {
-        'period': days,
+        'period': days if mode == 'preset' else None,
         'period_choices': period_choices,
-        'since': since.date(),
+        'since': since_date,
+        'until': until_date,
         'today': today,
+        'mode': mode,
+        'single_date': single_date if mode == 'single' else '',
+        'date_from': date_from if mode == 'range' else '',
+        'date_to': date_to if mode == 'range' else '',
         # Revenue
         'revenue_total': revenue_total,
         'orders_count': orders_count,
