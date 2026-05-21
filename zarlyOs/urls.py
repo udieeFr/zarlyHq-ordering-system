@@ -19,7 +19,7 @@ from django.urls import path, include
 from django.shortcuts import redirect, render
 from django.http import HttpResponse
 from admins.views import unified_login, logout_view, dashboard_home, admin_login, customer_login, custom_login
-from customers.views import stripe_webhook, home as customer_home_view, customer_signup, request_password_reset, verify_password_reset
+from customers.views import stripe_webhook, home as customer_home_view, customer_signup, request_password_reset, verify_password_reset, serve_private_media
 from django.conf import settings
 from django.conf.urls.static import static
 
@@ -88,6 +88,9 @@ urlpatterns = [
     path('login/customer/', customer_login, name='customer_login'),
     path('login/legacy/', custom_login, name='legacy_login'),
     
+    # Authenticated private media serving (payment proofs, signed PDFs, complaint evidence)
+    path('files/<path:filepath>', serve_private_media, name='serve_private_media'),
+
     # App URLs
     path('dashboard/', include('admins.urls')),  # All admin URLs under /dashboard/
     path('menu/', include('customers.urls')),    # All customer URLs under /menu/

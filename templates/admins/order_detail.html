@@ -383,7 +383,7 @@
           {% if order.payment_proof and not stripe_payment %}
           <div>
             <div class="od-label">Bank Transfer / DuitNow Proof</div>
-            <img src="{{ order.payment_proof.url }}" class="od-proof" onclick="window.open(this.src)" alt="Payment proof">
+            <img src="{% url 'serve_private_media' order.payment_proof.name %}" class="od-proof" onclick="window.open('{% url 'serve_private_media' order.payment_proof.name %}')" alt="Payment proof">
           </div>
           {% endif %}
           {% if not stripe_payment and not order.payment_proof %}

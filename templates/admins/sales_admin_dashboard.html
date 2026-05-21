@@ -303,7 +303,7 @@
                     <a href="{% url 'admin_order_detail' order.id %}" class="btn btn-sm btn-primary" title="{{ order.payment_review_tooltip }}" style="font-size:.75rem;">View &amp; Sign</a>
                     {% if order.payment_proof %}
                     <div class="proof-tooltip">
-                      <img src="{{ order.payment_proof.url }}" alt="Payment proof for order {{ order.id }}">
+                      <img src="{% url 'serve_private_media' order.payment_proof.name %}" alt="Payment proof for order {{ order.id }}">
                       <div class="proof-tooltip-note">Proof preview</div>
                     </div>
                     {% endif %}

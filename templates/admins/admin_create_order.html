@@ -238,7 +238,7 @@
 (function () {
   var PRODUCTS = [
     {% for p in products %}
-    { id: {{ p.id }}, name: "{{ p.name|escapejs }}", price: {{ p.price }}, stock: {{ p.stock }}, category: "{{ p.category.name|escapejs }}" }{% if not forloop.last %},{% endif %}
+    { id: {{ p.id }}, name: "{{ p.name|escapejs }}", price: {{ p.price }}, stock: {{ p.stock }}, category: "{{ p.category|escapejs }}" }{% if not forloop.last %},{% endif %}
     {% endfor %}
   ];
 

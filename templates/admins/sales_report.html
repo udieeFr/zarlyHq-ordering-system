@@ -34,17 +34,41 @@
   .rpt-metric-value.is-warn { color: oklch(55% 0.18 22); }
   .rpt-metric-sub { font-size: 0.68rem; color: oklch(48% 0.02 54); margin-top: 0.1rem; }
 
-  /* ── Period pills ── */
-  .period-bar { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
-  .period-label { font-size: 0.78rem; font-weight: 700; color: oklch(42% 0.06 52); margin-right: 0.25rem; }
+  /* ── Period bar ── */
+  .period-bar {
+    background: oklch(97% 0.016 62);
+    border: 1px solid oklch(91% 0.03 62);
+    border-radius: 1rem;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;
+  }
+  .period-section { display: flex; flex-direction: column; gap: 0.3rem; }
+  .period-section-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: oklch(48% 0.06 54); }
+  .period-pills { display: flex; gap: 0.3rem; flex-wrap: wrap; }
   .period-pill {
     font-size: 0.75rem; font-weight: 600; padding: 0.3rem 0.875rem; border-radius: 999px;
     border: 1.5px solid oklch(84% 0.04 62); color: oklch(42% 0.06 52);
     text-decoration: none; transition: all .15s; background: oklch(99.5% 0.006 60);
+    white-space: nowrap;
   }
   .period-pill:hover { border-color: oklch(16% 0.04 52); color: oklch(16% 0.04 52); }
   .period-pill.active { background: oklch(16% 0.04 52); border-color: oklch(16% 0.04 52); color: oklch(93% 0.012 62); }
-  .period-range { font-size: 0.78rem; color: oklch(48% 0.06 54); margin-left: 0.5rem; }
+  .period-divider { width: 1px; background: oklch(88% 0.03 62); align-self: stretch; margin: 0 0.25rem; }
+  .date-input {
+    font-size: 0.78rem; font-family: inherit; padding: 0.3rem 0.65rem;
+    border: 1.5px solid oklch(84% 0.04 62); border-radius: 0.5rem;
+    background: oklch(99.5% 0.006 60); color: oklch(22% 0.04 52);
+    outline: none; transition: border-color .15s;
+  }
+  .date-input:focus { border-color: oklch(44% 0.12 57); }
+  .date-go-btn {
+    font-size: 0.75rem; font-weight: 700; padding: 0.3rem 0.875rem; border-radius: 999px;
+    background: oklch(16% 0.04 52); border: none; color: oklch(93% 0.012 62);
+    cursor: pointer; transition: background .15s; font-family: inherit;
+  }
+  .date-go-btn:hover { background: oklch(28% 0.06 52); }
+  .period-range { font-size: 0.78rem; color: oklch(48% 0.06 54); align-self: center; margin-left: auto; white-space: nowrap; }
 
   /* ── Data panels ── */
   .rpt-panel {
@@ -91,16 +115,57 @@
 
 <div class="page-header">
   <h1>Sales Report</h1>
-  <p>Revenue, refund analytics, and product performance.</p>
+  <p>
+    {% if mode == 'single' %}Showing data for {{ since }}
+    {% elif mode == 'range' %}Showing {{ since }} — {{ until }}
+    {% else %}Last {{ period }} day{{ period|pluralize }} · {{ since }} — {{ until }}{% endif %}
+  </p>
 </div>
 
 <!-- Period selector -->
 <div class="period-bar">
-  <span class="period-label">Period:</span>
-  {% for label, val in period_choices.items %}
-  <a href="?period={{ val }}" class="period-pill {% if period == val %}active{% endif %}">{{ label }}</a>
-  {% endfor %}
-  <span class="period-range">{{ since }} — {{ today }}</span>
+
+  <div class="period-section">
+    <span class="period-section-label">Preset</span>
+    <div class="period-pills">
+      {% for label, val in period_choices.items %}
+      <a href="?period={{ val }}" class="period-pill {% if mode == 'preset' and period == val %}active{% endif %}">{{ label }}</a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="period-divider"></div>
+
+  <form method="get" style="display:contents;">
+    <div class="period-section">
+      <span class="period-section-label">Single Day</span>
+      <div style="display:flex;gap:0.4rem;align-items:center;">
+        <input type="date" name="date" class="date-input {% if mode == 'single' %}active{% endif %}"
+               value="{{ single_date }}" max="{{ today|date:'Y-m-d' }}">
+        <button type="submit" class="date-go-btn">Go</button>
+      </div>
+    </div>
+  </form>
+
+  <div class="period-divider"></div>
+
+  <form method="get" style="display:contents;">
+    <div class="period-section">
+      <span class="period-section-label">Date Range</span>
+      <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">
+        <input type="date" name="date_from" class="date-input" value="{{ date_from }}" max="{{ today|date:'Y-m-d' }}">
+        <span style="font-size:.75rem;color:oklch(48% 0.06 54);">to</span>
+        <input type="date" name="date_to" class="date-input" value="{{ date_to }}" max="{{ today|date:'Y-m-d' }}">
+        <button type="submit" class="date-go-btn">Go</button>
+      </div>
+    </div>
+  </form>
+
+  <span class="period-range">
+    {% if mode == 'single' %}{{ since }}
+    {% else %}{{ since }} — {{ until }}{% endif %}
+  </span>
+
 </div>
 
 <!-- Metric strip (replaces banned KPI cards) -->

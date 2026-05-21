@@ -153,10 +153,10 @@
           <td>
             {% if order.payment_proof %}
               {% if order.payment_proof.name|lower|endswith:'.pdf' %}
-                <a href="{{ order.payment_proof.url }}" target="_blank" class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;">PDF</a>
+                <a href="{% url 'serve_private_media' order.payment_proof.name %}" target="_blank" class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;">PDF</a>
               {% else %}
-                <img src="{{ order.payment_proof.url }}" alt="Proof" class="proof-thumb js-proof-img"
-                     data-proof-url="{{ order.payment_proof.url }}"
+                <img src="{% url 'serve_private_media' order.payment_proof.name %}" alt="Proof" class="proof-thumb js-proof-img"
+                     data-proof-url="{% url 'serve_private_media' order.payment_proof.name %}"
                      data-order-label="#{{ order.id }}">
               {% endif %}
             {% else %}

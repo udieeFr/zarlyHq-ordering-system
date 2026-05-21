@@ -28,17 +28,33 @@
   .log-panel-title { font-size: 0.88rem; font-weight: 800; color: oklch(18% 0.04 52); letter-spacing: -.01em; margin: 0; }
   .log-panel-body { padding: 1.1rem 1.25rem; }
 
-  /* Integrity banner */
-  .integrity-banner {
-    display: flex; align-items: flex-start; gap: 0.75rem;
-    border-radius: 0.875rem; padding: 0.875rem 1.1rem;
-    margin-bottom: 1.25rem; font-size: 0.85rem;
+  /* Integrity status bar */
+  .integrity-bar {
+    display: flex; align-items: center; gap: 0.6rem;
+    padding: 0.55rem 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid oklch(88% 0.03 62);
+    background: oklch(99% 0.008 62);
+    margin-bottom: 1.25rem;
+    font-size: 0.78rem;
   }
-  .integrity-ok  { background: oklch(95% 0.06 148); border: 1px solid oklch(80% 0.1 148); color: oklch(28% 0.1 148); }
-  .integrity-err { background: oklch(95% 0.05 22); border: 1px solid oklch(72% 0.12 22); color: oklch(30% 0.1 22); }
-  .integrity-icon { flex-shrink: 0; margin-top: 1px; }
-  .integrity-banner strong { display: block; margin-bottom: 0.15rem; }
-  .integrity-banner span { font-size: 0.8rem; opacity: 0.85; }
+  .integrity-bar-dot {
+    flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%;
+  }
+  .integrity-bar.is-ok  .integrity-bar-dot { background: oklch(55% 0.16 148); box-shadow: 0 0 0 3px oklch(55% 0.16 148 / 0.15); }
+  .integrity-bar.is-err .integrity-bar-dot { background: oklch(50% 0.18 22);  box-shadow: 0 0 0 3px oklch(50% 0.18 22 / 0.18); }
+  .integrity-bar-label {
+    font-weight: 700; font-size: 0.78rem;
+    color: oklch(22% 0.04 52);
+  }
+  .integrity-bar.is-ok  .integrity-bar-label { color: oklch(28% 0.1 148); }
+  .integrity-bar.is-err .integrity-bar-label { color: oklch(32% 0.12 22); }
+  .integrity-bar-detail {
+    color: oklch(48% 0.06 54); font-size: 0.75rem;
+  }
+  .integrity-bar-sep {
+    width: 1px; height: 12px; background: oklch(85% 0.03 62); flex-shrink: 0;
+  }
 
   /* Log table */
   .log-table { width: 100%; font-size: 0.78rem; border-collapse: collapse; }
@@ -54,6 +70,25 @@
   .lc-mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 0.72rem; color: oklch(42% 0.04 52); white-space: nowrap; }
   .lc-clip    { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lc-clip-sm { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Chain integrity per-row */
+  .chain-cell { display: flex; align-items: center; gap: 0.45rem; }
+  .chain-dot {
+    flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%;
+  }
+  .chain-dot-ok     { background: oklch(55% 0.16 148); box-shadow: 0 0 0 2px oklch(55% 0.16 148 / 0.18); }
+  .chain-dot-pre    { background: oklch(68% 0.02 54);  box-shadow: 0 0 0 2px oklch(68% 0.02 54 / 0.2); }
+  .chain-dot-broken { background: oklch(50% 0.18 22);  box-shadow: 0 0 0 2px oklch(50% 0.18 22 / 0.22); }
+  .chain-hash-btn {
+    font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    font-size: 0.64rem; color: oklch(48% 0.04 52);
+    background: none; border: none; padding: 0; cursor: pointer;
+    letter-spacing: 0.02em; transition: color .12s;
+  }
+  .chain-hash-btn:hover { color: oklch(28% 0.06 52); }
+  .chain-hash-btn.copied { color: oklch(42% 0.14 148); }
+  tr.row-chain-broken td { background: oklch(97% 0.04 22) !important; }
+  tr.row-chain-broken td:first-child { box-shadow: inset 3px 0 0 oklch(50% 0.18 22); }
 
   /* Action pills */
   .audit-action-pill {
@@ -100,24 +135,18 @@
 
 <!-- Integrity status -->
 {% if chain_valid %}
-<div class="integrity-banner integrity-ok">
-  <div class="integrity-icon">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-  </div>
-  <div>
-    <strong>Audit chain intact</strong>
-    <span>Every log entry is cryptographically linked — no tampering detected.{% if chain_broken_at %} Entries before ID #{{ chain_broken_at }} pre-date hash chaining.{% endif %}</span>
-  </div>
+<div class="integrity-bar is-ok">
+  <span class="integrity-bar-dot"></span>
+  <span class="integrity-bar-label">Chain intact</span>
+  <span class="integrity-bar-sep"></span>
+  <span class="integrity-bar-detail">All entries cryptographically linked{% if chain_broken_at %} &middot; entries before #{{ chain_broken_at }} pre-date hash chaining{% endif %}</span>
 </div>
 {% else %}
-<div class="integrity-banner integrity-err">
-  <div class="integrity-icon">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-  </div>
-  <div>
-    <strong>Chain integrity failure at entry #{{ chain_broken_at }}</strong>
-    <span>One or more audit entries may have been altered or deleted directly in the database. This requires immediate investigation.</span>
-  </div>
+<div class="integrity-bar is-err">
+  <span class="integrity-bar-dot"></span>
+  <span class="integrity-bar-label">Integrity failure at entry #{{ chain_broken_at }}</span>
+  <span class="integrity-bar-sep"></span>
+  <span class="integrity-bar-detail">One or more entries may have been altered or deleted. Requires investigation.</span>
 </div>
 {% endif %}
 
@@ -192,12 +221,12 @@
           <th style="width:110px;">Target</th>
           <th style="width:120px;">IP</th>
           <th style="width:180px;">Metadata</th>
-          <th style="width:80px;" title="First 8 chars of SHA-256 chain hash">Chain</th>
+          <th style="width:130px;" title="SHA-256 hash chained to previous entry. Green = verified, amber = pre-dates chaining, red = chain broken here. Click hash to copy.">Integrity</th>
         </tr>
       </thead>
       <tbody>
         {% for log in logs %}
-        <tr>
+        <tr{% if not chain_valid and chain_broken_at and log.id == chain_broken_at %} class="row-chain-broken"{% endif %}>
           <td class="lc-mono">{{ log.timestamp|date:"d M Y H:i:s" }}</td>
           <td>
             {% if log.actor %}
@@ -218,11 +247,18 @@
             {% if log.metadata %}{{ log.metadata }}{% else %}<span style="color:oklch(62% 0.02 54);">—</span>{% endif %}
           </td>
           <td>
-            {% if log.chain_hash %}
-            <span class="lc-mono" style="font-size:.65rem;color:oklch(58% 0.02 54);" title="{{ log.chain_hash }}">{{ log.chain_hash|slice:":8" }}…</span>
-            {% else %}
-            <span style="color:oklch(62% 0.02 54);">—</span>
-            {% endif %}
+            <div class="chain-cell">
+              {% if not log.chain_hash %}
+                <span class="chain-dot chain-dot-pre" title="Pre-dates hash chaining"></span>
+                <span style="font-size:.68rem;color:oklch(62% 0.02 54);">pre-chain</span>
+              {% elif not chain_valid and chain_broken_at and log.id == chain_broken_at %}
+                <span class="chain-dot chain-dot-broken" title="Chain broken at this entry — tampering suspected"></span>
+                <button class="chain-hash-btn" data-hash="{{ log.chain_hash }}" title="Click to copy full hash">{{ log.chain_hash|slice:":8" }}&hellip;</button>
+              {% else %}
+                <span class="chain-dot chain-dot-ok" title="Chain verified"></span>
+                <button class="chain-hash-btn" data-hash="{{ log.chain_hash }}" title="Click to copy full hash">{{ log.chain_hash|slice:":8" }}&hellip;</button>
+              {% endif %}
+            </div>
           </td>
         </tr>
         {% empty %}
@@ -256,4 +292,24 @@
   </div>
 </div>
 {% endif %}
+
+<script nonce="{{ request.csp_nonce }}">
+(function () {
+  document.querySelectorAll('.chain-hash-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var hash = btn.dataset.hash;
+      if (!hash) return;
+      navigator.clipboard.writeText(hash).then(function () {
+        var prev = btn.textContent;
+        btn.textContent = 'copied';
+        btn.classList.add('copied');
+        setTimeout(function () {
+          btn.textContent = prev;
+          btn.classList.remove('copied');
+        }, 1400);
+      });
+    });
+  });
+})();
+</script>
 {% endblock %}
