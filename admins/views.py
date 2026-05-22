@@ -24,6 +24,7 @@ from customers.auth_utils import (
     get_user_dashboard_url
 )
 import os
+from django.conf import settings
 from customers.models import Product, Allergy
 
 def is_sales_admin(user):
@@ -321,6 +322,16 @@ def manager_analytics_view(request):
         .count()
     )
 
+    _threshold = getattr(settings, 'LOW_STOCK_THRESHOLD', 10)
+    low_stock_products = list(
+        Product.objects.filter(is_unlimited_stock=False, stock__gt=0, stock__lte=_threshold)
+        .values('id', 'name', 'stock', 'category').order_by('stock')
+    )
+    out_of_stock_products = list(
+        Product.objects.filter(is_unlimited_stock=False, stock=0, is_available=True)
+        .values('id', 'name', 'category')
+    )
+
     return render(request, 'admins/manager_analytics.html', {
         # Revenue
         'revenue_today': revenue_today,
@@ -362,6 +373,10 @@ def manager_analytics_view(request):
         'repeat_rate': repeat_rate,
         'new_customers_week': new_customers_week,
         'returning_customers_week': returning_customers_week,
+        # Stock alerts
+        'low_stock_products': low_stock_products,
+        'out_of_stock_products': out_of_stock_products,
+        'low_stock_threshold': _threshold,
     })
 
 # --- INVENTORY MANAGEMENT (STAGED CHANGES) ---
@@ -851,6 +866,16 @@ def sales_admin_dashboard(request):
     # Get active rejection reasons for bulk reject modal
     rejection_reasons = RejectionReason.objects.filter(is_active=True).order_by('category', 'reason_text')
 
+    _threshold = getattr(settings, 'LOW_STOCK_THRESHOLD', 10)
+    low_stock_products = list(
+        Product.objects.filter(is_unlimited_stock=False, stock__gt=0, stock__lte=_threshold)
+        .values('id', 'name', 'stock', 'category').order_by('stock')
+    )
+    out_of_stock_products = list(
+        Product.objects.filter(is_unlimited_stock=False, stock=0, is_available=True)
+        .values('id', 'name', 'category')
+    )
+
     return render(request, 'admins/sales_admin_dashboard.html', {
         'pending_orders': pending_orders.order_by('-created_at'),
         'pending_payment_orders': pending_payment_orders,
@@ -861,6 +886,9 @@ def sales_admin_dashboard(request):
         'urgent_pending_ids': urgent_pending_ids,
         'high_value_pending_ids': high_value_pending_ids,
         'rejection_reasons': rejection_reasons,
+        'low_stock_products': low_stock_products,
+        'out_of_stock_products': out_of_stock_products,
+        'low_stock_threshold': _threshold,
     })
 
 @sales_admin_required

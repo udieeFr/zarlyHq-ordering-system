@@ -154,6 +154,30 @@
   </p>
 </div>
 
+{% if out_of_stock_products or low_stock_products %}
+<div class="alert alert-warning d-flex flex-wrap gap-3 align-items-start mb-3" style="border-left:4px solid #f59e0b;">
+  <div style="font-weight:800;font-size:.88rem;color:#92400e;min-width:120px;">⚠️ Stock Alert</div>
+  <div class="flex-fill">
+    {% if out_of_stock_products %}
+    <div style="font-size:.82rem;font-weight:700;color:#dc2626;margin-bottom:.35rem;">
+      Out of Stock ({{ out_of_stock_products|length }}):
+      {% for p in out_of_stock_products %}
+        <span class="badge bg-danger me-1">{{ p.name }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% if low_stock_products %}
+    <div style="font-size:.82rem;font-weight:700;color:#b45309;">
+      Low Stock (≤ {{ low_stock_threshold }} units):
+      {% for p in low_stock_products %}
+        <span class="badge bg-warning text-dark me-1">{{ p.name }} ({{ p.stock }})</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
 <!-- Metrics + Search -->
 <div style="display:flex;gap:1rem;align-items:flex-start;margin-bottom:1.25rem;flex-wrap:wrap;">
   <div class="metric-strip" style="flex:1;min-width:0;">
