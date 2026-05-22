@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block page_title %}Unsubscribe — Zarly BigFood{% endblock %}
+{% block content %}
+<div class="container py-5 text-center" style="max-width:480px;">
+  {% if status == 'success' %}
+    <h2 class="fw-bold mb-3">You've been unsubscribed</h2>
+    <p class="text-muted">
+      {{ user.email }} has been removed from our marketing list.
+      You will no longer receive promotional emails from Zarly BigFood.
+    </p>
+    <a href="{% url 'product_list' %}" class="btn btn-outline-secondary mt-3">Back to menu</a>
+  {% elif status == 'expired' %}
+    <h2 class="fw-bold mb-3">Link expired</h2>
+    <p class="text-muted">This unsubscribe link has expired (valid for 90 days). Please log in to manage your preferences from your profile.</p>
+    <a href="{% url 'login' %}" class="btn btn-outline-secondary mt-3">Log in</a>
+  {% else %}
+    <h2 class="fw-bold mb-3">Invalid link</h2>
+    <p class="text-muted">This unsubscribe link is invalid.</p>
+    <a href="{% url 'product_list' %}" class="btn btn-outline-secondary mt-3">Back to menu</a>
+  {% endif %}
+</div>
+{% endblock %}

@@ -66,4 +66,7 @@ urlpatterns = [
 
     # Account Deletion
     path('account/delete/', views.delete_account, name='delete_account'),
+
+    # Email Unsubscribe (public, no login required)
+    path('unsubscribe/<str:token>/', views.unsubscribe_email, name='unsubscribe_email'),
 ]

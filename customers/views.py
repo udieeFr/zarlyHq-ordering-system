@@ -2056,3 +2056,30 @@ def delete_account(request):
     })
 
 
+def unsubscribe_email(request, token):
+    from django.core import signing
+    from customers.models import CustomerProfile
+
+    try:
+        user_pk = signing.loads(token, salt='email-unsubscribe', max_age=60 * 60 * 24 * 90)
+    except signing.SignatureExpired:
+        return render(request, 'customers/unsubscribed.html', {'status': 'expired'})
+    except signing.BadSignature:
+        return render(request, 'customers/unsubscribed.html', {'status': 'invalid'})
+
+    try:
+        user = User.objects.get(pk=user_pk)
+    except User.DoesNotExist:
+        return render(request, 'customers/unsubscribed.html', {'status': 'invalid'})
+
+    profile, _ = CustomerProfile.objects.get_or_create(user=user)
+    profile.marketing_opt_in = False
+    profile.save(update_fields=['marketing_opt_in'])
+
+    from admins.notifications import log_audit
+    log_audit(request, 'marketing_opt_out', target=user,
+              description=f'{user.email} unsubscribed from marketing emails via email link',
+              actor=user)
+
+    return render(request, 'customers/unsubscribed.html', {'status': 'success', 'user': user})
+

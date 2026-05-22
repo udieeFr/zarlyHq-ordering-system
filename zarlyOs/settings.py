@@ -287,3 +287,5 @@ CSP_INCLUDE_NONCE_IN = ["script-src"]
 # INVENTORY
 # ============================================================================
 LOW_STOCK_THRESHOLD = 10  # Products at or below this count show in dashboard warnings
+
+SITE_URL = os.environ.get('SITE_URL', 'https://zarlybigfood.my')
