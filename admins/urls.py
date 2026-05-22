@@ -64,6 +64,9 @@ urlpatterns = [
     # Sales Report
     path('reports/', views.sales_report, name='sales_report'),
 
+    # Product Ratings Dashboard
+    path('ratings/', views.ratings_dashboard, name='ratings_dashboard'),
+
     # Availability Toggle
     path('inventory/<int:product_id>/toggle-availability/', views.toggle_product_availability, name='toggle_product_availability'),
 

@@ -1,0 +1,67 @@
+{% extends 'admin_base.html' %}
+{% block page_title %}Product Ratings{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Product Ratings</h1>
+  <p class="text-muted" style="font-size:.9rem;">Aggregate customer reviews per product. Products below {{ low_rating_threshold }} stars are flagged.</p>
+</div>
+
+<div class="table-responsive mb-4">
+  <table class="table table-hover align-middle" style="font-size:.85rem;">
+    <thead>
+      <tr>
+        <th>Product</th>
+        <th>Category</th>
+        <th>Avg Rating</th>
+        <th>Reviews</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for p in products %}
+      <tr>
+        <td class="fw-bold">{{ p.name }}</td>
+        <td>{{ p.category }}</td>
+        <td>
+          <span style="color:{% if p.avg_rating < low_rating_threshold %}#dc2626{% else %}#16a34a{% endif %};font-weight:800;">
+            {{ p.avg_rating|floatformat:1 }} ★
+          </span>
+        </td>
+        <td>{{ p.review_count }}</td>
+        <td>
+          {% if p.avg_rating < low_rating_threshold %}
+            <span class="badge bg-danger">Needs Attention</span>
+          {% else %}
+            <span class="badge bg-success">Good</span>
+          {% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="text-center text-muted py-3">No reviewed products yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h5 class="fw-bold mb-3">Recent Reviews</h5>
+<div class="table-responsive">
+  <table class="table table-sm" style="font-size:.82rem;">
+    <thead>
+      <tr><th>Date</th><th>Product</th><th>Customer</th><th>Rating</th><th>Comment</th></tr>
+    </thead>
+    <tbody>
+    {% for r in recent_reviews %}
+      <tr>
+        <td style="white-space:nowrap;">{{ r.created_at|date:"d M Y" }}</td>
+        <td>{{ r.product.name }}</td>
+        <td>{{ r.customer.username }}</td>
+        <td>{{ r.rating }} ★</td>
+        <td>{{ r.comment|default:"—"|truncatechars:80 }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="text-center text-muted">No reviews yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
