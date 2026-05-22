@@ -60,6 +60,12 @@
           <div class="form-text">When enabled, this product is always available regardless of stock count.</div>
         </div>
 
+        <div class="mb-3" id="bundleStockRow">
+          <label class="form-label fw-bold">Bundle Stock <span class="text-muted fw-normal">(optional)</span></label>
+          <input type="number" name="bundle_stock" min="0" class="form-control" placeholder="Leave blank if no bundle or to track retail stock only">
+          <div class="form-text">Set a separate stock counter for bundle orders. Only applies if a bundle price is configured on this product.</div>
+        </div>
+
         <div class="mb-3">
           <label class="form-label fw-bold">Category <span class="text-danger">*</span></label>
           <input type="text" name="category" class="form-control" list="category-list" placeholder="e.g. Drinks" required>

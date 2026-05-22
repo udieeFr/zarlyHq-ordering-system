@@ -21,10 +21,12 @@
           </svg>
         </div>
       {% endif %}
-      {% if p.stock <= 0 %}
+      {% if not p.is_unlimited_stock and p.stock <= 0 %}
+        {% if not p.has_bundle or p.bundle_stock == 0 %}
         <div class="pcard-soldout-overlay">
           <span class="pcard-soldout-label">SOLD OUT</span>
         </div>
+        {% endif %}
       {% endif %}
       {% if p.category %}
         <span class="pcard-cat">{{ p.category|slice:":1"|upper }}</span>
@@ -53,7 +55,7 @@
         {% endfor %}
       </div>
       {% endif %}
-      {% if p.stock > 0 and p.stock <= 5 %}
+      {% if not p.is_unlimited_stock and p.stock > 0 and p.stock <= 5 %}
         <div class="pcard-meta">Only {{ p.stock }} left</div>
       {% endif %}
 
@@ -85,7 +87,7 @@
 
       <div class="pcard-foot">
         <span class="pcard-price" data-retail-price="RM {{ p.price }}" data-bundle-price="{% if p.bundle_price %}RM {{ p.bundle_price }}{% endif %}">RM {{ p.price }}</span>
-        {% if p.stock > 0 %}
+        {% if p.is_unlimited_stock or p.stock > 0 or p.has_bundle and p.bundle_stock != 0 %}
           <form method="post" action="{% url 'add_to_cart' %}" data-cart-form>
             {% csrf_token %}
             <input type="hidden" name="product_id" value="{{ p.id }}">

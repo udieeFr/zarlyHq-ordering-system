@@ -275,8 +275,13 @@ CSP_STYLE_SRC    = (
     "https://fonts.googleapis.com",
 )
 CSP_FONT_SRC     = ("'self'", "https://fonts.gstatic.com")
-CSP_IMG_SRC      = ("'self'", "data:", "blob:")
-CSP_CONNECT_SRC  = ("'self'", "https://nominatim.openstreetmap.org", "https://unpkg.com")
+CSP_IMG_SRC      = (
+    "'self'", "data:", "blob:",
+    "https://*.tile.openstreetmap.org",
+    "https://*.tile.openstreetmap.fr",
+    "https://cdn.jsdelivr.net",
+)
+CSP_CONNECT_SRC  = ("'self'", "https://nominatim.openstreetmap.org")
 CSP_FRAME_ANCESTORS = ("'none'",)
 CSP_OBJECT_SRC   = ("'none'",)
 CSP_BASE_URI     = ("'self'",)

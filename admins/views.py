@@ -331,6 +331,14 @@ def manager_analytics_view(request):
         Product.objects.filter(is_unlimited_stock=False, stock=0, is_available=True)
         .values('id', 'name', 'category')
     )
+    low_bundle_stock_products = list(
+        Product.objects.filter(bundle_stock__isnull=False, bundle_stock__gt=0, bundle_stock__lte=_threshold)
+        .values('id', 'name', 'bundle_stock', 'category').order_by('bundle_stock')
+    )
+    out_of_bundle_stock_products = list(
+        Product.objects.filter(bundle_stock__isnull=False, bundle_stock=0, is_available=True)
+        .values('id', 'name', 'category')
+    )
 
     return render(request, 'admins/manager_analytics.html', {
         # Revenue
@@ -377,6 +385,8 @@ def manager_analytics_view(request):
         'low_stock_products': low_stock_products,
         'out_of_stock_products': out_of_stock_products,
         'low_stock_threshold': _threshold,
+        'low_bundle_stock_products': low_bundle_stock_products,
+        'out_of_bundle_stock_products': out_of_bundle_stock_products,
     })
 
 # --- INVENTORY MANAGEMENT (STAGED CHANGES) ---
@@ -468,6 +478,8 @@ def add_product(request):
         weight_grams = request.POST.get('weight_grams') or None
         category = request.POST.get('category', '').strip()
         is_unlimited_stock = request.POST.get('is_unlimited_stock') == 'on'
+        bundle_stock_raw = request.POST.get('bundle_stock', '').strip()
+        bundle_stock = int(bundle_stock_raw) if bundle_stock_raw.isdigit() else None
 
         if not name or not price or not category:
             messages.error(request, "Name, price, and category are required.")
@@ -488,6 +500,7 @@ def add_product(request):
             category=category,
             image=img,
             is_unlimited_stock=is_unlimited_stock,
+            bundle_stock=bundle_stock,
         )
         product.allergies.set(request.POST.getlist('allergies'))
 
@@ -524,6 +537,8 @@ def edit_product(request, product_id):
         product.stock = request.POST.get('stock', product.stock)
         product.weight_grams = request.POST.get('weight_grams', product.weight_grams)
         product.is_unlimited_stock = request.POST.get('is_unlimited_stock') == 'on'
+        bundle_stock_raw = request.POST.get('bundle_stock', '').strip()
+        product.bundle_stock = int(bundle_stock_raw) if bundle_stock_raw.isdigit() else None
         category = request.POST.get('category', '').strip()
         if category:
             product.category = category
@@ -537,7 +552,7 @@ def edit_product(request, product_id):
             product.image = None
         product.save(update_fields=[
             'name', 'price', 'stock', 'weight_grams',
-            'is_unlimited_stock', 'category', 'image',
+            'is_unlimited_stock', 'category', 'image', 'bundle_stock',
         ])
         product.allergies.set(request.POST.getlist('allergies'))
         after = {
@@ -875,6 +890,14 @@ def sales_admin_dashboard(request):
         Product.objects.filter(is_unlimited_stock=False, stock=0, is_available=True)
         .values('id', 'name', 'category')
     )
+    low_bundle_stock_products = list(
+        Product.objects.filter(bundle_stock__isnull=False, bundle_stock__gt=0, bundle_stock__lte=_threshold)
+        .values('id', 'name', 'bundle_stock', 'category').order_by('bundle_stock')
+    )
+    out_of_bundle_stock_products = list(
+        Product.objects.filter(bundle_stock__isnull=False, bundle_stock=0, is_available=True)
+        .values('id', 'name', 'category')
+    )
 
     return render(request, 'admins/sales_admin_dashboard.html', {
         'pending_orders': pending_orders.order_by('-created_at'),
@@ -889,6 +912,8 @@ def sales_admin_dashboard(request):
         'low_stock_products': low_stock_products,
         'out_of_stock_products': out_of_stock_products,
         'low_stock_threshold': _threshold,
+        'low_bundle_stock_products': low_bundle_stock_products,
+        'out_of_bundle_stock_products': out_of_bundle_stock_products,
     })
 
 @sales_admin_required

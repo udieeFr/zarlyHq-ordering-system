@@ -168,6 +168,15 @@
                   {% else %}
                     {{ item.product.stock }}
                   {% endif %}
+                  {% if item.product.has_bundle %}
+                    <br><small class="text-muted" style="font-size:.7rem;">Bundle:
+                      {% if item.product.bundle_stock is not None %}
+                        {{ item.product.bundle_stock }}
+                      {% else %}
+                        —
+                      {% endif %}
+                    </small>
+                  {% endif %}
                 </td>
                 <td>
                     <input type="number"

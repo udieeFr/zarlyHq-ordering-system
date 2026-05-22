@@ -52,6 +52,14 @@
         </div>
 
         <div class="mb-3">
+          <label class="form-label fw-bold">Bundle Stock <span class="text-muted fw-normal">(optional)</span></label>
+          <input type="number" name="bundle_stock" min="0" class="form-control"
+                 value="{% if product.bundle_stock is not None %}{{ product.bundle_stock }}{% endif %}"
+                 placeholder="Leave blank if no bundle or to track retail stock only">
+          <div class="form-text">Separate stock counter for bundle orders. Only applies if a bundle price is configured.</div>
+        </div>
+
+        <div class="mb-3">
           <label class="form-label fw-bold">Category</label>
           <input type="text" name="category" class="form-control" list="category-list" value="{{ product.category }}" required>
           <datalist id="category-list">

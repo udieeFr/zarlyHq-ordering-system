@@ -152,7 +152,7 @@
           <td style="font-weight:700;color:#ff9933;">RM {{ order.total_amount|floatformat:2 }}</td>
           <td>
             {% if order.payment_proof %}
-              {% if order.payment_proof.name|lower|endswith:'.pdf' %}
+              {% if '.pdf' in order.payment_proof.name|lower %}
                 <a href="{% url 'serve_private_media' order.payment_proof.name %}" target="_blank" class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;">PDF</a>
               {% else %}
                 <img src="{% url 'serve_private_media' order.payment_proof.name %}" alt="Proof" class="proof-thumb js-proof-img"

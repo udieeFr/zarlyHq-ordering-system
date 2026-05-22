@@ -369,7 +369,7 @@
       <p class="support-subtitle">View your submitted complaints and refund status.</p>
     </div>
     {% if eligible_orders %}
-    <button type="button" class="btn-new-complaint" onclick="openComplaintModal()">
+    <button type="button" class="btn-new-complaint js-new-complaint">
       + New Complaint
     </button>
     {% endif %}
@@ -402,8 +402,7 @@
           data-complaint-id="{{ c.id }}"
           data-subject="{{ c.subject|escapejs }}"
           data-locked="{% if c.status == 'resolved' %}true{% else %}false{% endif %}"
-          data-messages-url="{% url 'customer_complaint_messages' c.id %}"
-          onclick="openChatDrawer(this)">
+          data-messages-url="{% url 'customer_complaint_messages' c.id %}">
           💬 Chat
         </button>
       </div>
@@ -448,7 +447,7 @@
     <p class="text-muted" style="font-size:0.875rem;">
       Had an issue with a completed order?
       {% if eligible_orders %}
-        <button type="button" class="btn-link-inline" onclick="openComplaintModal()">File a complaint.</button>
+        <button type="button" class="btn-link-inline js-new-complaint">File a complaint.</button>
       {% else %}
         Complete an order first to file a complaint.
       {% endif %}
@@ -501,12 +500,12 @@
 </div>
 
 <!-- ── Chat Drawer ─────────────────────────────────────── -->
-<div class="chat-drawer-overlay" id="chatOverlay" onclick="closeChatDrawer()"></div>
+<div class="chat-drawer-overlay" id="chatOverlay"></div>
 
 <div class="chat-drawer" id="chatDrawer">
   <div class="chat-drawer-head">
     <span class="chat-drawer-title" id="drawerTitle">Support Chat</span>
-    <button class="chat-drawer-close" onclick="closeChatDrawer()">✕</button>
+    <button class="chat-drawer-close" id="drawerClose">✕</button>
   </div>
   <div class="chat-drawer-locked" id="drawerLocked" style="display:none;">🔒 This complaint is resolved. Chat is read-only.</div>
   <div class="chat-drawer-thread" id="drawerThread">
@@ -520,10 +519,24 @@
 
 <script nonce="{{ request.csp_nonce }}">
 (function () {
-  const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
-  const CSRF      = csrfInput ? csrfInput.value : '';
-  const overlay = document.getElementById('chatOverlay');
-  const drawer  = document.getElementById('chatDrawer');
+  function getCookie(name) {
+    let val = null;
+    if (document.cookie && document.cookie !== '') {
+      document.cookie.split(';').forEach(c => {
+        c = c.trim();
+        if (c.substring(0, name.length + 1) === name + '=') {
+          val = decodeURIComponent(c.substring(name.length + 1));
+        }
+      });
+    }
+    return val;
+  }
+  const CSRF = getCookie('csrftoken');
+  const overlay   = document.getElementById('chatOverlay');
+  const drawer    = document.getElementById('chatDrawer');
+  const closeBtn  = document.getElementById('drawerClose');
+  overlay.addEventListener('click', function () { closeChatDrawer(); });
+  if (closeBtn) closeBtn.addEventListener('click', function () { closeChatDrawer(); });
   const title   = document.getElementById('drawerTitle');
   const lockedBanner = document.getElementById('drawerLocked');
   const thread  = document.getElementById('drawerThread');
@@ -637,21 +650,32 @@
   };
 
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeChatDrawer(); });
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.btn-chat-open');
+    if (btn) openChatDrawer(btn);
+  });
 })();
 </script>
 
 <script nonce="{{ request.csp_nonce }}">
-function openComplaintModal(orderId) {
-  const sel = document.getElementById('complaintOrderSelect');
-  if (sel && orderId) {
-    for (let i = 0; i < sel.options.length; i++) {
-      if (sel.options[i].value === String(orderId)) {
-        sel.selectedIndex = i;
-        break;
+(function () {
+  function openComplaintModal(orderId) {
+    var sel = document.getElementById('complaintOrderSelect');
+    if (sel && orderId) {
+      for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === String(orderId)) {
+          sel.selectedIndex = i;
+          break;
+        }
       }
     }
+    new bootstrap.Modal(document.getElementById('compModal')).show();
   }
-  new bootstrap.Modal(document.getElementById('compModal')).show();
-}
+
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('.js-new-complaint')) openComplaintModal();
+  });
+})();
 </script>
 {% endblock %}

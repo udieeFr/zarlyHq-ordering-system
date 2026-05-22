@@ -48,6 +48,7 @@ class Product(models.Model):
     bundle_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     bundle_quantity = models.IntegerField(null=True, blank=True)
     bundle_weight_grams = models.IntegerField(null=True, blank=True)
+    bundle_stock = models.IntegerField(null=True, blank=True)
 
     @property
     def has_bundle(self):

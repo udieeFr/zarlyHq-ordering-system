@@ -597,22 +597,37 @@ def _create_order_atomic(user, total_price, cart_items, **order_fields):
         }
         for item in cart_items:
             product = locked_products[item['product'].id]
-            if not product.is_unlimited_stock and product.stock < item['quantity']:
-                raise ValueError(
-                    f"Sorry, '{product.name}' only has {product.stock} unit(s) left. "
-                    "Please update your cart and try again."
-                )
+            qty = item['quantity']
+            if item['is_bundle']:
+                if (not product.is_unlimited_stock
+                        and product.bundle_stock is not None
+                        and product.bundle_stock < qty):
+                    raise ValueError(
+                        f"Sorry, the bundle for '{product.name}' only has {product.bundle_stock} unit(s) left. "
+                        "Please update your cart and try again."
+                    )
+            else:
+                if not product.is_unlimited_stock and product.stock < qty:
+                    raise ValueError(
+                        f"Sorry, '{product.name}' only has {product.stock} unit(s) left. "
+                        "Please update your cart and try again."
+                    )
             OrderItem.objects.create(
                 order=order,
                 product=product,
-                quantity=item['quantity'],
+                quantity=qty,
                 unit_price=item['unit_price'],
                 is_bundle=item['is_bundle'],
                 subtotal=item['subtotal'],
             )
-            if not product.is_unlimited_stock:
-                product.stock -= item['quantity']
-                product.save(update_fields=['stock'])
+            if item['is_bundle']:
+                if not product.is_unlimited_stock and product.bundle_stock is not None:
+                    product.bundle_stock -= qty
+                    product.save(update_fields=['bundle_stock'])
+            else:
+                if not product.is_unlimited_stock:
+                    product.stock -= qty
+                    product.save(update_fields=['stock'])
         return order
 
 
@@ -1425,9 +1440,14 @@ def cancel_order(request, order_id):
 
     # Restore stock for each item (skip unlimited-stock products — their stock was never decremented)
     for item in order.items.select_related('product').all():
-        if not item.product.is_unlimited_stock:
-            item.product.stock += item.quantity
-            item.product.save(update_fields=['stock'])
+        if item.is_bundle:
+            if not item.product.is_unlimited_stock and item.product.bundle_stock is not None:
+                item.product.bundle_stock += item.quantity
+                item.product.save(update_fields=['bundle_stock'])
+        else:
+            if not item.product.is_unlimited_stock:
+                item.product.stock += item.quantity
+                item.product.save(update_fields=['stock'])
 
     order.status = 'cancelled'
     order.order_notes = (order.order_notes or '') + f'\n[CANCELLED by customer: {reason}]'
