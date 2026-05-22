@@ -447,6 +447,7 @@ class AuditLog(models.Model):
         ('customer_signup', 'Customer Signup'),
         ('email_verified', 'Email Verified'),
         ('password_reset', 'Password Reset via OTP'),
+        ('password_changed', 'Password Changed via OTP'),
         ('account_deleted', 'Account Self-Deleted'),
         ('login_rate_limited', 'Login Rate Limited'),
         ('order_approved_unpaid', 'Order Approved (Collect on Delivery)'),
