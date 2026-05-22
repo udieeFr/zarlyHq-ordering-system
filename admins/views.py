@@ -2101,6 +2101,38 @@ def customer_crm_detail(request, user_id):
     })
 
 
+# --- PRODUCT RATINGS DASHBOARD ---
+
+@manager_required
+def ratings_dashboard(request):
+    from django.db.models import Avg, Count
+    from customers.models import ProductReview
+
+    LOW_RATING_THRESHOLD = 3.5
+
+    products_with_ratings = (
+        Product.objects
+        .annotate(
+            avg_rating=Avg('reviews__rating'),
+            review_count=Count('reviews__id'),
+        )
+        .filter(review_count__gt=0)
+        .order_by('avg_rating')
+    )
+
+    recent_reviews = (
+        ProductReview.objects
+        .select_related('product', 'customer')
+        .order_by('-created_at')[:20]
+    )
+
+    return render(request, 'admins/ratings_dashboard.html', {
+        'products': products_with_ratings,
+        'recent_reviews': recent_reviews,
+        'low_rating_threshold': LOW_RATING_THRESHOLD,
+    })
+
+
 # --- EMAIL CAMPAIGNS ---
 
 @manager_required
@@ -2561,10 +2593,10 @@ def admin_profile(request):
 def manager_profile(request):
     from django.contrib.auth import update_session_auth_hash
     from .models import RejectedOrder, EmailCampaign
+    from customers.otp_utils import mask_email
 
     user = request.user
     week_ago = timezone.now() - timedelta(days=7)
-    show_pw_form = False
 
     if request.method == 'POST':
         if getattr(request, 'limited', False):
@@ -2580,31 +2612,46 @@ def manager_profile(request):
             messages.success(request, 'Profile updated.')
             return redirect('manager_profile')
 
-        if action == 'change_password':
+        if action == 'request_pw_change_otp':
+            from customers.otp_utils import generate_and_cache_pw_change_otp, send_pw_change_email
+            otp = generate_and_cache_pw_change_otp(user)
+            send_pw_change_email(user, otp)
+            request.session['pw_change_pending'] = True
+            messages.info(request, 'A 6-digit code has been sent to your email.')
+            return redirect('manager_profile')
+
+        if action == 'verify_pw_change_otp':
+            from customers.otp_utils import verify_pw_change_otp
             from django.contrib.auth.password_validation import validate_password
             from django.core.exceptions import ValidationError as DjangoValidationError
-            current = request.POST.get('current_password', '')
+            code = request.POST.get('otp', '').strip()
             new_pw = request.POST.get('new_password', '')
             confirm_pw = request.POST.get('confirm_password', '')
-            if not user.check_password(current):
-                messages.error(request, 'Current password is incorrect.')
-                show_pw_form = True
-            elif new_pw != confirm_pw:
-                messages.error(request, 'Passwords do not match.')
-                show_pw_form = True
-            else:
-                try:
-                    validate_password(new_pw, user)
-                except DjangoValidationError as ve:
-                    for msg in ve.messages:
-                        messages.error(request, msg)
-                    show_pw_form = True
+            result = verify_pw_change_otp(user, code)
+            if result == 'ok':
+                if new_pw != confirm_pw:
+                    messages.error(request, 'Passwords do not match.')
                 else:
-                    user.set_password(new_pw)
-                    user.save()
-                    update_session_auth_hash(request, user)
-                    messages.success(request, 'Password changed successfully.')
-                    return redirect('manager_profile')
+                    try:
+                        validate_password(new_pw, user)
+                    except DjangoValidationError as ve:
+                        for msg in ve.messages:
+                            messages.error(request, msg)
+                    else:
+                        user.set_password(new_pw)
+                        user.save()
+                        update_session_auth_hash(request, user)
+                        request.session.pop('pw_change_pending', None)
+                        log_audit(request, 'password_changed', target=user,
+                                  description=f'Password changed via OTP for {user.username}')
+                        messages.success(request, 'Password changed successfully.')
+                        return redirect('manager_profile')
+            elif result == 'invalid':
+                messages.error(request, 'Incorrect code. Please try again.')
+            else:
+                messages.error(request, 'Code expired or max attempts reached. Please request a new code.')
+                request.session.pop('pw_change_pending', None)
+                return redirect('manager_profile')
 
     approved_total = user.approved_orders.count()
     approved_week = user.approved_orders.filter(approved_at__gte=week_ago).count()
@@ -2627,6 +2674,7 @@ def manager_profile(request):
         'total_recipients': total_recipients,
         'recent_approved': recent_approved,
         'recent_campaigns': recent_campaigns,
-        'show_pw_form': show_pw_form,
+        'pw_change_pending': request.session.get('pw_change_pending', False),
+        'pw_change_email_masked': mask_email(user.email),
     })
     return JsonResponse({'is_vip': profile.is_vip})
