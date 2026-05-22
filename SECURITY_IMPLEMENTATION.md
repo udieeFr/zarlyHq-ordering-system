@@ -171,4 +171,253 @@ The public verification endpoint (`/menu/verify/<uuid:token>/`) recomputes the S
 
 ---
 
+---
+
+## 9. How to Demo & Test Each Security Feature
+
+All tests below assume the dev server is running (`python manage.py runserver`) with at least one manager account, one sales_admin account, and one customer account seeded in the DB.
+
+---
+
+### 9.1 Role-Based Access Control
+
+**What to verify:** a customer cannot reach admin pages; a sales_admin cannot reach manager-only pages.
+
+```
+# As a logged-in customer, visit an admin-only URL
+GET /dashboard/                      → redirected to product list (not 403)
+GET /dashboard/inventory/            → redirected to product list
+
+# As a sales_admin, visit a manager-only URL
+GET /dashboard/analytics/            → "You don't have permission" redirect
+GET /dashboard/add-product/          → "You don't have permission" redirect
+
+# As a manager
+GET /dashboard/analytics/            → 200 OK
+```
+
+---
+
+### 9.2 Step-Up Authentication (Sudo)
+
+**What to verify:** sensitive views require a second password even when already logged in as manager.
+
+```
+# Log in as manager, then visit directly:
+GET /dashboard/audit-log/            → redirected to /dashboard/sudo/confirm/
+GET /dashboard/refunds/              → redirected to /dashboard/sudo/confirm/
+
+# POST correct password to sudo confirm → granted 15-min window
+# Visit audit-log again within 15 min  → 200 OK (no re-prompt)
+# Wait 15 min OR manually clear session key 'sudo_expires_at' → re-prompts
+```
+
+To manually expire sudo in the shell:
+```python
+# In Django shell
+from django.contrib.sessions.backends.db import SessionStore
+s = SessionStore(session_key='<your session key from cookie>')
+del s['sudo_expires_at']
+s.save()
+```
+
+---
+
+### 9.3 Rate Limiting
+
+**What to verify:** repeated requests are blocked at defined thresholds.
+
+```bash
+# Login rate limit (10/min per IP)
+for i in $(seq 1 12); do
+  curl -s -o /dev/null -w "%{http_code}\n" -X POST http://localhost:8000/login/ \
+    -d "username=wrong&password=wrong&csrfmiddlewaretoken=..." \
+    -H "Cookie: csrftoken=..."
+done
+# Requests 11+ return 200 with "Too many login attempts" message (django-ratelimit block=False returns 200, not 429)
+
+# Sudo confirm rate limit (5/min per user)
+# POST wrong password 6 times as manager → "Too many attempts" message on 6th
+```
+
+---
+
+### 9.4 Private Media Serving (IDOR Prevention)
+
+**What to verify:** payment proofs, signed PDFs, and complaint evidence cannot be accessed without authentication and ownership.
+
+```bash
+# 1. Upload a payment proof as a customer, note the order ID
+# 2. Try to fetch the file URL directly (unauthenticated):
+curl http://localhost:8000/media/payment_proofs/20260522-ORDER42.jpg
+# → 403 Forbidden (nginx blocks /media/payment_proofs/ directly)
+
+# 3. Via Django's serve_private_media view:
+curl http://localhost:8000/files/payment_proofs/20260522-ORDER42.jpg
+# → 302 to login (unauthenticated)
+
+# 4. Log in as a DIFFERENT customer → GET the same URL
+# → 403 Forbidden (ownership check fails)
+
+# 5. Log in as the OWNING customer → GET the same URL
+# → 200 OK, file served via X-Accel-Redirect
+
+# 6. Log in as sales_admin → GET any payment proof URL
+# → 200 OK (staff bypass)
+```
+
+In development (without nginx), the `X-Accel-Redirect` header won't proxy — Django falls back to serving the file directly. To test the nginx layer, run docker-compose and hit port 80.
+
+---
+
+### 9.5 Receipt Verification (UUID Token, No IDOR)
+
+**What to verify:** receipt verification requires the UUID token, not a guessable integer order ID.
+
+```bash
+# Old-style integer URL (should 404)
+GET /menu/verify/42/                 → 404
+
+# Correct UUID URL (from order_success page)
+GET /menu/verify/3f2504e0-4f89-11d3-9a0c-0305e82c3301/   → 200, shows signature status
+
+# Try a random UUID
+GET /menu/verify/00000000-0000-0000-0000-000000000001/   → 404
+
+# Tamper test: open signed PDF in hex editor, change 1 byte, re-upload manually
+# Then visit verify URL → "Signature invalid" (hash mismatch)
+```
+
+---
+
+### 9.6 Audit Log & Hash Chain Integrity
+
+**What to verify:** every action is logged; tampering is detectable.
+
+```
+# 1. Log in as manager with sudo → visit /dashboard/audit-log/
+#    → All actions appear in reverse-chronological order
+#    → "Chain valid" badge shows green
+
+# 2. In Django shell, tamper with one entry:
+from admins.models import AuditLog
+entry = AuditLog.objects.order_by('id')[5]
+entry.description = "TAMPERED"
+entry.save()  # bypasses chain logic (chain_hash not recomputed)
+
+# 3. Reload audit-log page → "Chain broken at ID X" warning banner
+```
+
+```python
+# Verify chain programmatically
+from admins.models import AuditLog
+valid, broken_at = AuditLog.verify_chain()
+print(valid, broken_at)
+```
+
+---
+
+### 9.7 Support Chat Encryption
+
+**What to verify:** messages are stored as Fernet ciphertext, not plaintext.
+
+```python
+# In Django shell
+from admins.models import SupportMessage
+msg = SupportMessage.objects.last()
+print(msg.body)          # → "gAAAAAB..." (Fernet ciphertext)
+
+from admins.chat_crypto import decrypt_message
+print(decrypt_message(msg.body))   # → actual message text
+
+# Verify deletion is blocked
+msg.delete()             # → raises PermissionError
+SupportMessage.objects.all().delete()  # → raises PermissionError
+```
+
+---
+
+### 9.8 Digital Signature on Invoices
+
+**What to verify:** approving an order generates a signed PDF and the verify endpoint reports valid.
+
+```
+1. Create or find a pending order with confirmed payment
+2. As sales_admin, click Approve → order moves to 'approved'
+3. Check DigitalSignature record created:
+   python manage.py shell -c "from admins.models import DigitalSignature; print(DigitalSignature.objects.last().__dict__)"
+4. Visit the verify URL shown on the order success page:
+   GET /menu/verify/<uuid>/   → "Signature valid ✓"
+5. Download the signed PDF and confirm it has a visible signature field in a PDF viewer
+```
+
+---
+
+### 9.9 CSP Nonce
+
+**What to verify:** injected `<script>` tags without the nonce are blocked by the browser.
+
+```
+1. Open any admin page in Chrome DevTools → Network → response headers
+   → Look for Content-Security-Policy: script-src 'self' ... 'nonce-xxxxx'
+
+2. In browser console, inject a script tag:
+   var s = document.createElement('script');
+   s.textContent = "alert('xss')";
+   document.body.appendChild(s);
+   → CSP blocks it, DevTools console shows "Refused to execute inline script"
+
+3. Verify all <script> tags in admin templates carry nonce="{{ request.csp_nonce }}"
+   grep -r "<script" templates/admins/ | grep -v "nonce="
+   → Should return empty (all scripts have nonce)
+```
+
+---
+
+### 9.10 PDPA — Email Opt-Out & Account Deletion
+
+**What to verify:** opted-out customers are skipped in campaigns; account deletion works with OTP.
+
+```
+# Email opt-out
+1. As manager, go to CRM → select an opted-out customer → Send Campaign
+   → EmailLog for that customer shows status='skipped', reason='Customer opted out'
+
+# Account deletion
+1. Log in as customer → /menu/account/delete/
+   → OTP sent to registered email
+2. Enter OTP → account deactivated, session terminated, redirect to home
+3. Attempt login with same credentials → fails (account inactive)
+```
+
+---
+
+### 9.11 Known Vulnerability — Stored XSS in Email Template Preview
+
+**Status: Open (not yet fixed)**
+
+**To reproduce (requires manager account):**
+```
+1. Log in as manager → /dashboard/email-templates/new/
+2. In the Body field, enter:
+   <img src=x onerror="alert('XSS: '+document.cookie)">
+3. Save the template
+4. Any manager who opens this template for editing will trigger the alert on page load
+```
+
+**Fix:** Add DOMPurify to `email_template_form.html` and `campaign_compose.html`:
+```html
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"
+        nonce="{{ request.csp_nonce }}"></script>
+```
+Then change `updatePreview` to:
+```js
+function updatePreview(html) {
+    document.getElementById('previewPane').innerHTML =
+        DOMPurify.sanitize(html) || '<span class="text-muted">Start typing…</span>';
+}
+```
+
+---
+
 *Last updated: 2026-05-22*
