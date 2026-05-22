@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 MONTHLY_CAMPAIGN_LIMIT = 2  # max campaign emails per customer per rolling 30 days
 
 
-def _render_body(body_html, customer, profile):
+def _render_body(body_html, customer, profile, unsubscribe_url=''):
     """Replace template placeholders with customer-specific values."""
     from django.utils.dateformat import format as date_format
 
@@ -24,6 +24,7 @@ def _render_body(body_html, customer, profile):
         '{{loyalty_tier}}':   profile.get_loyalty_tier_display() if profile else '',
         '{{last_order_date}}': last_order,
         '{{company_name}}':   getattr(settings, 'COMPANY_NAME', 'Zarly BigFood'),
+        '{{unsubscribe_url}}': unsubscribe_url,
     }
     result = body_html
     for placeholder, value in replacements.items():
@@ -89,7 +90,7 @@ def send_campaign_email(customer, subject, body_html, campaign=None):
         return 'failed', reason
 
 
-def blast_campaign(customers_qs, template, campaign, sender):
+def blast_campaign(customers_qs, template, campaign, sender, request=None):
     """
     Send a campaign email to a queryset of customers.
 
@@ -140,8 +141,22 @@ def blast_campaign(customers_qs, template, campaign, sender):
             results.append({'customer': customer, 'status': 'skipped', 'reason': 'Monthly limit reached'})
             continue
 
+        # Generate per-recipient unsubscribe URL
+        from django.core import signing
+        from django.urls import reverse
+
+        token = signing.dumps(customer.pk, salt='email-unsubscribe')
+        if request is not None:
+            unsubscribe_url = request.build_absolute_uri(
+                reverse('unsubscribe_email', args=[token])
+            )
+        else:
+            from django.conf import settings as _settings
+            base_url = getattr(_settings, 'SITE_URL', 'https://zarlybigfood.my')
+            unsubscribe_url = f"{base_url}{reverse('unsubscribe_email', args=[token])}"
+
         # Render personalised body
-        body = _render_body(template.body_html, customer, profile)
+        body = _render_body(template.body_html, customer, profile, unsubscribe_url=unsubscribe_url)
 
         status, reason = send_campaign_email(
             customer=customer,

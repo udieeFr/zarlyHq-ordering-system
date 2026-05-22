@@ -2309,7 +2309,7 @@ def campaign_compose(request):
             total_recipients=customers_qs.count(),
         )
 
-        results = blast_campaign(customers_qs, tmpl, campaign, sender=request.user)
+        results = blast_campaign(customers_qs, tmpl, campaign, sender=request.user, request=request)
 
         log_audit(request, 'campaign_sent', target=campaign,
                   description=f'Campaign "{campaign_name}" sent — {campaign.sent_count} sent, '
