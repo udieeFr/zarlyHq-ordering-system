@@ -1548,9 +1548,9 @@ def reorder(request, order_id):
 def customer_profile(request):
     from customers.models import CustomerProfile, User as UserModel
     from django.contrib.auth import update_session_auth_hash
+    from .otp_utils import mask_email
 
     profile, _ = CustomerProfile.objects.get_or_create(user=request.user)
-    show_pw_form = False
 
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -1584,31 +1584,46 @@ def customer_profile(request):
             messages.success(request, 'Profile updated.')
             return redirect('customer_profile')
 
-        if action == 'change_password':
-            current = request.POST.get('current_password', '')
+        if action == 'request_pw_change_otp':
+            from .otp_utils import generate_and_cache_pw_change_otp, send_pw_change_email
+            otp = generate_and_cache_pw_change_otp(user)
+            send_pw_change_email(user, otp)
+            request.session['pw_change_pending'] = True
+            messages.info(request, 'A 6-digit code has been sent to your email.')
+            return redirect('customer_profile')
+
+        if action == 'verify_pw_change_otp':
+            from .otp_utils import verify_pw_change_otp
+            from django.contrib.auth.password_validation import validate_password
+            from django.core.exceptions import ValidationError as DjangoValidationError
+            code = request.POST.get('otp', '').strip()
             new_pw = request.POST.get('new_password', '')
             confirm_pw = request.POST.get('confirm_password', '')
-            if not user.check_password(current):
-                messages.error(request, 'Current password is incorrect.')
-                show_pw_form = True
-            elif new_pw != confirm_pw:
-                messages.error(request, 'Passwords do not match.')
-                show_pw_form = True
-            else:
-                from django.contrib.auth.password_validation import validate_password
-                from django.core.exceptions import ValidationError as DjangoValidationError
-                try:
-                    validate_password(new_pw, user)
-                except DjangoValidationError as e:
-                    for msg in e.messages:
-                        messages.error(request, msg)
-                    show_pw_form = True
+            result = verify_pw_change_otp(user, code)
+            if result == 'ok':
+                if new_pw != confirm_pw:
+                    messages.error(request, 'Passwords do not match.')
                 else:
-                    user.set_password(new_pw)
-                    user.save()
-                    update_session_auth_hash(request, user)
-                    messages.success(request, 'Password changed successfully.')
-                    return redirect('customer_profile')
+                    try:
+                        validate_password(new_pw, user)
+                    except DjangoValidationError as e:
+                        for msg in e.messages:
+                            messages.error(request, msg)
+                    else:
+                        user.set_password(new_pw)
+                        user.save()
+                        update_session_auth_hash(request, user)
+                        request.session.pop('pw_change_pending', None)
+                        log_audit(request, 'password_changed', target=user,
+                                  description=f'Password changed via OTP for {user.username}')
+                        messages.success(request, 'Password changed successfully.')
+                        return redirect('customer_profile')
+            elif result == 'invalid':
+                messages.error(request, 'Incorrect code. Please try again.')
+            else:
+                messages.error(request, 'Code expired or max attempts reached. Please request a new code.')
+                request.session.pop('pw_change_pending', None)
+                return redirect('customer_profile')
 
     TIER_ORDER = ['bronze', 'silver', 'gold', 'platinum']
     TIER_THRESHOLDS = {'bronze': 0, 'silver': 500, 'gold': 2000, 'platinum': 5000}
@@ -1630,7 +1645,8 @@ def customer_profile(request):
         'next_tier': next_tier,
         'progress_pct': progress_pct,
         'amount_to_next': amount_to_next,
-        'show_pw_form': show_pw_form,
+        'pw_change_pending': request.session.get('pw_change_pending', False),
+        'pw_change_email_masked': mask_email(request.user.email),
     })
 
 
