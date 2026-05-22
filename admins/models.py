@@ -50,6 +50,16 @@ class Order(models.Model):
 
     internal_note = models.TextField(blank=True, default='')
 
+    step_back_reason = models.TextField(blank=True, default='')
+    stepped_back_at = models.DateTimeField(null=True, blank=True)
+    stepped_back_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='stepped_back_orders',
+    )
+
     # Walk-in / manually-created orders
     is_walk_in = models.BooleanField(default=False)
 
@@ -453,6 +463,8 @@ class AuditLog(models.Model):
         ('order_approved_unpaid', 'Order Approved (Collect on Delivery)'),
         ('campaign_sent', 'Campaign Sent'),
         ('email_template_created', 'Email Template Created'),
+        ('order_stepped_back', 'Order Stepped Back'),
+        ('marketing_opt_out', 'Marketing Opt-Out (Unsubscribe)'),
     )
 
     actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
