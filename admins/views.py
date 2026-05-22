@@ -2210,6 +2210,12 @@ def email_template_create(request):
         subject   = request.POST.get('subject', '').strip()
         body_html = request.POST.get('body_html', '').strip()
         if name and subject and body_html:
+            if '{{unsubscribe_url}}' not in body_html:
+                messages.error(request, 'Template must include {{unsubscribe_url}} for PDPA compliance.')
+                return render(request, 'admins/email_template_form.html', {
+                    'editing': False,
+                    'form_data': {'name': name, 'subject': subject, 'body_html': body_html},
+                })
             t = EmailTemplate.objects.create(
                 name=name, subject=subject, body_html=body_html,
                 created_by=request.user,
@@ -2232,9 +2238,19 @@ def email_template_edit(request, template_id):
         if getattr(request, 'limited', False):
             messages.error(request, 'Too many requests. Please slow down.')
             return redirect('email_template_list')
-        tmpl.name      = request.POST.get('name', tmpl.name).strip()
-        tmpl.subject   = request.POST.get('subject', tmpl.subject).strip()
-        tmpl.body_html = request.POST.get('body_html', tmpl.body_html).strip()
+        name      = request.POST.get('name', tmpl.name).strip()
+        subject   = request.POST.get('subject', tmpl.subject).strip()
+        body_html = request.POST.get('body_html', tmpl.body_html).strip()
+        if '{{unsubscribe_url}}' not in body_html:
+            messages.error(request, 'Template must include {{unsubscribe_url}} for PDPA compliance.')
+            return render(request, 'admins/email_template_form.html', {
+                'editing': True,
+                'tmpl': tmpl,
+                'form_data': {'name': name, 'subject': subject, 'body_html': body_html},
+            })
+        tmpl.name      = name
+        tmpl.subject   = subject
+        tmpl.body_html = body_html
         tmpl.save(update_fields=['name', 'subject', 'body_html', 'updated_at'])
         messages.success(request, f'Template "{tmpl.name}" updated.')
         return redirect('email_template_list')

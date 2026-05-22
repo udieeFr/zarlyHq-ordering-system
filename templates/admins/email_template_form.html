@@ -34,13 +34,13 @@
         <div class="mb-3">
           <label class="form-label fw-bold">Template Name</label>
           <input type="text" name="name" class="form-control" required
-                 value="{% if editing %}{{ tmpl.name }}{% endif %}"
+                 value="{% if form_data %}{{ form_data.name }}{% elif editing %}{{ tmpl.name }}{% endif %}"
                  placeholder="e.g. Monthly Promo — Gold Customers">
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Email Subject</label>
           <input type="text" name="subject" class="form-control" required
-                 value="{% if editing %}{{ tmpl.subject }}{% endif %}"
+                 value="{% if form_data %}{{ form_data.subject }}{% elif editing %}{{ tmpl.subject }}{% endif %}"
                  placeholder="e.g. Special offer just for you, {{customer_name}}!">
         </div>
         <div class="mb-1">
@@ -54,7 +54,13 @@
         </div>
         <textarea name="body_html" id="bodyField" class="form-control font-monospace" rows="14"
                   required oninput="updatePreview(this.value)"
-                  placeholder="Write your email body here. Use the placeholders above to personalise.">{% if editing %}{{ tmpl.body_html }}{% endif %}</textarea>
+                  placeholder="Write your email body here. Use the placeholders above to personalise.">{% if form_data %}{{ form_data.body_html }}{% elif editing %}{{ tmpl.body_html }}{% endif %}</textarea>
+        <div id="unsubscribeWarning" class="form-text text-danger" style="display:none;">
+          &#9888;&#65039; Template must contain <code>&#123;&#123;unsubscribe_url&#125;&#125;</code> before saving.
+        </div>
+        <div class="form-text">
+          Include <code>&#123;&#123;unsubscribe_url&#125;&#125;</code> for the unsubscribe link. Also available: <code>&#123;&#123;customer_name&#125;&#125;</code>, <code>&#123;&#123;loyalty_tier&#125;&#125;</code>, <code>&#123;&#123;last_order_date&#125;&#125;</code>.
+        </div>
         <div class="mt-3 d-flex gap-2">
           <button type="submit" class="btn btn-primary">{% if editing %}Save Changes{% else %}Create Template{% endif %}</button>
           <a href="{% url 'email_template_list' %}" class="btn btn-outline-secondary">Cancel</a>
@@ -93,5 +99,17 @@
   {% if editing %}
   updatePreview(document.getElementById('bodyField').value);
   {% endif %}
+
+  (function() {
+    var bodyField = document.getElementById('bodyField');
+    var warn = document.getElementById('unsubscribeWarning');
+    if (bodyField && warn) {
+      function checkBody() {
+        warn.style.display = bodyField.value.includes('{{unsubscribe_url}}') ? 'none' : '';
+      }
+      bodyField.addEventListener('input', checkBody);
+      checkBody(); // run on page load too
+    }
+  })();
 </script>
 {% endblock %}
