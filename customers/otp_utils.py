@@ -151,3 +151,66 @@ def send_signup_verification_email(username, email, otp):
         )
     except Exception as e:
         logger.warning(f'Could not send verification email to {email}: {e}')
+
+
+# ── Password-change OTP (separate key prefix to avoid collisions) ─────────────
+
+def _pw_change_cache_key(user_pk):
+    return f'pw_change_otp_{user_pk}'
+
+
+def _pw_change_attempts_key(user_pk):
+    return f'pw_change_otp_attempts_{user_pk}'
+
+
+def generate_and_cache_pw_change_otp(user):
+    """Generate a 6-digit OTP for a password-change request and cache it."""
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    cache.set(_pw_change_cache_key(user.pk), code, OTP_TTL)
+    cache.delete(_pw_change_attempts_key(user.pk))
+    return code
+
+
+def verify_pw_change_otp(user, submitted_code):
+    """
+    Verify a password-change OTP.
+    Returns: 'ok' | 'invalid' | 'expired'
+    Single-use; invalidated after MAX_ATTEMPTS wrong guesses.
+    """
+    key = _pw_change_cache_key(user.pk)
+    stored = cache.get(key)
+    if stored is None:
+        return 'expired'
+
+    att_key = _pw_change_attempts_key(user.pk)
+    attempts = (cache.get(att_key) or 0) + 1
+
+    if stored != submitted_code:
+        if attempts >= MAX_ATTEMPTS:
+            cache.delete(key)
+            cache.delete(att_key)
+            return 'expired'
+        cache.set(att_key, attempts, OTP_TTL)
+        return 'invalid'
+
+    cache.delete(key)
+    cache.delete(att_key)
+    return 'ok'
+
+
+def send_pw_change_email(user, otp):
+    """Send a password-change OTP to the user's registered email."""
+    try:
+        body = render_to_string('emails/email_verification.html', {
+            'username': user.username,
+            'otp': otp,
+        })
+        send_mail(
+            subject='Your ZarlyHQ password change code',
+            message=f'Your password change code is: {otp}. It expires in 5 minutes.',
+            from_email=None,
+            recipient_list=[user.email],
+            html_message=body,
+        )
+    except Exception as e:
+        logger.warning(f'Could not send password change email to {user.email}: {e}')
