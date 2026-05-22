@@ -154,35 +154,71 @@
     <div class="prof-panel">
       <div class="prof-panel-header">
         <span class="prof-panel-title">Security</span>
-        <button type="button" class="pw-toggle-btn" id="pw-toggle-btn" onclick="togglePw()">
-          {% if show_pw_form %}Cancel{% else %}Change password{% endif %}
-        </button>
+        {% if not pw_change_pending %}
+        <button type="button" class="pw-toggle-btn" id="pw-toggle-btn">Change password</button>
+        {% endif %}
       </div>
-      <div id="pw-section" {% if show_pw_form %}class="open"{% endif %}>
+
+      {% if not pw_change_pending %}
+      <div id="pw-section">
         <form method="post">
           {% csrf_token %}
-          <input type="hidden" name="action" value="change_password">
-          <div class="prof-field">
-            <label class="prof-label" for="id_current_pw">Current password</label>
-            <input type="password" id="id_current_pw" name="current_password"
-                   class="form-control form-control-sm" style="max-width:320px;" autocomplete="current-password" required>
-          </div>
-          <div class="prof-field">
-            <label class="prof-label" for="id_new_pw">New password <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8;">(min. 8 characters)</span></label>
-            <input type="password" id="id_new_pw" name="new_password"
-                   class="form-control form-control-sm" style="max-width:320px;" autocomplete="new-password" required minlength="8">
-          </div>
-          <div class="prof-field">
-            <label class="prof-label" for="id_confirm_pw">Confirm new password</label>
-            <input type="password" id="id_confirm_pw" name="confirm_password"
-                   class="form-control form-control-sm" style="max-width:320px;" autocomplete="new-password" required>
-          </div>
-          <div style="margin-top:1rem;display:flex;gap:.5rem;align-items:center;">
-            <button type="submit" class="btn btn-sm btn-danger" style="font-size:.82rem;">Update password</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" style="font-size:.82rem;" onclick="togglePw()">Cancel</button>
+          <input type="hidden" name="action" value="request_pw_change_otp">
+          <div class="prof-panel-body" style="padding-top:.75rem;padding-bottom:.75rem;">
+            <p style="font-size:.82rem;color:oklch(45% 0.03 54);margin:0 0 .75rem;">
+              We'll send a 6-digit code to
+              <strong>{{ pw_change_email_masked }}</strong> to verify it's you.
+            </p>
+            <button type="submit" class="btn btn-sm btn-outline-danger" style="font-size:.82rem;">
+              Send verification code
+            </button>
           </div>
         </form>
       </div>
+      {% else %}
+      <div id="pw-section" class="open">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="verify_pw_change_otp">
+          <div class="prof-panel-body">
+            <p style="font-size:.82rem;color:oklch(45% 0.03 54);margin:0 0 1rem;">
+              Enter the 6-digit code sent to <strong>{{ pw_change_email_masked }}</strong>.
+            </p>
+
+            <div class="prof-field">
+              <label class="prof-label" for="id_otp">Verification code</label>
+              <input type="text" id="id_otp" name="otp"
+                     class="form-control form-control-sm" style="max-width:180px;"
+                     inputmode="numeric" maxlength="6" autocomplete="one-time-code"
+                     placeholder="000000" required>
+            </div>
+
+            <div class="prof-field">
+              <label class="prof-label" for="id_new_pw">New password <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8;">(min. 8 characters)</span></label>
+              <input type="password" id="id_new_pw" name="new_password"
+                     class="form-control form-control-sm" style="max-width:320px;"
+                     autocomplete="new-password" required minlength="8">
+            </div>
+
+            <div class="prof-field">
+              <label class="prof-label" for="id_confirm_pw">Confirm new password</label>
+              <input type="password" id="id_confirm_pw" name="confirm_password"
+                     class="form-control form-control-sm" style="max-width:320px;"
+                     autocomplete="new-password" required>
+            </div>
+
+            <div style="margin-top:1rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+              <button type="submit" class="btn btn-sm btn-danger" style="font-size:.82rem;">
+                Change password
+              </button>
+              <a href="{% url 'manager_profile' %}" class="btn btn-sm btn-outline-secondary" style="font-size:.82rem;">
+                Cancel
+              </a>
+            </div>
+          </div>
+        </form>
+      </div>
+      {% endif %}
     </div>
 
   </div>
