@@ -520,7 +520,10 @@ def edit_product(request, product_id):
             product.image = img
         elif request.POST.get('clear_image'):
             product.image = None
-        product.save()
+        product.save(update_fields=[
+            'name', 'price', 'stock', 'weight_grams',
+            'is_unlimited_stock', 'category', 'image',
+        ])
         product.allergies.set(request.POST.getlist('allergies'))
         after = {
             'name': product.name,
