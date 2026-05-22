@@ -40,7 +40,7 @@
               <input type="number" name="price" step="0.01" min="0" class="form-control" placeholder="0.00" required>
             </div>
           </div>
-          <div class="col-md-4">
+          <div class="col-md-4" id="stockRow">
             <label class="form-label fw-bold">Initial Stock</label>
             <input type="number" name="stock" min="0" value="0" class="form-control">
           </div>
@@ -48,6 +48,16 @@
             <label class="form-label fw-bold">Weight (grams)</label>
             <input type="number" name="weight_grams" min="0" class="form-control" placeholder="optional">
           </div>
+        </div>
+
+        <div class="mb-3 form-check">
+          <input type="checkbox" class="form-check-input" id="id_is_unlimited_stock"
+                 name="is_unlimited_stock"
+                 onchange="document.getElementById('stockRow').style.opacity = this.checked ? '0.4' : '1'">
+          <label class="form-check-label fw-bold" for="id_is_unlimited_stock">
+            Unlimited Stock
+          </label>
+          <div class="form-text">When enabled, this product is always available regardless of stock count.</div>
         </div>
 
         <div class="mb-3">

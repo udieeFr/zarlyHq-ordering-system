@@ -452,6 +452,7 @@ def add_product(request):
         stock = request.POST.get('stock', 0)
         weight_grams = request.POST.get('weight_grams') or None
         category = request.POST.get('category', '').strip()
+        is_unlimited_stock = request.POST.get('is_unlimited_stock') == 'on'
 
         if not name or not price or not category:
             messages.error(request, "Name, price, and category are required.")
@@ -471,12 +472,13 @@ def add_product(request):
             weight_grams=weight_grams,
             category=category,
             image=img,
+            is_unlimited_stock=is_unlimited_stock,
         )
         product.allergies.set(request.POST.getlist('allergies'))
 
         log_audit(request, 'product_added', target=product,
                   description=f"Product '{name}' added to menu",
-                  metadata={'price': str(price), 'stock': int(stock), 'category': category})
+                  metadata={'price': str(price), 'stock': int(stock), 'category': category, 'is_unlimited_stock': is_unlimited_stock})
         messages.success(request, f"Product '{name}' added successfully.")
         return redirect('inventory_list')
 
@@ -500,11 +502,13 @@ def edit_product(request, product_id):
             'price': str(product.price),
             'stock': product.stock,
             'category': product.category,
+            'is_unlimited_stock': product.is_unlimited_stock,
         }
         product.name = request.POST.get('name', product.name).strip()
         product.price = request.POST.get('price', product.price)
         product.stock = request.POST.get('stock', product.stock)
         product.weight_grams = request.POST.get('weight_grams', product.weight_grams)
+        product.is_unlimited_stock = request.POST.get('is_unlimited_stock') == 'on'
         category = request.POST.get('category', '').strip()
         if category:
             product.category = category
@@ -523,6 +527,7 @@ def edit_product(request, product_id):
             'price': str(product.price),
             'stock': product.stock,
             'category': product.category,
+            'is_unlimited_stock': product.is_unlimited_stock,
         }
         changes = {k: {'before': before[k], 'after': after[k]} for k in before if before[k] != after[k]}
         log_audit(request, 'product_edited', target=product,

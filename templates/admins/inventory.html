@@ -148,6 +148,7 @@
                 <th>Category</th>
                 <th class="text-end">Price</th>
                 <th class="text-center">Current Stock</th>
+                <th class="text-center">Unlimited</th>
                 <th style="width: 130px;">Update Stock</th>
                 <th class="text-center">Stock Status</th>
                 {% if request.user.role == 'manager' or request.user.is_superuser %}
@@ -163,6 +164,13 @@
                 <td><span class="cat-badge">{{ item.product.category }}</span></td>
                 <td class="text-end price-cell">RM {{ item.product.price }}</td>
                 <td class="text-center">{{ item.product.stock }}</td>
+                <td class="text-center">
+                  {% if item.product.is_unlimited_stock %}
+                    <span class="badge bg-success">∞</span>
+                  {% else %}
+                    &mdash;
+                  {% endif %}
+                </td>
                 <td>
                     <input type="number"
                            name="stock"
