@@ -1698,6 +1698,60 @@ def reject_order(request, order_id):
 
     return redirect('sales_admin_dashboard')
 
+
+STEP_BACK_MAP = {
+    'pending_payment': ('pending',               ['approved_at', 'approved_by_id']),
+    'approved':        ('pending',               ['approved_at', 'approved_by_id']),
+    'prepared':        ('approved',              ['prepared_at', 'prepared_by_id']),
+    'ready_for_delivery': ('prepared',           ['ready_for_delivery_at', 'ready_for_delivery_by_id']),
+    'out_for_delivery':   ('ready_for_delivery', ['delivery_assigned_at', 'delivery_assigned_by_id']),
+}
+
+
+@sales_admin_required
+@ratelimit(key='user', rate='20/m', method='POST', block=False)
+def step_back_order(request, order_id):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+    if getattr(request, 'limited', False):
+        return JsonResponse({'ok': False, 'error': 'Too many requests.'}, status=429)
+
+    order = get_object_or_404(Order, id=order_id)
+    reason = request.POST.get('reason', '').strip()
+
+    if not reason:
+        return JsonResponse({'ok': False, 'error': 'A reason is required.'}, status=400)
+
+    if order.status not in STEP_BACK_MAP:
+        return JsonResponse({'ok': False, 'error': f'Cannot step back a {order.get_status_display()} order.'}, status=400)
+
+    previous_status, fields_to_clear = STEP_BACK_MAP[order.status]
+    old_status = order.status
+
+    order.status = previous_status
+    order.step_back_reason = reason
+    order.stepped_back_at = timezone.now()
+    order.stepped_back_by = request.user
+
+    for field in fields_to_clear:
+        setattr(order, field, None)
+
+    update_fields = ['status', 'step_back_reason', 'stepped_back_at', 'stepped_back_by'] + fields_to_clear
+    order.save(update_fields=update_fields)
+
+    log_audit(request, 'order_stepped_back', target=order,
+              description=f'Order #{order.id} stepped back from {old_status} to {previous_status}: {reason}',
+              metadata={'from_status': old_status, 'to_status': previous_status, 'reason': reason})
+
+    notify(order.customer,
+           title='Order update',
+           message=f'Your Order #{order.id} status has been updated.',
+           link=f'/menu/order-details/{order.id}/',
+           notification_type='order_update')
+
+    return JsonResponse({'ok': True, 'new_status': previous_status})
+
+
 # --- COMPLAINTS ---
 
 @sales_admin_required

@@ -22,6 +22,7 @@ urlpatterns = [
     path('order/<int:order_id>/out-for-delivery/', views.mark_order_out_for_delivery, name='mark_order_out_for_delivery'),
     path('order/<int:order_id>/delivered/', views.mark_order_delivered, name='mark_order_delivered'),
     path('order/<int:order_id>/tracking/', views.update_order_tracking, name='update_order_tracking'),
+    path('order/<int:order_id>/step-back/', views.step_back_order, name='step_back_order'),
     path('order/<int:order_id>/internal-note/', views.save_internal_note, name='save_internal_note'),
     path('order/<int:order_id>/print-summary/', views.print_order_summary, name='print_order_summary'),
     path('prep-list/', views.print_prep_list, name='print_prep_list'),
