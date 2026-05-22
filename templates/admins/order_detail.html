@@ -242,6 +242,12 @@
         <button type="button" class="od-btn b-warn" id="forceApproveBtn">Approve Unpaid</button>
         <form id="forceApproveForm" method="post" action="{% url 'force_approve_unpaid' order.id %}" style="display:none;">{% csrf_token %}</form>
       {% endif %}
+      {% if order.status == 'pending_payment' or order.status == 'approved' or order.status == 'prepared' or order.status == 'ready_for_delivery' or order.status == 'out_for_delivery' %}
+      <button type="button" class="btn btn-outline-warning btn-sm"
+              onclick="document.getElementById('stepBackModal').style.display='flex'">
+        ↩ Step Back
+      </button>
+      {% endif %}
     </div>
   </div>
 
@@ -530,6 +536,61 @@
         else { err.style.display = 'inline'; }
       })
       .catch(function () { btn.textContent = 'Save Note'; btn.disabled = false; err.style.display = 'inline'; });
+    });
+  }
+})();
+</script>
+
+<!-- Step Back Modal -->
+<div id="stepBackModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1050;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:1rem;padding:1.5rem;max-width:480px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.18);">
+    <h5 class="fw-bold mb-1">Step Back Order #{{ order.id }}?</h5>
+    <p style="font-size:.85rem;color:#64748b;margin-bottom:1rem;">
+      This will revert the order to its previous status.
+      {% if order.status == 'approved' or order.status == 'pending_payment' %}
+      <strong class="text-warning d-block mt-1">⚠️ If this order has a confirmed payment, no refund will be triggered. Use Reject to issue a refund.</strong>
+      {% endif %}
+    </p>
+    <form id="stepBackForm" method="post" action="{% url 'step_back_order' order.id %}">
+      {% csrf_token %}
+      <textarea name="reason" id="stepBackReason" class="form-control mb-3" rows="3"
+                placeholder="Required: explain why this order is being stepped back…"></textarea>
+      <div class="d-flex gap-2 justify-content-end">
+        <button type="button" class="btn btn-outline-secondary btn-sm"
+                onclick="document.getElementById('stepBackModal').style.display='none'">Cancel</button>
+        <button type="submit" id="stepBackSubmit" class="btn btn-warning btn-sm" disabled>
+          Confirm Step Back
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+<script nonce="{{ request.csp_nonce }}">
+(function() {
+  var reason = document.getElementById('stepBackReason');
+  var submit = document.getElementById('stepBackSubmit');
+  if (reason && submit) {
+    reason.addEventListener('input', function() {
+      submit.disabled = this.value.trim().length === 0;
+    });
+  }
+  var form = document.getElementById('stepBackForm');
+  if (form) {
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': form.querySelector('[name=csrfmiddlewaretoken]').value,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: 'reason=' + encodeURIComponent(reason.value.trim()),
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.ok) { window.location.reload(); }
+        else { alert('Error: ' + data.error); }
+      });
     });
   }
 })();
