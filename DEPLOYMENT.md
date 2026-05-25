@@ -31,14 +31,14 @@ No repo clone on the VPS. No building. Just pull and run.
 
 ### Phase 1 — Before Touching the VPS
 
-- [ ] Push latest image to Docker Hub
+- [x ] Push latest image to Docker Hub
   ```bash
   docker build -t udieefr/zarlyhq:latest .
   docker push udieefr/zarlyhq:latest
   ```
-- [ ] Buy domain (e.g. `zarlybigfood.my`) — ~RM 50/year
+- [x ] Buy domain (e.g. `zarlybigfood.my`) — ~RM 50/year
 - [ ] Sign up for Stripe at stripe.com (5 min)
-- [ ] Sign up for AWS at aws.amazon.com (free account)
+- [ x] Sign up for AWS at aws.amazon.com (free account)
 
 ---
 
@@ -60,13 +60,13 @@ No repo clone on the VPS. No building. Just pull and run.
 
 ### Phase 3 — Domain Setup
 
-- [x] In your domain registrar, add **A record**:
+- [ x] In your domain registrar, add **A record**:
   - Name: `@`
   - Value: your Lightsail static IP
-- [x] Add **www A record** pointing to same IP
+- [ x] Add **www A record** pointing to same IP (optional)
 - [x] Wait 5–30 min for DNS to propagate
-- [x] Verify: `nslookup zarlybigfood.my` should return your IP
-- [x] Update `nginx.conf` with your real domain:
+- [ x] Verify: `nslookup zarlybigfood.my` should return your IP
+- [ ] Update `nginx.conf` with your real domain:
   ```nginx
   server_name zarlybigfood.my www.zarlybigfood.my;
   ```
@@ -75,21 +75,11 @@ No repo clone on the VPS. No building. Just pull and run.
 
 ### Phase 4 — VPS Initial Setup
 
-SSH into your instance (run from your project root):
+SSH into your instance:
 ```bash
-ssh -i secure_keys/zarlysshkey.pem ubuntu@52.220.39.92
+ssh -i zarlyhq/secure_keys/zarlysshkey.pem ubuntu@52.220.39.92
 ```
-
-> **Note:** The SSH key (`secure_keys/zarlysshkey.pem`) must be in OPENSSH format.
-> If you get "Permission denied (publickey)", convert it first:
-> ```bash
-> ssh-keygen -p -N "" -f secure_keys/zarlysshkey.pem
-> ```
-> Then add the public key to the VPS via Lightsail browser SSH:
-> ```bash
-> echo "$(ssh-keygen -y -f secure_keys/zarlysshkey.pem)" >> ~/.ssh/authorized_keys
-> ```
-
+172.26.2.111
 - [ ] Update system
   ```bash
   sudo apt update && sudo apt upgrade -y
@@ -118,20 +108,20 @@ ssh -i secure_keys/zarlysshkey.pem ubuntu@52.220.39.92
 
 - [ ] Create deployment folder
   ```bash
-  mkdir -p /home/ubuntu/zarlyhq
-  cd /home/ubuntu/zarlyhq
+  mkdir -p /home/ubuntu/zarlyos
+  cd /home/ubuntu/zarlyos
   ```
-- [ ] Upload `docker-compose.yml` from your PC (run from project root)
+- [ ] Upload `docker-compose.yml` from your PC
   ```bash
-  scp -i secure_keys/lightsail.pem docker-compose.yml ubuntu@<ip>:/home/ubuntu/zarlyhq/
+  scp -i ~/.ssh/lightsail.pem docker-compose.yml ubuntu@<ip>:/home/ubuntu/zarlyos/
   ```
-- [ ] Upload `nginx.conf` from your PC (run from project root)
+- [ ] Upload `nginx.conf` from your PC
   ```bash
-  scp -i secure_keys/lightsail.pem nginx.conf ubuntu@<ip>:/home/ubuntu/zarlyhq/
+  scp -i ~/.ssh/lightsail.pem nginx.conf ubuntu@<ip>:/home/ubuntu/zarlyos/
   ```
 - [ ] Create `.env` file on VPS
   ```bash
-  nano /home/ubuntu/zarlyhq/.env
+  nano /home/ubuntu/zarlyos/.env
   ```
   Paste and fill in your values:
   ```env
@@ -155,42 +145,37 @@ ssh -i secure_keys/zarlysshkey.pem ubuntu@52.220.39.92
 
 ---
 
-### Phase 6 — SSL Certificate (Let's Encrypt via Certbot)
+### Phase 6 — SSL Certificate
 
-> **What this does:** Issues a free 90-day TLS certificate from Let's Encrypt.
-> Certbot verifies you own the domain by placing a file at `/.well-known/acme-challenge/`
-> and having Let's Encrypt fetch it over HTTP. nginx must be running and serving that path.
-
-- [x] Install Certbot on VPS
+- [ ] Install Certbot on VPS
   ```bash
   sudo apt install certbot -y
   ```
-- [x] Create webroot folder (where certbot places challenge files)
+- [ ] Create webroot folder
   ```bash
   sudo mkdir -p /var/www/certbot
   ```
-- [x] Deploy HTTP-only `nginx.conf` first (no SSL block) so nginx stays up during challenge
+- [ ] Start nginx temporarily (HTTP only, to pass certbot challenge)
   ```bash
-  scp -i secure_keys/zarlysshkey.pem nginx.conf ubuntu@52.220.39.92:~/zarlyhq/nginx.conf
-  docker compose restart nginx
+  docker-compose up -d nginx
   ```
-- [x] Generate SSL certificate
+- [ ] Generate SSL certificate
   ```bash
   sudo certbot certonly --webroot -w /var/www/certbot \
-    -d zarlybigfood.my -d www.zarlybigfood.my
+    -d zarlybigfood.my -d www.zarlybigfood.my \
+    --email your-email@gmail.com --agree-tos --non-interactive
   ```
-  Certs are saved to `/etc/letsencrypt/live/zarlybigfood.my/`
-- [x] Upload final HTTPS `nginx.conf` (with real cert paths + HTTP→HTTPS redirect)
-  ```bash
-  scp -i secure_keys/zarlysshkey.pem nginx.conf ubuntu@52.220.39.92:~/zarlyhq/nginx.conf
-  docker compose restart nginx
+- [ ] Update `nginx.conf` — swap self-signed for real certs:
+  ```nginx
+  # Comment out self-signed lines:
+  # ssl_certificate /etc/nginx/ssl/cert.pem;
+  # ssl_certificate_key /etc/nginx/ssl/key.pem;
+
+  # Uncomment Let's Encrypt lines:
+  ssl_certificate /etc/letsencrypt/live/zarlybigfood.my/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/zarlybigfood.my/privkey.pem;
   ```
-- [ ] Set up auto-renewal (certs expire every 90 days)
-  ```bash
-  sudo crontab -e
-  # Add this line:
-  0 3 * * * certbot renew --quiet && docker compose -f /home/ubuntu/zarlyhq/docker-compose.yml restart nginx
-  ```
+- [ ] Re-upload updated `nginx.conf` to VPS
 
 ---
 
@@ -198,7 +183,7 @@ ssh -i secure_keys/zarlysshkey.pem ubuntu@52.220.39.92
 
 - [ ] Pull image and start all containers
   ```bash
-  cd /home/ubuntu/zarlyhq
+  cd /home/ubuntu/zarlyos
   docker-compose up -d
   ```
 - [ ] Verify all 3 containers are running
@@ -234,9 +219,9 @@ You can deploy with test keys first and switch after approval.
 
 **After approval:**
 - [ ] Get live keys: Stripe Dashboard → Developers → API Keys
-- [ ] Update `.env` on VPS
+- [ z] Update `.env` on VPS
   ```bash
-  nano /home/ubuntu/zarlyhq/.env
+  nano /home/ubuntu/zarlyos/.env
   # Change sk_test_ → sk_live_
   # Change pk_test_ → pk_live_
   ```
@@ -248,7 +233,7 @@ You can deploy with test keys first and switch after approval.
 ---
 
 ## Updating the App After Go-Live
-
+  
 Every time you push new code:
 
 ```bash
@@ -257,7 +242,7 @@ docker build -t udieefr/zarlyhq:latest .
 docker push udieefr/zarlyhq:latest
 
 # On VPS — pull and restart
-cd /home/ubuntu/zarlyhq
+cd /home/ubuntu/zarlyos
 docker-compose pull django
 docker-compose up -d
 docker-compose exec django python manage.py migrate  # only if DB schema changed

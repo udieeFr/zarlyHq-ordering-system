@@ -36,7 +36,7 @@ class Allergy(models.Model):
 
 class Product(models.Model):
     name = models.CharField(max_length=200)
-    category = models.CharField(max_length=100, blank=True)
+    category = models.CharField(max_length=100, blank=True, default='')
     price = models.DecimalField(max_digits=10, decimal_places=2)
     weight_grams = models.IntegerField(default=0)
     stock = models.IntegerField(default=0)

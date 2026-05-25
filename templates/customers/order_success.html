@@ -22,6 +22,12 @@
                     </div>
                     {% endfor %}
                     <hr>
+                    {% if order.shipping_fee %}
+                    <div class="d-flex justify-content-between mb-2 text-muted">
+                        <span>Delivery fee</span>
+                        <span>RM {{ order.shipping_fee }}</span>
+                    </div>
+                    {% endif %}
                     <div class="d-flex justify-content-between h5 fw-bold text-primary">
                         <span>Grand Total</span>
                         <span>RM {{ order.total_amount }}</span>

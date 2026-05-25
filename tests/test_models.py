@@ -6,6 +6,7 @@ Real-world: Models are the foundation of your app - if they're broken, everythin
 """
 
 import pytest
+from decimal import Decimal
 from django.contrib.auth import get_user_model
 from admins.models import Order, DigitalSignature
 from customers.models import Product
@@ -63,6 +64,23 @@ class TestOrderModelBasics:
             # status not specified - should default to 'pending'
         )
         assert order.status == 'pending'
+
+    def test_order_has_shipping_fee_field(self, test_customer):
+        order = Order.objects.create(
+            customer=test_customer,
+            total_amount=Decimal('48.90'),
+            shipping_fee=Decimal('10.90'),
+            status='pending'
+        )
+        assert order.shipping_fee == Decimal('10.90')
+
+    def test_order_shipping_fee_defaults_to_zero(self, test_customer):
+        order = Order.objects.create(
+            customer=test_customer,
+            total_amount=Decimal('38.00'),
+            status='pending'
+        )
+        assert order.shipping_fee == Decimal('0.00')
 
 
 # ============================================================================

@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 from django.db import models
 from django.utils import timezone
 from customers.models import User, Product
@@ -29,6 +30,7 @@ class Order(models.Model):
     rejection_reason = models.TextField(null=True, blank=True)
     order_notes = models.TextField(null=True, blank=True)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    shipping_fee = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal('0.00'))
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='pending')
     otp_code = models.CharField(max_length=6, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)

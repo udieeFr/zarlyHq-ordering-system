@@ -2040,9 +2040,10 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
 }
 
 .pcard-meta {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: var(--brand);
   font-weight: 600;
+  line-height: 1.2;
 }
 
 .pcard-desc {
@@ -2079,6 +2080,13 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
   justify-content: space-between;
   margin-top: auto;
   padding-top: 0.4rem;
+  gap: 0.25rem;
+}
+.pcard-foot-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
 }
 
 .pcard-price {

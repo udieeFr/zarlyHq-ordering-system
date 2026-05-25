@@ -567,9 +567,16 @@ def checkout(request):
     checkout_key = secrets.token_hex(16)
     request.session['checkout_key'] = checkout_key
 
+    total_weight = sum(
+        (item['product'].bundle_weight_grams or item['product'].weight_grams if item['is_bundle']
+         else item['product'].weight_grams) * item['quantity']
+        for item in cart_items
+    )
+
     return render(request, 'customers/checkout.html', {
         'cart_items': cart_items,
         'total_price': total_price,
+        'total_weight': total_weight,
         'profile': profile,
         'last_order': last_order,
         'checkout_key': checkout_key,
@@ -661,6 +668,8 @@ def submit_order(request):
             messages.error(request, 'Your cart is empty!')
             return redirect('product_list')
 
+        from customers.delivery_utils import calculate_shipping_fee
+
         # Capture realistic shipping information
         latitude = request.POST.get('latitude')
         longitude = request.POST.get('longitude')
@@ -688,9 +697,18 @@ def submit_order(request):
             part for part in [street_address, city, state, postcode] if part
         ))[:500]
 
+        total_weight = sum(
+            (item['product'].bundle_weight_grams or item['product'].weight_grams if item['is_bundle']
+             else item['product'].weight_grams) * item['quantity']
+            for item in cart_items
+        )
+        shipping_fee = calculate_shipping_fee(total_weight, state)
+        grand_total = total_price + shipping_fee
+
         try:
             order = _create_order_atomic(
-                request.user, total_price, cart_items,
+                request.user, grand_total, cart_items,
+                shipping_fee=shipping_fee,
                 full_name=request.POST.get('full_name', '').strip()[:150],
                 phone_number=request.POST.get('phone_number', '').strip()[:20],
                 street_address=street_address,

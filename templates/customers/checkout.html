@@ -307,9 +307,18 @@
           </div>
           {% endfor %}
           <hr class="summary-divider">
+          <div class="summary-item">
+            <span class="summary-item-name" style="color:#9ca3af;">Subtotal</span>
+            <span class="summary-item-price" style="color:#9ca3af;">RM {{ total_price }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-item-name" style="color:#9ca3af;">Delivery</span>
+            <span class="summary-item-price" id="shippingFeeDisplay" style="color:#9ca3af;">—</span>
+          </div>
+          <hr class="summary-divider">
           <div class="summary-total">
             <span>Total</span>
-            <span>RM {{ total_price }}</span>
+            <span id="grandTotalDisplay">RM {{ total_price }}</span>
           </div>
 
           <div class="terms-row">
@@ -332,7 +341,7 @@
 
   <!-- Mobile sticky CTA -->
   <div class="mobile-cta-bar" id="mobileCta">
-    <div class="mobile-cta-total">Total: <strong>RM {{ total_price }}</strong></div>
+    <div class="mobile-cta-total">Total: <strong id="mobileTotalDisplay">RM {{ total_price }}</strong></div>
     <button type="submit" form="checkoutForm" class="btn-place-order" id="placeOrderBtnMobile"
             style="margin-top:0;width:auto;padding:.75rem 1.75rem;font-size:.9rem;">
       Confirm Order →
@@ -516,7 +525,57 @@
     if (isManual) document.getElementById('manual-suboptions').classList.add('visible');
   });
 
-  // Prevent double-submit and show loading state on both desktop and mobile buttons
+  // ── Shipping fee calculator ───────────────────────────────
+  const TOTAL_WEIGHT = {{ total_weight }};
+  const SUBTOTAL = parseFloat("{{ total_price }}");
+  const EAST_MY = new Set(['sabah', 'sarawak', 'labuan']);
+  const RATE_TABLE_JS = [
+    [1000, 6.00, 11.00], [2000, 8.00, 14.00], [3000, 9.00, 16.00],
+    [5000, 11.00, 19.00], [10000, 16.00, 27.00],
+  ];
+
+  function calcFee(weightGrams, state) {
+    if (!state || !state.trim()) return null;
+    const isEast = EAST_MY.has(state.trim().toLowerCase());
+    const w = Math.max(weightGrams, 1);
+    for (const [maxG, pen, east] of RATE_TABLE_JS) {
+      if (w <= maxG) return isEast ? east : pen;
+    }
+    const kgOver = (w - 10000) / 1000;
+    return isEast
+      ? 27.00 + Math.round(kgOver * 2.50 * 100) / 100
+      : 16.00 + Math.round(kgOver * 1.50 * 100) / 100;
+  }
+
+  function updateShipping() {
+    const state = document.getElementById('state').value.trim();
+    const fee = calcFee(TOTAL_WEIGHT, state);
+    const feeEl = document.getElementById('shippingFeeDisplay');
+    const grandEl = document.getElementById('grandTotalDisplay');
+    const mobileEl = document.getElementById('mobileTotalDisplay');
+    if (fee === null) {
+      feeEl.textContent = '—';
+      const s = 'RM ' + SUBTOTAL.toFixed(2);
+      grandEl.textContent = s;
+      if (mobileEl) mobileEl.textContent = s;
+    } else {
+      feeEl.textContent = fee === 0 ? 'Free' : 'RM ' + fee.toFixed(2);
+      const grand = 'RM ' + (SUBTOTAL + fee).toFixed(2);
+      grandEl.textContent = grand;
+      if (mobileEl) mobileEl.textContent = grand;
+    }
+  }
+
+  document.getElementById('state').addEventListener('input', updateShipping);
+
+  // Hook into fillAddress so geocoding/saved-address also triggers update
+  const _origFillAddress = fillAddress;
+  function fillAddress(street, city, state, postcode, formatted) {
+    _origFillAddress(street, city, state, postcode, formatted);
+    updateShipping();
+  }
+
+  // ── Prevent double-submit and show loading state on both desktop and mobile buttons
   document.getElementById('checkoutForm').addEventListener('submit', function() {
     const btns = [
       document.getElementById('placeOrderBtn'),

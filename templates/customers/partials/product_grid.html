@@ -1,7 +1,7 @@
 {% load static %}
 {% for p in products %}
-<div class="col-6 col-md-4 col-lg-3">
-  <div class="pcard">
+<div class="col-6 col-md-4 col-lg-3 d-flex">
+  <div class="pcard w-100">
     <div class="pcard-img-wrap">
       {% if p.image %}
         <img src="{{ p.image.url }}" alt="{{ p.name }}" loading="lazy">
@@ -55,10 +55,6 @@
         {% endfor %}
       </div>
       {% endif %}
-      {% if not p.is_unlimited_stock and p.stock > 0 and p.stock <= 5 %}
-        <div class="pcard-meta">Only {{ p.stock }} left</div>
-      {% endif %}
-
       <div class="pcard-toggle-area">
         {% if p.has_bundle %}
         <div class="pcard-variant-toggle" role="group" aria-label="Choose size">
@@ -86,7 +82,12 @@
       </div>
 
       <div class="pcard-foot">
-        <span class="pcard-price" data-retail-price="RM {{ p.price }}" data-bundle-price="{% if p.bundle_price %}RM {{ p.bundle_price }}{% endif %}">RM {{ p.price }}</span>
+        <div class="pcard-foot-left">
+          <span class="pcard-price" data-retail-price="RM {{ p.price }}" data-bundle-price="{% if p.bundle_price %}RM {{ p.bundle_price }}{% endif %}">RM {{ p.price }}</span>
+          {% if not p.is_unlimited_stock and p.stock > 0 and p.stock <= 5 %}
+            <span class="pcard-meta">Only {{ p.stock }} left</span>
+          {% endif %}
+        </div>
         {% if p.is_unlimited_stock or p.stock > 0 or p.has_bundle and p.bundle_stock != 0 %}
           <form method="post" action="{% url 'add_to_cart' %}" data-cart-form>
             {% csrf_token %}

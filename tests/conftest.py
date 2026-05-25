@@ -15,6 +15,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'zarlyOs.settings')
 django.setup()
 
 import pytest
+from decimal import Decimal
 from django.contrib.auth import get_user_model
 from admins.models import Order, DigitalSignature
 from customers.models import Product
@@ -108,17 +109,18 @@ def test_product():
 def test_order(test_customer):
     """
     Create a test order.
-    
+
     Real-world use: Test order approval, payment, status tracking.
-    
+
     Dependency: Needs test_customer (shown in function parameter)
                 pytest automatically creates test_customer first
-    
+
     Returns: Order object
     """
     order = Order.objects.create(
         customer=test_customer,
-        total_amount=100.00,
+        total_amount=Decimal('110.90'),
+        shipping_fee=Decimal('10.90'),
         status='pending'
     )
     return order
@@ -128,15 +130,16 @@ def test_order(test_customer):
 def test_approved_order(test_customer):
     """
     Create a test order that's already approved.
-    
+
     Real-world use: Test order delivery, signature verification, etc.
                    where order must be in 'approved' state.
-    
+
     Returns: Order object with status='approved'
     """
     order = Order.objects.create(
         customer=test_customer,
-        total_amount=150.00,
+        total_amount=Decimal('160.90'),
+        shipping_fee=Decimal('10.90'),
         status='approved'
     )
     return order
