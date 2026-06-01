@@ -4,6 +4,8 @@ from django.contrib.auth import get_user_model
 from admins.models import Order, AuditLog, OrderItem
 from customers.models import Product
 from customers.views import compute_order_commitment_hash
+from customers.otp_utils import generate_and_cache_order_otp, verify_order_otp
+from django.core.cache import cache
 
 User = get_user_model()
 pytestmark = pytest.mark.django_db
@@ -102,3 +104,30 @@ class TestCommitmentHash:
         order.save(update_fields=['total_amount'])
         h2 = compute_order_commitment_hash(order)
         assert h1 != h2
+
+
+class TestOrderOtp:
+
+    def test_generate_order_otp_returns_6_digits(self, test_customer):
+        otp = generate_and_cache_order_otp(test_customer)
+        assert len(otp) == 6
+        assert otp.isdigit()
+
+    def test_verify_order_otp_ok(self, test_customer):
+        otp = generate_and_cache_order_otp(test_customer)
+        assert verify_order_otp(test_customer, otp) == 'ok'
+
+    def test_verify_order_otp_invalid(self, test_customer):
+        generate_and_cache_order_otp(test_customer)
+        assert verify_order_otp(test_customer, '000000') == 'invalid'
+
+    def test_verify_order_otp_expired_when_not_generated(self, test_customer):
+        cache.delete(f'order_confirm_otp_{test_customer.pk}')
+        assert verify_order_otp(test_customer, '123456') == 'expired'
+
+    def test_order_otp_does_not_collide_with_email_otp(self, test_customer):
+        from customers.otp_utils import generate_and_cache_otp, verify_otp
+        email_otp = generate_and_cache_otp(test_customer)
+        order_otp = generate_and_cache_order_otp(test_customer)
+        assert verify_otp(test_customer, email_otp) == 'ok'
+        assert verify_order_otp(test_customer, order_otp) == 'ok'
