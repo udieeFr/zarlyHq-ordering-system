@@ -1173,7 +1173,7 @@ def customer_orders(request):
 
     upcoming_orders = Order.objects.filter(
         customer=request.user,
-        status__in=['pending', 'prepared', 'ready_for_delivery', 'out_for_delivery'],
+        status__in=['pending_confirmation', 'pending', 'prepared', 'ready_for_delivery', 'out_for_delivery'],
     ).prefetch_related('items__product').order_by('-created_at')
 
     previous_orders = Order.objects.filter(
