@@ -31,6 +31,33 @@ from .payment_utils import validate_payment_proof, get_payment_proof_context, ge
 
 logger = logging.getLogger(__name__)
 
+
+def compute_order_commitment_hash(order):
+    """
+    SHA-256 over identity-bound order contents.
+    Stored at staging time to lock what the customer was shown.
+    Recomputing and comparing later proves the DB was not altered post-confirmation.
+    """
+    import json
+    items = list(
+        order.items.values('product_id', 'quantity', 'unit_price', 'is_bundle')
+    )
+    items_sorted = sorted(items, key=lambda x: x['product_id'])
+    for item in items_sorted:
+        item['unit_price'] = str(item['unit_price'])
+    items_json = json.dumps(items_sorted, sort_keys=True)
+    content = '|'.join([
+        str(order.id),
+        str(order.customer_id),
+        items_json,
+        str(order.total_amount),
+        str(order.shipping_fee),
+        order.formatted_address or '',
+        order.created_at.isoformat(),
+    ])
+    return hashlib.sha256(content.encode('utf-8')).hexdigest()
+
+
 def customer_signup(request):
     """Customer registration view."""
     if request.user.is_authenticated:
