@@ -54,7 +54,32 @@ def generate_invoice_pdf(order, approver=None):
     c.line(50, y-10, 550, y-10)
     c.setFont("Helvetica-Bold", 14)
     c.drawString(350, y-40, f"TOTAL: RM {order.total_amount}")
-    
+
+    # Nonrepudiation section
+    y_nr = y - 80
+    c.setFont("Helvetica", 8)
+    c.setFillColorRGB(0.4, 0.4, 0.4)
+    c.line(50, y_nr + 10, 550, y_nr + 10)
+    c.drawString(50, y_nr, "NONREPUDIATION RECORD")
+    y_nr -= 14
+    if approver:
+        approved_at_str = order.approved_at.strftime('%Y-%m-%d %H:%M UTC') if order.approved_at else 'pending'
+        c.drawString(50, y_nr,
+            f"Approved by: {approver.username} ({approver.role})  |  Approved at: {approved_at_str}"
+        )
+        y_nr -= 12
+    if order.customer_confirmed_at:
+        c.drawString(50, y_nr,
+            f"Customer confirmed: {order.customer_confirmed_at.strftime('%Y-%m-%d %H:%M UTC')}"
+        )
+        y_nr -= 12
+    if order.customer_commitment_hash:
+        c.drawString(50, y_nr,
+            f"Commitment hash: {order.customer_commitment_hash[:32]}..."
+        )
+        y_nr -= 12
+    c.setFillColorRGB(0, 0, 0)
+
     c.save()
     return file_path
 

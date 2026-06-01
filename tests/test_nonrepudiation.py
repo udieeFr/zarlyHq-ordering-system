@@ -246,3 +246,47 @@ class TestSubmitOrderStaging:
         ).first()
         assert log is not None
         assert log.metadata.get('commitment_hash') == 'b' * 64
+
+
+class TestPdfAdminIdentity:
+
+    def test_pdf_embeds_approver_name(self, test_customer, test_product, test_sales_admin):
+        import os
+        from django.conf import settings
+        from admins.utils import generate_invoice_pdf
+        order = Order.objects.create(
+            customer=test_customer,
+            total_amount=Decimal('50.00'),
+            status='pending',
+            customer_commitment_hash='c' * 64,
+            approved_by=test_sales_admin,
+        )
+        OrderItem.objects.create(
+            order=order, product=test_product,
+            quantity=1, unit_price=Decimal('50.00'),
+            is_bundle=False, subtotal=Decimal('50.00'),
+        )
+        pdf_path = generate_invoice_pdf(order, approver=test_sales_admin)
+        assert os.path.exists(pdf_path)
+        with open(pdf_path, 'rb') as f:
+            content = f.read()
+        assert test_sales_admin.username.encode() in content
+
+    def test_pdf_embeds_commitment_hash_prefix(self, test_customer, test_product, test_sales_admin):
+        import os
+        from admins.utils import generate_invoice_pdf
+        order = Order.objects.create(
+            customer=test_customer,
+            total_amount=Decimal('50.00'),
+            status='pending',
+            customer_commitment_hash='d' * 64,
+        )
+        OrderItem.objects.create(
+            order=order, product=test_product,
+            quantity=1, unit_price=Decimal('50.00'),
+            is_bundle=False, subtotal=Decimal('50.00'),
+        )
+        pdf_path = generate_invoice_pdf(order, approver=test_sales_admin)
+        with open(pdf_path, 'rb') as f:
+            content = f.read()
+        assert ('d' * 32).encode() in content
