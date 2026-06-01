@@ -290,3 +290,35 @@ class TestPdfAdminIdentity:
         with open(pdf_path, 'rb') as f:
             content = f.read()
         assert ('d' * 32).encode() in content
+
+
+class TestCancelUnconfirmedOrders:
+
+    def test_cancels_orders_older_than_30_minutes(self, test_customer, test_product):
+        from django.utils import timezone
+        from datetime import timedelta
+        from django.core.management import call_command
+        order = Order.objects.create(
+            customer=test_customer,
+            total_amount=Decimal('100.00'),
+            status='pending_confirmation',
+            customer_commitment_hash='e' * 64,
+        )
+        Order.objects.filter(pk=order.pk).update(
+            created_at=timezone.now() - timedelta(minutes=31)
+        )
+        call_command('cancel_unconfirmed_orders', '--dry-run=false')
+        order.refresh_from_db()
+        assert order.status == 'cancelled'
+
+    def test_does_not_cancel_recent_orders(self, test_customer):
+        from django.core.management import call_command
+        order = Order.objects.create(
+            customer=test_customer,
+            total_amount=Decimal('100.00'),
+            status='pending_confirmation',
+            customer_commitment_hash='f' * 64,
+        )
+        call_command('cancel_unconfirmed_orders', '--dry-run=false')
+        order.refresh_from_db()
+        assert order.status == 'pending_confirmation'
