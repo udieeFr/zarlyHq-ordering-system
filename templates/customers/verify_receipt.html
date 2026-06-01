@@ -239,14 +239,45 @@
       </div>
       <div class="verify-row">
         <span class="verify-label">Type</span>
-        <span class="verify-value plain">Self-signed (SME)</span>
+        <span class="verify-value plain">
+          <span style="color:#b45309;">⚠ Self-signed</span>
+          <small style="display:block;color:#888;font-family:inherit;">Identity claim unverified by a trusted CA</small>
+        </span>
       </div>
+      {% endif %}
+
+      <!-- Nonrepudiation Record -->
+      {% if order %}
+      <p class="verify-section-title">Nonrepudiation Record</p>
+      {% if order.approved_by %}
+      <div class="verify-row">
+        <span class="verify-label">Approved by</span>
+        <span class="verify-value plain">{{ order.approved_by.username }} ({{ order.approved_by.get_role_display }})</span>
+      </div>
+      {% endif %}
+      {% if order.customer_confirmed_at %}
+      <div class="verify-row">
+        <span class="verify-label">Customer confirmed</span>
+        <span class="verify-value plain">{{ order.customer_confirmed_at|date:"Y-m-d H:i" }} UTC</span>
+      </div>
+      {% endif %}
+      {% if order.customer_commitment_hash %}
+      <div class="verify-row">
+        <span class="verify-label">Commitment hash</span>
+        <span class="verify-value">
+          {{ order.customer_commitment_hash|slice:":16" }}…
+          <small style="display:block;font-family:inherit;color:#888;">SHA-256 of order contents at customer confirmation time</small>
+        </span>
+      </div>
+      {% endif %}
       {% endif %}
 
       <div class="verify-note">
         This verification checks that the receipt was signed by Zarly BigFood Sdn Bhd and has not been modified since signing.
         The certificate is self-signed, which is standard for SME deployments.
         SHA-256 algorithm is used for file integrity and RSA for the cryptographic signature.
+        The <strong>commitment hash</strong> proves the customer confirmed the exact order contents (Nonrepudiation of Origin).
+        The <strong>PKCS#7 signature</strong> proves the company approved and committed to the order (Nonrepudiation of Finalization).
       </div>
     </div>
     {% endif %}

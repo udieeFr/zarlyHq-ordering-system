@@ -1411,8 +1411,16 @@ def verify_receipt(request, token):
         })
 
     pdf_path = os.path.join(settings.MEDIA_ROOT, str(sig_record.pdf_path))
+
+    from admins.models import Order as AdminOrder
+    try:
+        sig_order = AdminOrder.objects.select_related('approved_by').get(pk=sig_record.order_id)
+    except AdminOrder.DoesNotExist:
+        sig_order = None
+
     result = {
         'order_id': sig_record.order_id,
+        'order': sig_order,
         'signed_at': sig_record.timestamp,
         'signer': 'Zarly BigFood Sdn Bhd',
         'stored_hash': sig_record.signature_hash,
