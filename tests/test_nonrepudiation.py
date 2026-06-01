@@ -131,3 +131,118 @@ class TestOrderOtp:
         order_otp = generate_and_cache_order_otp(test_customer)
         assert verify_otp(test_customer, email_otp) == 'ok'
         assert verify_order_otp(test_customer, order_otp) == 'ok'
+
+
+class TestSubmitOrderStaging:
+
+    def test_submit_order_creates_pending_confirmation(self, test_customer, test_product):
+        test_customer.email_verified = True
+        test_customer.save()
+        from django.test import Client
+        from django.urls import reverse
+        client = Client()
+        client.force_login(test_customer)
+        session = client.session
+        session['cart'] = {str(test_product.id): 1}
+        session['checkout_key'] = 'testkey123'
+        session.save()
+        client.post(reverse('submit_order'), {
+            'full_name': 'Test User',
+            'phone_number': '0123456789',
+            'street_address': '1 Jalan Test',
+            'city': 'Kuala Lumpur',
+            'state': 'Wilayah Persekutuan',
+            'postcode': '50000',
+            'payment_method': 'manual',
+            'manual_payment_timing': 'later',
+            'checkout_key': 'testkey123',
+        })
+        order = Order.objects.filter(customer=test_customer).first()
+        assert order is not None
+        assert order.status == 'pending_confirmation'
+
+    def test_submit_order_stores_commitment_hash(self, test_customer, test_product):
+        test_customer.email_verified = True
+        test_customer.save()
+        from django.test import Client
+        from django.urls import reverse
+        client = Client()
+        client.force_login(test_customer)
+        session = client.session
+        session['cart'] = {str(test_product.id): 1}
+        session['checkout_key'] = 'testkey456'
+        session.save()
+        client.post(reverse('submit_order'), {
+            'full_name': 'Test User',
+            'phone_number': '0123456789',
+            'street_address': '1 Jalan Test',
+            'city': 'Kuala Lumpur',
+            'state': 'Wilayah Persekutuan',
+            'postcode': '50000',
+            'payment_method': 'manual',
+            'manual_payment_timing': 'later',
+            'checkout_key': 'testkey456',
+        })
+        order = Order.objects.filter(customer=test_customer).first()
+        assert len(order.customer_commitment_hash) == 64
+
+    def test_confirm_order_with_valid_otp_moves_to_pending(self, test_customer):
+        from django.test import Client
+        from django.urls import reverse
+        order = Order.objects.create(
+            customer=test_customer,
+            total_amount=Decimal('100.00'),
+            status='pending_confirmation',
+            customer_commitment_hash='a' * 64,
+        )
+        otp = generate_and_cache_order_otp(test_customer)
+        client = Client()
+        client.force_login(test_customer)
+        session = client.session
+        session[f'pending_payment_method_{order.id}'] = 'manual'
+        session[f'pending_manual_timing_{order.id}'] = 'later'
+        session.save()
+        client.post(reverse('confirm_order', args=[order.id]), {'otp': otp})
+        order.refresh_from_db()
+        assert order.status == 'pending'
+        assert order.customer_confirmed_at is not None
+
+    def test_confirm_order_with_invalid_otp_stays_pending_confirmation(self, test_customer):
+        from django.test import Client
+        from django.urls import reverse
+        order = Order.objects.create(
+            customer=test_customer,
+            total_amount=Decimal('100.00'),
+            status='pending_confirmation',
+            customer_commitment_hash='a' * 64,
+        )
+        generate_and_cache_order_otp(test_customer)
+        client = Client()
+        client.force_login(test_customer)
+        client.post(reverse('confirm_order', args=[order.id]), {'otp': '000000'})
+        order.refresh_from_db()
+        assert order.status == 'pending_confirmation'
+
+    def test_confirm_order_logs_audit_with_commitment_hash(self, test_customer):
+        from django.test import Client
+        from django.urls import reverse
+        order = Order.objects.create(
+            customer=test_customer,
+            total_amount=Decimal('100.00'),
+            status='pending_confirmation',
+            customer_commitment_hash='b' * 64,
+        )
+        otp = generate_and_cache_order_otp(test_customer)
+        client = Client()
+        client.force_login(test_customer)
+        session = client.session
+        session[f'pending_payment_method_{order.id}'] = 'manual'
+        session[f'pending_manual_timing_{order.id}'] = 'later'
+        session.save()
+        client.post(reverse('confirm_order', args=[order.id]), {'otp': otp})
+        log = AuditLog.objects.filter(
+            action_type='order_confirmed_by_customer',
+            target_id=order.id,
+        ).first()
+        assert log is not None
+        assert log.metadata.get('commitment_hash') == 'b' * 64

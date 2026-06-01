@@ -621,7 +621,6 @@ def _create_order_atomic(user, total_price, cart_items, **order_fields):
         order = Order.objects.create(
             customer=user,
             total_amount=total_price,
-            status='pending',
             **order_fields,
         )
         product_ids = [item['product'].id for item in cart_items]
@@ -735,6 +734,7 @@ def submit_order(request):
         try:
             order = _create_order_atomic(
                 request.user, grand_total, cart_items,
+                status='pending_confirmation',
                 shipping_fee=shipping_fee,
                 full_name=request.POST.get('full_name', '').strip()[:150],
                 phone_number=request.POST.get('phone_number', '').strip()[:20],
@@ -752,16 +752,11 @@ def submit_order(request):
             return redirect('checkout')
 
         from admins.models import OrderEvent
-        OrderEvent.objects.create(order=order, status='pending', actor=request.user)
-        log_audit(request, 'order_created', target=order,
-                  description=f"Customer placed Order #{order.id}",
-                  metadata={'total': str(total_price), 'items': len(cart_items)})
-        notify_admins(
-            title="New order received",
-            message=f"Customer {request.user.username} placed Order #{order.id} for RM {total_price}.",
-            link=f"/dashboard/order/{order.id}/detail/",
-            notification_type='admin_alert',
-        )
+        OrderEvent.objects.create(order=order, status='pending_confirmation', actor=request.user)
+
+        # Compute and store commitment hash — locks in what the customer was shown
+        order.customer_commitment_hash = compute_order_commitment_hash(order)
+        order.save(update_fields=['customer_commitment_hash'])
 
         # Persist preferred payment method to profile for next auto-fill
         payment_method = request.POST.get('payment_method')
@@ -774,74 +769,144 @@ def submit_order(request):
         except Exception:
             pass
 
-        # Handle payment method selection
-        
-        if payment_method == 'stripe':
-            # Create Stripe Checkout Session
-            session_id, error = create_stripe_checkout_session(order, request)
-            if error:
-                messages.error(
-                    request,
-                    f"Could not create Stripe payment session: {error}. Check STRIPE_SECRET_KEY and try again."
-                )
-                return redirect('checkout')
+        # Save payment intent to session — processed after OTP confirmation
+        request.session[f'pending_payment_method_{order.id}'] = payment_method
+        if payment_method == 'manual':
+            request.session[f'pending_manual_timing_{order.id}'] = request.POST.get('manual_payment_timing', 'later')
 
-            # Keep order in pending review until admin accepts it.
-            # Stripe webhook will mark the payment as succeeded when confirmed.
-            # Admin acceptance will route paid orders to approved and unpaid to pending_payment.
-            
-            # Get the checkout URL
-            checkout_url = get_session_url(session_id)
-            if not checkout_url:
-                messages.error(request, "Could not retrieve Stripe checkout URL. Please try again.")
-                return redirect('checkout')
-            
-            # Clear cart before redirecting to Stripe
-            request.session['cart'] = {}
-            request.session.modified = True
-            
-            messages.success(request, 'Order created! Redirecting to payment...')
-            return redirect(checkout_url)
-        
-        elif payment_method == 'manual':
-            # Manual payment: customer can choose to pay now or later
-            # Order starts as 'pending' (pending request)
-            # Admin will approve and set to 'accepted' or 'awaiting_payment'
-            manual_timing = request.POST.get('manual_payment_timing', 'now')
-            
-            if manual_timing == 'now':
-                # Pay Now: show payment methods immediately to upload proof
-                messages.success(request, f'Order #{order.id} created! Please complete payment below.')
-            else:
-                # Pay Later: customer pays after admin approval
-                messages.success(
-                    request, 
-                    f'Order #{order.id} created! Once we approve your order, you can pay and upload proof from your dashboard.'
-                )
-            
-            # Create a manual payment record for audit trail
-            Payment.objects.create(
-                order=order,
-                payment_method='manual',
-                status='pending',
-                amount=order.total_amount,
-                currency=settings.STRIPE_CURRENCY,
-            )
-            
-            # Store payment timing in session so order_success knows which UI to show
-            request.session[f'payment_timing_{order.id}'] = manual_timing
-            
-            # Clear cart
-            request.session['cart'] = {}
-            request.session.modified = True
-            
-            return redirect('order_success', order_id=order.id)
-        
-        else:
-            messages.error(request, 'Please select a payment method.')
-            return redirect('checkout')
+        # Send OTP email with order summary
+        from customers.otp_utils import generate_and_cache_order_otp, send_order_confirmation_email
+        otp = generate_and_cache_order_otp(request.user)
+        send_order_confirmation_email(request.user, otp, order)
+
+        log_audit(request, 'order_created', target=order,
+                  description=f"Customer staged Order #{order.id} — awaiting OTP confirmation",
+                  metadata={'total': str(grand_total), 'items': len(cart_items),
+                            'commitment_hash': order.customer_commitment_hash})
+
+        # Clear cart — stock was already decremented in _create_order_atomic
+        request.session['cart'] = {}
+        request.session.modified = True
+
+        return redirect('confirm_order', order_id=order.id)
 
     return redirect('checkout')
+
+
+@customer_required
+@ratelimit(key='user', rate='5/m', method='POST', block=False)
+def confirm_order(request, order_id):
+    """
+    Step 2 of order placement: customer enters the OTP emailed at staging time.
+    Verifies OTP, stamps commitment, moves order to pending, then handles payment routing.
+    """
+    order = get_object_or_404(Order, id=order_id, customer=request.user,
+                              status='pending_confirmation')
+
+    from customers.otp_utils import (
+        verify_order_otp, generate_and_cache_order_otp,
+        send_order_confirmation_email, mask_email,
+    )
+
+    if request.method == 'POST':
+        if getattr(request, 'limited', False):
+            messages.error(request, 'Too many attempts. Please wait before trying again.')
+            return redirect('confirm_order', order_id=order_id)
+
+        if request.POST.get('action') == 'resend':
+            otp = generate_and_cache_order_otp(request.user)
+            send_order_confirmation_email(request.user, otp, order)
+            messages.success(request, f'A new code was sent to {mask_email(request.user.email)}.')
+            return redirect('confirm_order', order_id=order_id)
+
+        code = request.POST.get('otp', '').strip()
+        result = verify_order_otp(request.user, code)
+
+        if result == 'ok':
+            from django.utils import timezone as tz
+            from admins.models import OrderEvent
+            order.customer_confirmed_at = tz.now()
+            order.status = 'pending'
+            order.save(update_fields=['status', 'customer_confirmed_at'])
+
+            OrderEvent.objects.create(order=order, status='pending', actor=request.user)
+            log_audit(request, 'order_confirmed_by_customer', target=order,
+                      description=f'Customer confirmed Order #{order.id} via OTP',
+                      metadata={
+                          'commitment_hash': order.customer_commitment_hash,
+                          'confirmed_at': order.customer_confirmed_at.isoformat(),
+                      })
+
+            # Retrieve payment intent stored at staging
+            payment_method = request.session.pop(f'pending_payment_method_{order.id}', 'manual')
+            manual_timing = request.session.pop(f'pending_manual_timing_{order.id}', 'later')
+
+            notify_admins(
+                title='New order received',
+                message=f'Customer {request.user.username} confirmed Order #{order.id} for RM {order.total_amount}.',
+                link=f'/dashboard/order/{order.id}/detail/',
+                notification_type='admin_alert',
+            )
+
+            if payment_method == 'stripe':
+                session_id, error = create_stripe_checkout_session(order, request)
+                if error:
+                    messages.error(request, f'Could not create Stripe session: {error}')
+                    return redirect('order_success', order_id=order.id)
+                checkout_url = get_session_url(session_id)
+                if not checkout_url:
+                    messages.error(request, 'Could not open Stripe checkout. Please try again.')
+                    return redirect('order_success', order_id=order.id)
+                log_audit(request, 'payment_initiated', target=order,
+                          description=f'Stripe checkout started for Order #{order.id}',
+                          metadata={'stripe_session_id': session_id})
+                return redirect(checkout_url)
+
+            else:  # manual
+                Payment.objects.create(
+                    order=order,
+                    payment_method='manual',
+                    status='pending',
+                    amount=order.total_amount,
+                    currency=settings.STRIPE_CURRENCY,
+                )
+                request.session[f'payment_timing_{order.id}'] = manual_timing
+                if manual_timing == 'now':
+                    messages.success(request, f'Order #{order.id} confirmed! Please complete payment below.')
+                else:
+                    messages.success(request, f'Order #{order.id} confirmed! Pay from your dashboard after approval.')
+                return redirect('order_success', order_id=order.id)
+
+        elif result == 'invalid':
+            messages.error(request, 'Incorrect code. Please try again.')
+
+        else:  # expired / max attempts
+            _cancel_pending_confirmation_order(order, request.user)
+            messages.error(request, 'Code expired. Your order was cancelled — please start again.')
+            return redirect('checkout')
+
+    return render(request, 'customers/order_confirmation.html', {
+        'order': order,
+        'masked_email': mask_email(request.user.email),
+    })
+
+
+def _cancel_pending_confirmation_order(order, user):
+    """Restore stock and cancel an unconfirmed order."""
+    from admins.models import OrderEvent
+    for item in order.items.select_related('product').all():
+        if item.is_bundle:
+            if not item.product.is_unlimited_stock and item.product.bundle_stock is not None:
+                item.product.bundle_stock += item.quantity
+                item.product.save(update_fields=['bundle_stock'])
+        else:
+            if not item.product.is_unlimited_stock:
+                item.product.stock += item.quantity
+                item.product.save(update_fields=['stock'])
+    order.status = 'cancelled'
+    order.save(update_fields=['status'])
+    OrderEvent.objects.create(order=order, status='cancelled', actor=user,
+                              note='Cancelled: OTP confirmation expired')
 
 @customer_required
 def order_success(request, order_id):
