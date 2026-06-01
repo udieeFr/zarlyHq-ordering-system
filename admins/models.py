@@ -6,6 +6,7 @@ from customers.models import User, Product
 
 class Order(models.Model):
     STATUS_CHOICES = (
+        ('pending_confirmation', 'Pending Customer Confirmation'),
         ('pending', 'Pending'),
         ('approved', 'Approved'),
         ('prepared', 'Prepared'),
@@ -33,6 +34,8 @@ class Order(models.Model):
     shipping_fee = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal('0.00'))
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='pending')
     otp_code = models.CharField(max_length=6, blank=True, null=True)
+    customer_commitment_hash = models.CharField(max_length=64, blank=True, default='')
+    customer_confirmed_at    = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     approved_at = models.DateTimeField(null=True, blank=True)
     approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
@@ -427,6 +430,7 @@ class AuditLog(models.Model):
     """
     ACTION_CHOICES = (
         ('order_created', 'Order Created'),
+        ('order_confirmed_by_customer', 'Order Confirmed by Customer (OTP)'),
         ('order_approved', 'Order Approved'),
         ('order_rejected', 'Order Rejected'),
         ('order_prepared', 'Order Prepared'),
