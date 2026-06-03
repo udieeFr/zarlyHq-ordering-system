@@ -19,6 +19,23 @@ services:
     networks:
       - zarlyos-network
 
+  redis:
+    image: redis:7-alpine
+    container_name: zarlyos-redis
+    restart: unless-stopped
+    # Persist OTP / rate-limit state across restarts (appendonly file).
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    # No ports exposed — only reachable internally on the VPS network.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zarlyos-network
+
   django:
     image: udieefr/zarlyhq:latest
     container_name: zarlyos-app
@@ -26,8 +43,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       DEBUG: ${DEBUG:-False}
+      # Shared cache across all gunicorn workers — required for OTP + rate limiting.
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       SECRET_KEY: ${SECRET_KEY}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost}
       DATABASE_NAME: ${DB_NAME:-zarlyos}
@@ -80,3 +101,4 @@ networks:
 volumes:
   postgres_data:
   static_files:
+  redis_data:

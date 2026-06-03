@@ -881,9 +881,21 @@ def confirm_order(request, order_id):
             messages.error(request, 'Incorrect code. Please try again.')
 
         else:  # expired / max attempts
-            _cancel_pending_confirmation_order(order, request.user)
-            messages.error(request, 'Code expired. Your order was cancelled — please start again.')
-            return redirect('checkout')
+            # Do NOT destroy the order here. An 'expired' result can also be
+            # caused by an infra-level cache miss (e.g. a transient Redis blip,
+            # which is swallowed because of IGNORE_EXCEPTIONS), and silently
+            # cancelling a confirmed order over that is far too aggressive.
+            # Keep the order in pending_confirmation, issue a fresh code, and
+            # let the customer retry. The cancel_unconfirmed_orders cron cleans
+            # up genuinely abandoned orders after 30 minutes.
+            otp = generate_and_cache_order_otp(request.user)
+            send_order_confirmation_email(request.user, otp, order)
+            messages.warning(
+                request,
+                f'That code expired. We sent a new code to {mask_email(request.user.email)} — '
+                'please enter it below.'
+            )
+            return redirect('confirm_order', order_id=order_id)
 
     return render(request, 'customers/order_confirmation.html', {
         'order': order,
