@@ -1027,7 +1027,9 @@ git commit -m "feat: add checkout gate blocking unverified customers from placin
             <div class="card border-0 login-card">
                 <div class="card-body p-5">
                     <div class="text-center mb-4">
-                        <div class="login-logo-wrap">🍊</div>
+                        <div class="login-logo-wrap">
+                            <img src="{% static 'images/finallogo.png' %}" alt="Zarly logo" style="width:100%;height:100%;object-fit:contain;border-radius:0;"/>
+                        </div>
                         <h2 class="fw-bold mb-1" style="letter-spacing:-0.02em;">Create Account</h2>
                         <p class="text-muted mb-0" style="font-size:0.875rem;">Join Zarly BigFood</p>
                     </div>

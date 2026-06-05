@@ -285,8 +285,8 @@ def download_invoice(request, order_id):
         return redirect('customer_orders')
     order = get_object_or_404(Order, id=order_id, customer=request.user)
 
-    if order.status != 'pending_payment':
-        messages.error(request, "Invoice is only available for orders pending payment.")
+    if order.status in ('cancelled', 'rejected'):
+        messages.error(request, "Invoice is not available for cancelled or rejected orders.")
         return redirect('product_list')
 
     try:
