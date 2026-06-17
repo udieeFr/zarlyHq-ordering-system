@@ -6,4 +6,12 @@
 python manage.py collectstatic --noinput \
     || echo "[entrypoint] collectstatic failed — continuing with existing static files"
 
+# Schedule the unconfirmed-order cleanup cron (every 5 minutes).
+# Cancels orders stuck in pending_confirmation and restores their stock.
+(while true; do
+    python manage.py cancel_unconfirmed_orders --dry-run false \
+        >> /tmp/cancel_unconfirmed.log 2>&1
+    sleep 300
+done) &
+
 exec "$@"

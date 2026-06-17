@@ -282,7 +282,7 @@ CSP_IMG_SRC      = (
     "https://cdn.jsdelivr.net",
 )
 CSP_CONNECT_SRC  = ("'self'", "https://nominatim.openstreetmap.org")
-CSP_FRAME_ANCESTORS = ("'none'",)
+CSP_FRAME_ANCESTORS = ("'self'",)
 CSP_OBJECT_SRC   = ("'none'",)
 CSP_BASE_URI     = ("'self'",)
 CSP_FORM_ACTION  = ("'self'",)

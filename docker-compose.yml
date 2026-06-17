@@ -72,6 +72,7 @@ services:
     volumes:
       - static_files:/app/staticfiles
       - ./media:/app/media
+      - /home/ubuntu/secure_keys:/app/secure_keys:ro
     expose:
       - "8000"
     healthcheck:
