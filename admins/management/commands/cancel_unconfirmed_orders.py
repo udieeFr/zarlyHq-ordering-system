@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+from django.db import transaction
 from datetime import timedelta
 from admins.models import Order, OrderEvent
 
@@ -33,21 +34,22 @@ class Command(BaseCommand):
 
         cancelled = 0
         for order in stale:
-            for item in order.items.all():
-                if item.is_bundle:
-                    if not item.product.is_unlimited_stock and item.product.bundle_stock is not None:
-                        item.product.bundle_stock += item.quantity
-                        item.product.save(update_fields=['bundle_stock'])
-                else:
-                    if not item.product.is_unlimited_stock:
-                        item.product.stock += item.quantity
-                        item.product.save(update_fields=['stock'])
-            order.status = 'cancelled'
-            order.save(update_fields=['status'])
-            OrderEvent.objects.create(
-                order=order, status='cancelled', actor=None,
-                note=f'Auto-cancelled: OTP confirmation timeout ({TIMEOUT_MINUTES} min)',
-            )
+            with transaction.atomic():
+                for item in order.items.all():
+                    if item.is_bundle:
+                        if not item.product.is_unlimited_stock and item.product.bundle_stock is not None:
+                            item.product.bundle_stock += item.quantity
+                            item.product.save(update_fields=['bundle_stock'])
+                    else:
+                        if not item.product.is_unlimited_stock:
+                            item.product.stock += item.quantity
+                            item.product.save(update_fields=['stock'])
+                order.status = 'cancelled'
+                order.save(update_fields=['status'])
+                OrderEvent.objects.create(
+                    order=order, status='cancelled', actor=None,
+                    note=f'Auto-cancelled: OTP confirmation timeout ({TIMEOUT_MINUTES} min)',
+                )
             cancelled += 1
 
         self.stdout.write(self.style.SUCCESS(f'Cancelled {cancelled} unconfirmed order(s).'))

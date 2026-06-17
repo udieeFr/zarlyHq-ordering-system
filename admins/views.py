@@ -14,7 +14,7 @@ from django.http import JsonResponse, HttpResponse
 from django.db.models import Q, Sum, Count, Max, F
 from datetime import timedelta
 from .models import Order, OrderItem, DigitalSignature, Complaint, PrepGroup, Payment, AuditLog, Notification, OrderEvent, SupportMessage
-from .utils import generate_invoice_pdf, sign_pdf_digitally
+from .utils import generate_invoice_pdf, sign_pdf_digitally, compute_order_integrity_hash
 from .notifications import log_audit, notify, notify_admins
 from .sudo import sudo_required, grant_sudo, SUDO_NEXT_KEY, SUDO_DURATION
 from customers.auth_utils import (
@@ -37,17 +37,29 @@ def order_has_confirmed_payment(order):
     Returns True when order has verified payment (manual proof or Stripe webhook confirmed).
     For Stripe: checks that webhook has fired (stripe_payment_intent_id set) and payment succeeded.
     For manual: checks that payment proof was uploaded.
+
+    Uses prefetched payments when available to avoid N+1 queries in list views.
     """
-    # Check Stripe payment - must have payment_intent_id (set by webhook) and be succeeded
+    # Use prefetched cache when available to avoid per-order DB hits
+    cache = getattr(order, '_prefetched_objects_cache', {})
+    if 'payments' in cache:
+        for p in cache['payments']:
+            if p.payment_method == 'stripe' and p.status == 'succeeded' and p.stripe_payment_intent_id:
+                return True
+            if p.payment_method == 'manual' and p.proof_image and p.status != 'rejected':
+                return True
+        return False
+
+    # Fallback: no prefetch — hit the DB
     has_stripe_payment = order.payments.filter(
         payment_method='stripe',
         status='succeeded',
-        stripe_payment_intent_id__isnull=False  # Webhook has processed this payment
+        stripe_payment_intent_id__isnull=False
     ).exists()
     has_manual_proof = order.payments.filter(
         payment_method='manual',
         proof_image__isnull=False,
-    ).exclude(proof_image='').exists()
+    ).exclude(proof_image='').exclude(status='rejected').exists()
     return has_manual_proof or has_stripe_payment
 
 
@@ -81,11 +93,13 @@ def sudo_confirm(request):
 
 def finalize_order_approval(order, user, request=None):
     """Signs the invoice and marks the order as approved."""
-    raw_pdf = generate_invoice_pdf(order, approver=user)
-    signed_path, doc_hash, sig_value = sign_pdf_digitally(raw_pdf, order.id)
+    now = timezone.now()
+    order_hash = compute_order_integrity_hash(order)
+    raw_pdf = generate_invoice_pdf(order, approver=user, sig_hash=order_hash, sig_timestamp=now, approved_at=now)
+    signed_path, file_hash, sig_value = sign_pdf_digitally(raw_pdf, order.id)
     sig_record = DigitalSignature.objects.create(
         order=order,
-        signature_hash=doc_hash,
+        signature_hash=file_hash,
         pdf_path=os.path.join('signed_pdfs', os.path.basename(signed_path)),
         signature_value=sig_value,
     )
@@ -98,7 +112,7 @@ def finalize_order_approval(order, user, request=None):
     # Audit + notification + CRM update
     log_audit(request, 'signature_created', target=sig_record,
               description=f"Signed receipt generated for Order #{order.id}",
-              metadata={'order_id': order.id, 'sha256': doc_hash}, actor=user)
+              metadata={'order_id': order.id, 'sha256': file_hash}, actor=user)
     log_audit(request, 'order_approved', target=order,
               description=f"Order #{order.id} approved", actor=user)
     if not order.is_walk_in:
@@ -219,8 +233,10 @@ def manager_analytics_view(request):
     month_ago = now - timedelta(days=30)
 
     # --- Revenue ---
-    completed_statuses = ['approved', 'delivered']
-    all_completed = Order.objects.filter(status__in=completed_statuses)
+    # All orders that have been approved (regardless of current post-approval status)
+    all_completed = Order.objects.filter(
+        approved_at__isnull=False
+    ).exclude(status__in=['rejected', 'cancelled'])
     revenue_today    = all_completed.filter(approved_at__date=today).aggregate(t=Sum('total_amount'))['t'] or 0
     revenue_week     = all_completed.filter(approved_at__gte=week_ago).aggregate(t=Sum('total_amount'))['t'] or 0
     revenue_month    = all_completed.filter(approved_at__gte=month_ago).aggregate(t=Sum('total_amount'))['t'] or 0
@@ -314,12 +330,20 @@ def manager_analytics_view(request):
     repeat_rate      = round(repeat_customers / customers_ever_ordered * 100, 1) if customers_ever_ordered else 0
     new_customers_week = CustomerProfile.objects.filter(created_at__gte=week_ago).count()
     returning_customers_week = (
-        Order.objects.filter(created_at__gte=week_ago, status__in=completed_statuses)
+        Order.objects.filter(created_at__gte=week_ago, approved_at__isnull=False)
+        .exclude(status__in=['rejected', 'cancelled'])
         .exclude(is_walk_in=True)
         .values('customer')
         .distinct()
         .filter(customer__customer_profile__total_orders__gt=1)
         .count()
+    )
+
+    # Recent approved purchases for the audit trail preview
+    recent_purchases = (
+        all_completed
+        .select_related('customer')
+        .order_by('-created_at')[:10]
     )
 
     _threshold = getattr(settings, 'LOW_STOCK_THRESHOLD', 10)
@@ -366,8 +390,9 @@ def manager_analytics_view(request):
         'pending_complaints': pending_complaints,
         'resolved_complaints': resolved_complaints,
         'recent_complaints': recent_complaints,
-        # Audit
+        # Audit & purchases
         'recent_audit': recent_audit,
+        'recent_purchases': recent_purchases,
         # Refunds
         'pending_refunds_count': pending_refunds_count,
         'recent_refunds': recent_refunds,
@@ -580,24 +605,28 @@ def edit_product(request, product_id):
 @manager_required
 @sudo_required
 @ratelimit(key='user', rate='10/m', method='POST', block=False)
+@manager_required
+@ratelimit(key='user', rate='20/m', method='POST', block=False)
 def delete_product(request, product_id):
     """Delete a product. POST only, manager-only."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
     if getattr(request, 'limited', False):
-        messages.error(request, 'Too many requests. Please wait before deleting again.')
-        return redirect('inventory_list')
+        return JsonResponse({'ok': False, 'error': 'Too many requests.'}, status=429)
     product = get_object_or_404(Product, id=product_id)
-    if request.method == 'POST':
-        snapshot = {
-            'name': product.name,
-            'price': str(product.price),
-            'stock': product.stock,
-            'category': product.category,
-        }
-        product.delete()
-        log_audit(request, 'product_deleted', target=None,
-                  description=f"Product '{snapshot['name']}' permanently deleted from menu",
-                  metadata=snapshot)
-        messages.success(request, f"'{snapshot['name']}' deleted from the menu.")
+    snapshot = {
+        'name': product.name,
+        'price': str(product.price),
+        'stock': product.stock,
+        'category': product.category,
+    }
+    product.delete()
+    log_audit(request, 'product_deleted', target=None,
+              description=f"Product '{snapshot['name']}' permanently deleted from menu",
+              metadata=snapshot)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'ok': True, 'message': f"'{snapshot['name']}' deleted."})
+    messages.success(request, f"'{snapshot['name']}' deleted from the menu.")
     return redirect('inventory_list')
 
 
@@ -665,29 +694,20 @@ def admin_create_order(request):
             customer = get_object_or_404(CustomerUser, id=customer_id, role='customer')
             customer_label = customer.username
 
-        # Build items list
+        # Build items list (preliminary check before acquiring locks)
         product_ids = request.POST.getlist('product_id[]')
         quantities  = request.POST.getlist('quantity[]')
-        items, total, errors = [], 0, []
+        item_inputs, errors = [], []
         for pid, qty_str in zip(product_ids, quantities):
             try:
                 qty = int(qty_str)
                 if qty < 1:
                     continue
-                product = Product.objects.get(id=pid)
-                if not product.is_unlimited_stock and product.stock < qty:
-                    errors.append(f"'{product.name}' only has {product.stock} in stock.")
-                    continue
-                subtotal = product.price * qty
-                items.append({'product': product, 'quantity': qty, 'subtotal': subtotal})
-                total += subtotal
-            except (Product.DoesNotExist, ValueError):
+                item_inputs.append({'product_id': pid, 'quantity': qty})
+            except ValueError:
                 continue
 
-        for e in errors:
-            messages.error(request, e)
-
-        if not items:
+        if not item_inputs:
             messages.error(request, 'No valid items — order not created.')
             return redirect('admin_create_order')
 
@@ -700,36 +720,66 @@ def admin_create_order(request):
             full_name = (customer_label if is_walk_in else
                          customer.get_full_name() or customer.username)
 
-        order = Order.objects.create(
-            customer=customer,
-            is_walk_in=is_walk_in,
-            full_name=full_name,
-            phone_number=request.POST.get('phone_number', '').strip(),
-            street_address=request.POST.get('street_address', '').strip(),
-            city=request.POST.get('city', '').strip(),
-            state=request.POST.get('state', '').strip(),
-            postcode=request.POST.get('postcode', '').strip(),
-            order_notes=request.POST.get('order_notes', '').strip(),
-            total_amount=total,
-            status=initial_status,
-        )
-        if initial_status == 'approved':
-            order.approved_at = timezone.now()
-            order.approved_by = request.user
-            order.save(update_fields=['approved_at', 'approved_by'])
+        from django.db import transaction as db_transaction
+        try:
+            with db_transaction.atomic():
+                # Lock all products in one query to prevent concurrent oversell
+                input_ids = [inp['product_id'] for inp in item_inputs]
+                locked = {str(p.id): p for p in Product.objects.select_for_update().filter(id__in=input_ids)}
+                items, total = [], 0
+                for inp in item_inputs:
+                    product = locked.get(str(inp['product_id']))
+                    if product is None:
+                        continue
+                    qty = inp['quantity']
+                    if not product.is_unlimited_stock and product.stock < qty:
+                        errors.append(f"'{product.name}' only has {product.stock} in stock.")
+                        continue
+                    subtotal = product.price * qty
+                    items.append({'product': product, 'quantity': qty, 'subtotal': subtotal})
+                    total += subtotal
 
-        for item in items:
-            OrderItem.objects.create(
-                order=order,
-                product=item['product'],
-                quantity=item['quantity'],
-                unit_price=item['product'].price,
-                is_bundle=False,
-                subtotal=item['subtotal'],
-            )
-            if not item['product'].is_unlimited_stock:
-                item['product'].stock -= item['quantity']
-                item['product'].save(update_fields=['stock'])
+                if errors:
+                    for e in errors:
+                        messages.error(request, e)
+                if not items:
+                    messages.error(request, 'No valid items — order not created.')
+                    return redirect('admin_create_order')
+
+                order = Order.objects.create(
+                    customer=customer,
+                    is_walk_in=is_walk_in,
+                    full_name=full_name,
+                    phone_number=request.POST.get('phone_number', '').strip(),
+                    street_address=request.POST.get('street_address', '').strip(),
+                    city=request.POST.get('city', '').strip(),
+                    state=request.POST.get('state', '').strip(),
+                    postcode=request.POST.get('postcode', '').strip(),
+                    order_notes=request.POST.get('order_notes', '').strip(),
+                    total_amount=total,
+                    status=initial_status,
+                )
+                if initial_status == 'approved':
+                    order.approved_at = timezone.now()
+                    order.approved_by = request.user
+                    order.save(update_fields=['approved_at', 'approved_by'])
+
+                for item in items:
+                    OrderItem.objects.create(
+                        order=order,
+                        product=item['product'],
+                        quantity=item['quantity'],
+                        unit_price=item['product'].price,
+                        is_bundle=False,
+                        subtotal=item['subtotal'],
+                    )
+                    if not item['product'].is_unlimited_stock:
+                        item['product'].stock -= item['quantity']
+                        item['product'].save(update_fields=['stock'])
+        except Exception as e:
+            logger.error("admin_create_order transaction failed: %s", e, exc_info=True)
+            messages.error(request, "Order could not be created due to a server error. Please try again.")
+            return redirect('admin_create_order')
 
         log_order_event(order, initial_status, actor=request.user,
                         note=f'Manually created by admin — {"walk-in" if is_walk_in else customer_label}')
@@ -1009,14 +1059,19 @@ def pending_payment_orders_list(request):
 @ratelimit(key='user', rate='60/m', method='POST', block=False)
 def approve_pending_payment(request, order_id):
     """Approve an awaiting-payment order when payment is confirmed."""
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     if request.method != 'POST':
         return redirect('pending_payment_orders_list')
     if getattr(request, 'limited', False):
+        if is_ajax:
+            return JsonResponse({'ok': False, 'error': 'Too many requests.'}, status=429)
         messages.error(request, 'Too many requests. Please slow down.')
         return redirect('pending_payment_orders_list')
     order = get_object_or_404(Order, id=order_id, status='pending_payment')
 
     if not order_has_confirmed_payment(order):
+        if is_ajax:
+            return JsonResponse({'ok': False, 'error': 'Payment not confirmed yet. Wait for Stripe or manual proof upload.'}, status=400)
         messages.error(
             request,
             "Payment is not confirmed yet for this order. Wait for Stripe confirmation or manual proof upload."
@@ -1029,6 +1084,8 @@ def approve_pending_payment(request, order_id):
     log_audit(request, 'payment_verified', target=order,
               description=f"Payment verified for Order #{order.id}")
 
+    if is_ajax:
+        return JsonResponse({'ok': True, 'message': f'Order #{order.id} payment approved and signed.'})
     messages.success(request, f"Order #{order.id} payment approved and signed.")
     return redirect('pending_payment_orders_list')
 
@@ -1036,13 +1093,20 @@ def approve_pending_payment(request, order_id):
 @ratelimit(key='user', rate='60/m', method='POST', block=False)
 def reject_pending_payment(request, order_id):
     """Reject payment proof and move order back to pending for re-upload."""
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    if request.method != 'POST':
+        return redirect('pending_payment_orders_list')
     if getattr(request, 'limited', False):
+        if is_ajax:
+            return JsonResponse({'ok': False, 'error': 'Too many requests.'}, status=429)
         messages.error(request, 'Too many requests. Please slow down.')
         return redirect('pending_payment_orders_list')
     order = get_object_or_404(Order, id=order_id, status='pending_payment')
-    
+
     rejection_reason = request.POST.get('rejection_reason', '').strip()
     if not rejection_reason:
+        if is_ajax:
+            return JsonResponse({'ok': False, 'error': 'Please provide a rejection reason.'}, status=400)
         messages.error(request, "Please provide a rejection reason.")
         return redirect('pending_payment_orders_list')
     
@@ -1098,13 +1162,15 @@ def reject_pending_payment(request, order_id):
         except Exception as e:
             logger.warning("Rejection email failed for order %s: %s", order.id, e)
     
+    if is_ajax:
+        return JsonResponse({'ok': True, 'message': f'Order #{order.id} payment proof rejected. Customer notified.'})
     messages.success(request, f"Order #{order.id} payment proof rejected. Customer notified.")
     return redirect('pending_payment_orders_list')
 
 @sales_admin_required
 def print_order_summary(request, order_id):
     """Generate a printable order summary / proforma invoice PDF."""
-    ALLOWED_STATUSES = ['approved', 'pending_payment', 'prepared', 'ready_for_delivery', 'out_for_delivery', 'delivered']
+    ALLOWED_STATUSES = ['pending', 'approved', 'pending_payment', 'prepared', 'ready_for_delivery', 'out_for_delivery', 'delivered']
     order = get_object_or_404(Order, id=order_id, status__in=ALLOWED_STATUSES)
     try:
         pdf_path = generate_invoice_pdf(order)
@@ -1236,12 +1302,52 @@ def prep_group_detail(request, group_id):
     prep_group = get_object_or_404(PrepGroup, group_id=group_id)
     orders = prep_group.orders.all().prefetch_related('items__product', 'payments')
     unpaid_order_ids = {o.id for o in orders if not order_has_confirmed_payment(o)}
+    has_prepared = any(o.status == 'prepared' for o in orders)
 
     return render(request, 'admins/prep_group_detail.html', {
         'prep_group': prep_group,
         'orders': orders,
         'unpaid_order_ids': unpaid_order_ids,
+        'has_prepared': has_prepared,
     })
+
+@sales_admin_required
+@ratelimit(key='user', rate='10/m', method='POST', block=False)
+def cancel_prep_group(request, group_id):
+    """Cancel a prep group — step all its orders back to 'approved'."""
+    if request.method != 'POST':
+        return redirect('prep_group_detail', group_id=group_id)
+
+    prep_group = get_object_or_404(PrepGroup, group_id=group_id)
+    orders = list(prep_group.orders.filter(status='prepared'))
+
+    if not orders:
+        messages.warning(request, 'No prepared orders in this group to cancel.')
+        return redirect('prep_group_detail', group_id=group_id)
+
+    now = timezone.now()
+    stepped_back = 0
+    for order in orders:
+        order.status = 'approved'
+        order.step_back_reason = f'Prep group {group_id} cancelled by {request.user.username}'
+        order.stepped_back_at = now
+        order.stepped_back_by = request.user
+        order.prepared_at = None
+        order.prepared_by = None
+        order.save(update_fields=[
+            'status', 'step_back_reason', 'stepped_back_at', 'stepped_back_by',
+            'prepared_at', 'prepared_by',
+        ])
+        log_order_event(order, 'approved', actor=request.user)
+        stepped_back += 1
+
+    log_audit(request, 'order_stepped_back', target=prep_group,
+              description=f'Prep group {group_id} cancelled — {stepped_back} orders returned to approved',
+              metadata={'group_id': group_id, 'order_ids': [o.id for o in orders]})
+
+    messages.success(request, f'Prep group {group_id} cancelled. {stepped_back} order(s) returned to Approved.')
+    return redirect('approved_orders_list')
+
 
 @sales_admin_required
 @ratelimit(key='user', rate='30/m', method='POST', block=False)
@@ -1297,7 +1403,12 @@ def mark_prep_group_ready(request, group_id):
 @ratelimit(key='user', rate='60/m', block=False)
 def mark_order_out_for_delivery(request, order_id):
     """Move a single order from ready_for_delivery to out_for_delivery."""
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    if request.method != 'POST':
+        return redirect('delivery_orders_list')
     if getattr(request, 'limited', False):
+        if is_ajax:
+            return JsonResponse({'ok': False, 'error': 'Too many requests.'}, status=429)
         messages.error(request, 'Too many requests. Please slow down.')
         return redirect('delivery_orders_list')
     order = get_object_or_404(Order, id=order_id, status='ready_for_delivery')
@@ -1313,6 +1424,8 @@ def mark_order_out_for_delivery(request, order_id):
                        f"{'Track it with Citylink: ' + order.tracking_number if order.tracking_number else ''}",
                link=f"/order-details/{order.id}/",
                notification_type='delivery')
+    if is_ajax:
+        return JsonResponse({'ok': True, 'message': f'Order #{order.id} marked as Out for Delivery.'})
     messages.success(request, f"Order #{order.id} marked as Out for Delivery.")
     return redirect('delivery_orders_list')
 
@@ -1320,7 +1433,12 @@ def mark_order_out_for_delivery(request, order_id):
 @ratelimit(key='user', rate='60/m', block=False)
 def mark_order_delivered(request, order_id):
     """Mark a single order as delivered."""
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    if request.method != 'POST':
+        return redirect('delivery_orders_list')
     if getattr(request, 'limited', False):
+        if is_ajax:
+            return JsonResponse({'ok': False, 'error': 'Too many requests.'}, status=429)
         messages.error(request, 'Too many requests. Please slow down.')
         return redirect('delivery_orders_list')
     order = get_object_or_404(Order, id=order_id, status='out_for_delivery')
@@ -1343,6 +1461,8 @@ def mark_order_delivered(request, order_id):
         profile.recalculate()
     except Exception:
         pass
+    if is_ajax:
+        return JsonResponse({'ok': True, 'message': f'Order #{order.id} marked as Delivered.'})
     messages.success(request, f"Order #{order.id} marked as Delivered.")
     return redirect('delivery_orders_list')
 
@@ -1407,10 +1527,13 @@ def delivery_orders_list(request):
 @ratelimit(key='user', rate='30/m', method='POST', block=False)
 def update_order_tracking(request, order_id):
     """Update tracking number for an order in delivery."""
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     order = get_object_or_404(Order, id=order_id, status__in=['ready_for_delivery', 'out_for_delivery'])
 
     if request.method == 'POST':
         if getattr(request, 'limited', False):
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': 'Too many requests.'}, status=429)
             messages.error(request, 'Too many requests. Please slow down.')
             return redirect('delivery_orders_list')
         tracking_number = request.POST.get('tracking_number', '').strip()
@@ -1421,8 +1544,12 @@ def update_order_tracking(request, order_id):
             log_audit(request, 'tracking_updated', target=order,
                       description=f"Tracking # set on Order #{order.id}",
                       metadata={'old': old_tn or '', 'new': tracking_number})
+            if is_ajax:
+                return JsonResponse({'ok': True, 'message': f'Tracking number saved for Order #{order.id}.'})
             messages.success(request, f"Tracking number updated for Order #{order.id}.")
         else:
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': 'Tracking number cannot be empty.'}, status=400)
             messages.warning(request, "Tracking number cannot be empty.")
 
     return redirect('delivery_orders_list')
@@ -1440,9 +1567,20 @@ def mark_orders_prepared(request):
             messages.error(request, "No orders selected.")
             return redirect('approved_orders_list')
 
-        orders = Order.objects.filter(id__in=order_ids, status__in=['approved', 'pending_payment'])
+        orders = Order.objects.filter(id__in=order_ids, status='approved').prefetch_related('payments')
         if not orders:
-            messages.error(request, "No valid approved or pending-payment orders found.")
+            messages.error(request, "No valid approved orders found. Only approved (paid) orders can enter preparation.")
+            return redirect('approved_orders_list')
+
+        # Block unpaid orders unless admin explicitly confirms
+        order_list = list(orders)
+        unpaid_ids = [o.id for o in order_list if not order_has_confirmed_payment(o)]
+        if unpaid_ids and request.POST.get('confirm_unpaid') != 'true':
+            messages.error(
+                request,
+                f"Cannot prepare {len(unpaid_ids)} unpaid order(s) (#{', #'.join(str(i) for i in unpaid_ids)}). "
+                f"These orders have no confirmed payment. Select only paid orders, or confirm to proceed anyway."
+            )
             return redirect('approved_orders_list')
 
         # Create prep group
@@ -1450,10 +1588,6 @@ def mark_orders_prepared(request):
             created_by=request.user,
         )
         prep_group.orders.set(orders)
-
-        # Snapshot order list BEFORE marking as prepared (update() invalidates queryset)
-        order_list = list(orders)
-        unpaid_ids = [o.id for o in order_list if not order_has_confirmed_payment(o)]
 
         # Mark orders as prepared
         orders.update(
@@ -1482,8 +1616,14 @@ def mark_orders_prepared(request):
     return redirect('approved_orders_list')
 
 @sales_admin_required
+@ratelimit(key='user', rate='60/m', method='POST', block=False)
 def set_pending_payment(request, order_id):
     """Marks order as accepted and requests payment from customer."""
+    if request.method != 'POST':
+        return redirect('sales_admin_dashboard')
+    if getattr(request, 'limited', False):
+        messages.error(request, 'Too many requests. Please slow down.')
+        return redirect('sales_admin_dashboard')
     order = get_object_or_404(Order, id=order_id)
     if order_has_confirmed_payment(order):
         finalize_order_approval(order, request.user, request=request)
@@ -1501,16 +1641,23 @@ def force_approve_unpaid(request, order_id):
     """Move a pending_payment order to approved without confirmed payment.
     Order is tagged unpaid — staff must collect payment on delivery.
     """
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     if request.method != 'POST':
         return redirect('admin_order_detail', order_id=order_id)
     if getattr(request, 'limited', False):
+        if is_ajax:
+            return JsonResponse({'ok': False, 'error': 'Too many requests.'}, status=429)
         messages.error(request, 'Too many requests. Please slow down.')
         return redirect('admin_order_detail', order_id=order_id)
     order = get_object_or_404(Order, id=order_id, status='pending_payment')
-    order.status = 'approved'
-    order.approved_at = timezone.now()
-    order.approved_by = request.user
-    order.save()
+    try:
+        finalize_order_approval(order, request.user, request=request)
+    except Exception as e:
+        logger.error("Document signing failed for order %s: %s", order_id, e, exc_info=True)
+        if is_ajax:
+            return JsonResponse({'ok': False, 'error': 'Failed to sign the invoice. Try again.'}, status=500)
+        messages.error(request, "Failed to sign the invoice. Please try again or contact support.")
+        return redirect('admin_order_detail', order_id=order_id)
     log_order_event(order, 'approved_unpaid', actor=request.user)
     log_audit(request, 'order_approved_unpaid', target=order,
               description=f"Order #{order.id} force-approved without payment — collect on delivery",
@@ -1521,6 +1668,8 @@ def force_approve_unpaid(request, order_id):
                message=f"Order #{order.id} is approved. Payment will be collected on delivery.",
                link="/orders/",
                notification_type='order_update')
+    if is_ajax:
+        return JsonResponse({'ok': True, 'message': f'Order #{order.id} approved (unpaid — collect on delivery).'})
     messages.success(request, f"Order #{order.id} moved to Approved (unpaid — collect on delivery).")
     return redirect('approved_orders_list')
 
@@ -1528,8 +1677,11 @@ def force_approve_unpaid(request, order_id):
 @ratelimit(key='user', rate='10/m', method='POST', block=False)
 def bulk_accept_orders(request):
     """Accepts multiple pending or awaiting payment orders in one action."""
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     if request.method == 'POST':
         if getattr(request, 'limited', False):
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': 'Too many requests.'}, status=429)
             messages.error(request, 'Too many requests. Please slow down.')
             return redirect('sales_admin_dashboard')
         order_ids = request.POST.getlist('order_ids')[:20]   # cap: each triggers a PyHanko signing call
@@ -1549,13 +1701,13 @@ def bulk_accept_orders(request):
                     order.save()
                 awaiting_payment_count += 1
 
+        msg = f"Accepted {approved_count} paid order(s) and moved {awaiting_payment_count} order(s) to awaiting payment." if (approved_count or awaiting_payment_count) else 'No pending orders were selected or eligible for acceptance.'
+        if is_ajax:
+            return JsonResponse({'ok': bool(approved_count or awaiting_payment_count), 'message': msg})
         if approved_count or awaiting_payment_count:
-            messages.success(
-                request,
-                f"Accepted {approved_count} paid order(s) and moved {awaiting_payment_count} order(s) to awaiting payment."
-            )
+            messages.success(request, msg)
         else:
-            messages.warning(request, 'No pending orders were selected or eligible for acceptance.')
+            messages.warning(request, msg)
     return redirect('sales_admin_dashboard')
 
 @sales_admin_required
@@ -1629,9 +1781,12 @@ def approve_order(request, order_id):
     Approves a pending order. If payment is confirmed, moves to 'approved' status.
     If payment is not yet confirmed, moves to 'pending_payment' (awaiting payment list).
     """
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     if request.method != 'POST':
         return redirect('sales_admin_dashboard')
     if getattr(request, 'limited', False):
+        if is_ajax:
+            return JsonResponse({'ok': False, 'error': 'Too many requests.'}, status=429)
         messages.error(request, 'Too many requests. Please slow down.')
         return redirect('sales_admin_dashboard')
     order = get_object_or_404(Order, id=order_id)
@@ -1640,15 +1795,21 @@ def approve_order(request, order_id):
         # Payment confirmed - approve and sign invoice
         try:
             finalize_order_approval(order, request.user, request=request)
+            if is_ajax:
+                return JsonResponse({'ok': True, 'message': f'Order #{order.id} approved and digitally signed.'})
             messages.success(request, f"Order #{order.id} Approved and Digitally Signed.")
         except Exception as e:
             logger.error("Document signing failed for order %s: %s", order_id, e, exc_info=True)
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': 'Failed to sign the invoice. Try again.'}, status=500)
             messages.error(request, "Failed to sign the invoice. Please try again or contact support.")
     else:
         # Payment not yet received - move to awaiting payment list
         order.status = 'pending_payment'
         order.save()
         log_order_event(order, 'pending_payment', actor=request.user)
+        if is_ajax:
+            return JsonResponse({'ok': True, 'message': f'Order #{order.id} moved to Awaiting Payment.'})
         messages.success(request, f"Order #{order.id} Approved. Customer will see it in their Awaiting Payment list.")
 
     return redirect('sales_admin_dashboard')
@@ -1661,10 +1822,13 @@ def reject_order(request, order_id):
     from admins.models import RejectionReason, RejectedOrder
     from admins.notification_utils import notify_rejection_to_customer
 
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     order = get_object_or_404(Order, id=order_id)
     if request.method != 'POST':
         return redirect('admin_order_detail', order_id=order.id)
     if getattr(request, 'limited', False):
+        if is_ajax:
+            return JsonResponse({'ok': False, 'error': 'Too many requests.'}, status=429)
         messages.error(request, 'Too many requests. Please slow down.')
         return redirect('admin_order_detail', order_id=order.id)
     
@@ -1679,10 +1843,23 @@ def reject_order(request, order_id):
         except:
             pass
      
-    # Update order status
-    order.status = 'rejected'
-    order.save()
-    log_order_event(order, 'rejected', actor=request.user)
+    # Restore stock atomically — all items or none
+    from django.db import transaction as rejection_transaction
+    with rejection_transaction.atomic():
+        for item in order.items.select_related('product').all():
+            if item.is_bundle:
+                if not item.product.is_unlimited_stock and item.product.bundle_stock is not None:
+                    item.product.bundle_stock += item.quantity
+                    item.product.save(update_fields=['bundle_stock'])
+            else:
+                if not item.product.is_unlimited_stock:
+                    item.product.stock += item.quantity
+                    item.product.save(update_fields=['stock'])
+
+        # Update order status
+        order.status = 'rejected'
+        order.save()
+        log_order_event(order, 'rejected', actor=request.user)
 
     # Create rejection record for analytics
     rejected_order_record = RejectedOrder.objects.create(
@@ -1721,13 +1898,13 @@ def reject_order(request, order_id):
     from admins.refund_utils import process_refund
     process_refund(order, source='order_rejection', request=request)
 
+    if is_ajax:
+        return JsonResponse({'ok': True, 'message': f'Order #{order.id} rejected.'})
     return redirect('sales_admin_dashboard')
 
 
 STEP_BACK_MAP = {
-    'pending_payment': ('pending',               ['approved_at', 'approved_by_id']),
-    'approved':        ('pending',               ['approved_at', 'approved_by_id']),
-    'prepared':        ('approved',              ['prepared_at', 'prepared_by_id']),
+    'prepared':           ('approved',           ['prepared_at', 'prepared_by_id']),
     'ready_for_delivery': ('prepared',           ['ready_for_delivery_at', 'ready_for_delivery_by_id']),
     'out_for_delivery':   ('ready_for_delivery', ['delivery_assigned_at', 'delivery_assigned_by_id']),
 }
@@ -2071,15 +2248,20 @@ def mark_refund_processed(request, refund_id):
     """Mark a manual/failed refund as completed after the manager does the bank transfer."""
     from admins.models import Refund
 
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     if request.method != 'POST':
         return redirect('refund_list')
     if getattr(request, 'limited', False):
+        if is_ajax:
+            return JsonResponse({'ok': False, 'error': 'Too many requests.'}, status=429)
         messages.error(request, 'Too many requests. Please slow down.')
         return redirect('refund_list')
 
     refund = get_object_or_404(Refund, id=refund_id)
 
     if refund.status not in ('manual', 'failed', 'pending'):
+        if is_ajax:
+            return JsonResponse({'ok': False, 'error': f'Refund #{refund.id} is already {refund.get_status_display()}.'}, status=400)
         messages.warning(request, f"Refund #{refund.id} is already {refund.get_status_display()}.")
         return redirect('refund_list')
 
@@ -2106,6 +2288,8 @@ def mark_refund_processed(request, refund_id):
                link=f'/order-details/{refund.order.id}/',
                notification_type='payment')
 
+    if is_ajax:
+        return JsonResponse({'ok': True, 'message': f'Refund #{refund.id} processed (RM {refund.amount}).'})
     messages.success(request, f"Refund #{refund.id} marked as processed (RM {refund.amount}).")
     return redirect('refund_list')
 
@@ -2214,6 +2398,28 @@ def ratings_dashboard(request):
 
 # --- EMAIL CAMPAIGNS ---
 
+# Placeholder tokens available for email template body — passed to the
+# template form so the chips render correctly (raw {{ }} would be eaten
+# by Django's template engine).
+EMAIL_TEMPLATE_PLACEHOLDERS = [
+    '{{customer_name}}',
+    '{{loyalty_tier}}',
+    '{{last_order_date}}',
+    '{{company_name}}',
+    '{{unsubscribe_url}}',
+]
+
+
+def _template_form_context(editing=False, tmpl=None, form_data=None):
+    """Return the common context dict for the email template form."""
+    ctx = {'editing': editing, 'placeholders': EMAIL_TEMPLATE_PLACEHOLDERS}
+    if tmpl is not None:
+        ctx['tmpl'] = tmpl
+    if form_data is not None:
+        ctx['form_data'] = form_data
+    return ctx
+
+
 @manager_required
 def email_template_list(request):
     """Manager: list and create email templates."""
@@ -2237,10 +2443,9 @@ def email_template_create(request):
         if name and subject and body_html:
             if '{{unsubscribe_url}}' not in body_html:
                 messages.error(request, 'Template must include {{unsubscribe_url}} for PDPA compliance.')
-                return render(request, 'admins/email_template_form.html', {
-                    'editing': False,
-                    'form_data': {'name': name, 'subject': subject, 'body_html': body_html},
-                })
+                return render(request, 'admins/email_template_form.html',
+                              _template_form_context(editing=False,
+                                  form_data={'name': name, 'subject': subject, 'body_html': body_html}))
             t = EmailTemplate.objects.create(
                 name=name, subject=subject, body_html=body_html,
                 created_by=request.user,
@@ -2250,7 +2455,8 @@ def email_template_create(request):
             messages.success(request, f'Template "{t.name}" created.')
             return redirect('email_template_list')
         messages.error(request, 'All fields are required.')
-    return render(request, 'admins/email_template_form.html', {'editing': False})
+    return render(request, 'admins/email_template_form.html',
+                  _template_form_context(editing=False))
 
 
 @manager_required
@@ -2268,18 +2474,19 @@ def email_template_edit(request, template_id):
         body_html = request.POST.get('body_html', tmpl.body_html).strip()
         if '{{unsubscribe_url}}' not in body_html:
             messages.error(request, 'Template must include {{unsubscribe_url}} for PDPA compliance.')
-            return render(request, 'admins/email_template_form.html', {
-                'editing': True,
-                'tmpl': tmpl,
-                'form_data': {'name': name, 'subject': subject, 'body_html': body_html},
-            })
+            return render(request, 'admins/email_template_form.html',
+                          _template_form_context(editing=True, tmpl=tmpl,
+                              form_data={'name': name, 'subject': subject, 'body_html': body_html}))
         tmpl.name      = name
         tmpl.subject   = subject
         tmpl.body_html = body_html
-        tmpl.save(update_fields=['name', 'subject', 'body_html', 'updated_at'])
+        # Don't include updated_at in update_fields — Django auto-sets auto_now fields
+        # that are NOT in the list; including it saves the old value instead.
+        tmpl.save(update_fields=['name', 'subject', 'body_html'])
         messages.success(request, f'Template "{tmpl.name}" updated.')
         return redirect('email_template_list')
-    return render(request, 'admins/email_template_form.html', {'editing': True, 'tmpl': tmpl})
+    return render(request, 'admins/email_template_form.html',
+                  _template_form_context(editing=True, tmpl=tmpl))
 
 
 @manager_required
@@ -2322,6 +2529,10 @@ def campaign_compose(request):
 
         if not customer_ids or not template_id or not campaign_name:
             messages.error(request, 'Campaign name, template, and at least one recipient are required.')
+            return redirect('campaign_compose')
+
+        if len(campaign_name) > 200:
+            messages.error(request, 'Campaign name must be 200 characters or fewer.')
             return redirect('campaign_compose')
 
         tmpl = get_object_or_404(EmailTemplate, id=template_id, is_active=True)
@@ -2429,7 +2640,9 @@ def sales_report(request):
     )
     days = (until_date - since_date).days + 1
 
-    completed = Order.objects.filter(status__in=['approved', 'delivered'])
+    completed = Order.objects.filter(
+        approved_at__isnull=False
+    ).exclude(status__in=['rejected', 'cancelled'])
     in_range  = completed.filter(approved_at__gte=since, approved_at__lte=until)
 
     # --- Revenue summary ---
@@ -2461,7 +2674,8 @@ def sales_report(request):
     # --- Top products ---
     top_products = (
         OrderItem.objects
-        .filter(order__approved_at__gte=since, order__approved_at__lte=until, order__status__in=['approved', 'delivered'])
+        .filter(order__approved_at__gte=since, order__approved_at__lte=until)
+        .exclude(order__status__in=['rejected', 'cancelled'])
         .values('product__name', 'product__category')
         .annotate(qty=Sum('quantity'), revenue=Sum('subtotal'))
         .order_by('-revenue')[:10]
@@ -2470,7 +2684,8 @@ def sales_report(request):
     # --- Category breakdown ---
     category_revenue = (
         OrderItem.objects
-        .filter(order__approved_at__gte=since, order__approved_at__lte=until, order__status__in=['approved', 'delivered'])
+        .filter(order__approved_at__gte=since, order__approved_at__lte=until)
+        .exclude(order__status__in=['rejected', 'cancelled'])
         .values('product__category')
         .annotate(revenue=Sum('subtotal'), qty=Sum('quantity'))
         .order_by('-revenue')
@@ -2556,6 +2771,23 @@ def toggle_product_availability(request, product_id):
               description=f"Product '{product.name}' {'listed' if product.is_available else 'hidden'} from menu",
               metadata={'is_available': product.is_available})
     return JsonResponse({'is_available': product.is_available, 'name': product.name})
+
+
+@manager_required
+@ratelimit(key='user', rate='60/m', method='POST', block=False)
+def toggle_unlimited_stock(request, product_id):
+    """AJAX POST — flip a product's is_unlimited_stock flag."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    if getattr(request, 'limited', False):
+        return JsonResponse({'error': 'Too many requests.'}, status=429)
+    product = get_object_or_404(Product, id=product_id)
+    product.is_unlimited_stock = not product.is_unlimited_stock
+    product.save(update_fields=['is_unlimited_stock'])
+    log_audit(request, 'product_unlimited_toggled', target=product,
+              description=f"Product '{product.name}' stock set to {'unlimited' if product.is_unlimited_stock else 'limited'}",
+              metadata={'is_unlimited_stock': product.is_unlimited_stock})
+    return JsonResponse({'is_unlimited_stock': product.is_unlimited_stock, 'name': product.name})
 
 
 # ---------------------------------------------------------------------------

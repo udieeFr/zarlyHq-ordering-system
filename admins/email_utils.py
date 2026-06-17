@@ -1,5 +1,5 @@
 """
-Email sending utilities using SendGrid.
+Email sending utilities using Django's built-in SMTP backend.
 
 send_campaign_email  — send one personalised campaign email to a single customer.
 blast_campaign       — iterate over a queryset of customers, enforcing opt-in and rate limit.
@@ -7,7 +7,9 @@ blast_campaign       — iterate over a queryset of customers, enforcing opt-in 
 import logging
 from datetime import timedelta
 from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
 from django.utils import timezone
+from django.utils.html import strip_tags
 
 logger = logging.getLogger(__name__)
 
@@ -34,55 +36,45 @@ def _render_body(body_html, customer, profile, unsubscribe_url=''):
 
 def send_campaign_email(customer, subject, body_html, campaign=None):
     """
-    Send a single HTML email via SendGrid.
+    Send a single HTML email via Django's SMTP backend.
 
     Returns (status: str, reason: str) — status is 'sent', 'failed', or 'skipped'.
     Does NOT check opt-in or rate limits — call blast_campaign for that.
     """
     from admins.models import EmailLog
 
-    api_key = getattr(settings, 'SENDGRID_API_KEY', None)
     from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@zarlybigfood.com')
+    email_host_user = getattr(settings, 'EMAIL_HOST_USER', None)
 
-    if not api_key or api_key == 'your-sendgrid-api-key-here':
-        logger.warning(f'SendGrid API key not configured — skipping email to {customer.email}')
-        log = EmailLog.objects.create(
+    if not email_host_user:
+        logger.warning(f'EMAIL_HOST_USER not configured — skipping email to {customer.email}')
+        EmailLog.objects.create(
             customer=customer, campaign=campaign,
             subject=subject, status='failed',
-            reason='SendGrid API key not configured',
+            reason='Email host not configured (EMAIL_HOST_USER is empty)',
         )
-        return 'failed', 'SendGrid API key not configured'
+        return 'failed', 'Email host not configured'
 
     try:
-        import sendgrid
-        from sendgrid.helpers.mail import Mail
-
-        sg = sendgrid.SendGridAPIClient(api_key=api_key)
-        message = Mail(
-            from_email=from_email,
-            to_emails=customer.email,
+        plain_body = strip_tags(body_html)
+        msg = EmailMultiAlternatives(
             subject=subject,
-            html_content=body_html,
+            body=plain_body,
+            from_email=from_email,
+            to=[customer.email],
         )
-        response = sg.send(message)
+        msg.attach_alternative(body_html, 'text/html')
+        msg.send(fail_silently=False)
 
-        if response.status_code in (200, 202):
-            EmailLog.objects.create(
-                customer=customer, campaign=campaign,
-                subject=subject, status='sent',
-            )
-            return 'sent', ''
-        else:
-            reason = f'SendGrid returned status {response.status_code}'
-            EmailLog.objects.create(
-                customer=customer, campaign=campaign,
-                subject=subject, status='failed', reason=reason,
-            )
-            return 'failed', reason
+        EmailLog.objects.create(
+            customer=customer, campaign=campaign,
+            subject=subject, status='sent',
+        )
+        return 'sent', ''
 
     except Exception as e:
         reason = str(e)
-        logger.error(f'SendGrid error sending to {customer.email}: {reason}')
+        logger.error(f'SMTP error sending to {customer.email}: {reason}')
         EmailLog.objects.create(
             customer=customer, campaign=campaign,
             subject=subject, status='failed', reason=reason[:300],
@@ -111,7 +103,7 @@ def blast_campaign(customers_qs, template, campaign, sender, request=None):
         # Opt-in check
         try:
             profile = customer.customer_profile
-        except Exception:
+        except CustomerProfile.DoesNotExist:
             profile, _ = CustomerProfile.objects.get_or_create(user=customer)
 
         if not profile.marketing_opt_in:
@@ -151,8 +143,7 @@ def blast_campaign(customers_qs, template, campaign, sender, request=None):
                 reverse('unsubscribe_email', args=[token])
             )
         else:
-            from django.conf import settings as _settings
-            base_url = getattr(_settings, 'SITE_URL', 'https://zarlybigfood.my')
+            base_url = getattr(settings, 'SITE_URL', 'https://zarlybigfood.my')
             unsubscribe_url = f"{base_url}{reverse('unsubscribe_email', args=[token])}"
 
         # Render personalised body

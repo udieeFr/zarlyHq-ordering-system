@@ -20,6 +20,7 @@ urlpatterns = [
     
     # Document & Payment Paths
     path('order/<int:order_id>/invoice/', views.download_invoice, name='download_invoice'),
+    path('order/<int:order_id>/receipt/', views.download_watermarked_receipt, name='download_watermarked_receipt'),
     path('order/<int:order_id>/pay/', views.upload_payment_proof, name='upload_payment_proof'),
     
     # Customer Orders Dashboard

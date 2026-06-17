@@ -159,7 +159,7 @@ def remake_order(original_order, resolved_by, request=None):
     Returns the new Order instance.
     """
     from admins.models import Order, OrderItem, DigitalSignature
-    from admins.utils import generate_invoice_pdf, sign_pdf_digitally
+    from admins.utils import generate_invoice_pdf, sign_pdf_digitally, compute_order_integrity_hash
     from admins.notifications import log_audit, notify
 
     new_order = Order.objects.create(
@@ -184,23 +184,51 @@ def remake_order(original_order, resolved_by, request=None):
         is_priority=True,
     )
 
-    for item in original_order.items.all():
-        OrderItem.objects.create(
-            order=new_order,
-            product=item.product,
-            quantity=item.quantity,
-            unit_price=item.unit_price,
-            is_bundle=item.is_bundle,
-            subtotal=item.subtotal,
-        )
+    from customers.models import Product
+    from django.db import transaction
+    with transaction.atomic():
+        # Lock products and decrement stock — remake consumes real inventory
+        product_ids = [item.product_id for item in original_order.items.all()]
+        locked = {p.id: p for p in Product.objects.select_for_update().filter(id__in=product_ids)}
+        for item in original_order.items.select_related('product').all():
+            product = locked.get(item.product_id)
+            if product and not product.is_unlimited_stock:
+                if item.is_bundle:
+                    if product.bundle_stock is not None:
+                        if product.bundle_stock < item.quantity:
+                            raise ValueError(
+                                f"Cannot remake: bundle '{product.name}' only has "
+                                f"{product.bundle_stock} unit(s) left."
+                            )
+                        product.bundle_stock -= item.quantity
+                        product.save(update_fields=['bundle_stock'])
+                else:
+                    if product.stock < item.quantity:
+                        raise ValueError(
+                            f"Cannot remake: '{product.name}' only has "
+                            f"{product.stock} unit(s) left."
+                        )
+                    product.stock -= item.quantity
+                    product.save(update_fields=['stock'])
+            OrderItem.objects.create(
+                order=new_order,
+                product=item.product,
+                quantity=item.quantity,
+                unit_price=item.unit_price,
+                is_bundle=item.is_bundle,
+                subtotal=item.subtotal,
+            )
 
     # Sign a fresh receipt for the remake
     try:
-        raw_pdf = generate_invoice_pdf(new_order)
-        signed_path, doc_hash, sig_value = sign_pdf_digitally(raw_pdf, new_order.id)
+        from django.utils import timezone as tz
+        now = tz.now()
+        order_hash = compute_order_integrity_hash(new_order)
+        raw_pdf = generate_invoice_pdf(new_order, sig_hash=order_hash, sig_timestamp=now, approved_at=now)
+        signed_path, file_hash, sig_value = sign_pdf_digitally(raw_pdf, new_order.id)
         DigitalSignature.objects.create(
             order=new_order,
-            signature_hash=doc_hash,
+            signature_hash=file_hash,
             pdf_path=os.path.join('signed_pdfs', os.path.basename(signed_path)),
             signature_value=sig_value,
         )

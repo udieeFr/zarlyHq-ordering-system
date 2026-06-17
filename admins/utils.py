@@ -1,11 +1,15 @@
 
+import io
 import os
+import json
 import hashlib
 import base64
+import math
 from decimal import Decimal
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
+from reportlab.lib.colors import Color
 from reportlab.lib.units import mm
 from reportlab.platypus import Table, TableStyle
 from django.conf import settings
@@ -33,7 +37,24 @@ def _draw_table(c, table, x, y):
     return h
 
 
-def generate_invoice_pdf(order, approver=None):
+def compute_order_integrity_hash(order):
+    """SHA-256 of canonical order data for non-repudiation. Independent of PDF file format."""
+    items = sorted(order.items.all(), key=lambda i: i.id)
+    data = {
+        'order_id': order.id,
+        'customer_id': order.customer_id,
+        'total_amount': str(order.total_amount),
+        'created_at': order.created_at.isoformat(),
+        'items': [
+            {'product_id': i.product_id, 'quantity': i.quantity, 'unit_price': str(i.unit_price)}
+            for i in items
+        ],
+    }
+    canonical = json.dumps(data, sort_keys=True)
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def generate_invoice_pdf(order, approver=None, sig_hash=None, sig_timestamp=None, approved_at=None):
     filename = f"order_{order.id}_receipt.pdf"
     file_path = os.path.join(settings.MEDIA_ROOT, 'temp_pdfs', filename)
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
@@ -243,12 +264,13 @@ def generate_invoice_pdf(order, approver=None):
     c.setFillColor(_GREY)
     c.drawString(MARGIN, footer_top - 12, "Cryptographic Integrity Signature")
     c.setFont("Helvetica", 6.5)
-    try:
-        sig = order.digital_signature
+    if sig_hash:
         c.setFillColor(_GREY)
-        c.drawString(MARGIN, footer_top - 22, f"SHA-256 HASH: {sig.signature_hash}")
-        c.drawString(MARGIN, footer_top - 32, f"Timestamp: {sig.timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
-    except Exception:
+        c.drawString(MARGIN, footer_top - 22, f"SHA-256 HASH: {sig_hash}")
+        ts_str = sig_timestamp.strftime('%Y-%m-%d %H:%M:%S UTC') if sig_timestamp else ''
+        if ts_str:
+            c.drawString(MARGIN, footer_top - 32, f"Timestamp: {ts_str}")
+    else:
         c.setFillColor(colors.HexColor('#cc0000'))
         c.drawString(MARGIN, footer_top - 22, "PENDING SIGNATURE: This document is not yet verified.")
 
@@ -260,7 +282,8 @@ def generate_invoice_pdf(order, approver=None):
     nr_y -= 10
     c.setFont("Helvetica", 6.5)
     if approver:
-        approved_at_str = order.approved_at.strftime('%Y-%m-%d %H:%M UTC') if order.approved_at else 'pending'
+        _approved_at = approved_at or order.approved_at
+        approved_at_str = _approved_at.strftime('%Y-%m-%d %H:%M UTC') if _approved_at else 'pending'
         c.drawString(MARGIN, nr_y, f"Approved by: {approver.username} ({approver.role})  |  Approved at: {approved_at_str}")
         nr_y -= 9
     if order.customer_confirmed_at:
@@ -326,3 +349,133 @@ def sign_pdf_digitally(input_pdf_path, order_id):
         pass  # Non-fatal: hash is still the primary integrity check
 
     return signed_path, sha256_hash.hexdigest(), signature_value
+
+
+def _build_watermark_pdf(verified: bool) -> bytes:
+    """
+    Returns an A4 PDF (as bytes) containing:
+      1. A pantograph-style micro-text security background (tiled, rotated).
+      2. A large diagonal stamp — 'AUTHENTIC' (green) or 'VOID' (red).
+    Intended to be merged as an overlay onto the signed receipt via pypdf.
+
+    Uses NO alpha/transparency — instead uses light opaque colours that
+    render reliably when merged by pypdf (which may drop ExtGState resources).
+    """
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    w, h = A4
+
+    # ── Security background: tiled micro-text (pantograph style) ─────────
+    # Light grey text on white — no alpha needed, works with any PDF merger.
+    micro_color = Color(0.82, 0.82, 0.82)  # light grey, opaque
+    c.setFillColor(micro_color)
+    c.setFont("Helvetica", 5.5)
+    tile_text = "ZARLY BIGFOOD SDN BHD  ●  "
+    tile_w = c.stringWidth(tile_text, "Helvetica", 5.5)
+    row_gap = 14
+    for row in range(-10, int(h / row_gap) + 10):
+        y_origin = row * row_gap
+        x_origin = -(w * 0.5)
+        c.saveState()
+        c.translate(x_origin, y_origin)
+        c.rotate(35)
+        cols = int((w * 2) / tile_w) + 4
+        for col in range(cols):
+            c.drawString(col * tile_w, 0, tile_text)
+        c.restoreState()
+
+    # ── Main diagonal stamp ───────────────────────────────────────────────
+    c.saveState()
+    c.translate(w / 2, h / 2)
+    c.rotate(45)
+
+    if verified:
+        # Two-line stamp: "AUTHENTIC" large + "Digitally Signed" smaller
+        stamp_text = "AUTHENTIC"
+        stamp_color = Color(0.25, 0.65, 0.25)  # medium green, opaque
+        font_size = 72
+    else:
+        stamp_text = "VOID"
+        stamp_color = Color(0.85, 0.25, 0.25)  # medium red, opaque
+        font_size = 110
+
+    c.setFont("Helvetica-Bold", font_size)
+    c.setFillColor(stamp_color)
+    text_w = c.stringWidth(stamp_text, "Helvetica-Bold", font_size)
+    c.drawString(-text_w / 2, -font_size / 4, stamp_text)
+
+    # Second line for verified stamp — descriptive sub-label
+    if verified:
+        sub_text = "Digitally Signed · PKCS#7 · Tamper-Proof"
+        sub_size = 14
+        c.setFont("Helvetica", sub_size)
+        sub_color = Color(0.35, 0.55, 0.35)
+        c.setFillColor(sub_color)
+        sub_w = c.stringWidth(sub_text, "Helvetica", sub_size)
+        c.drawString(-sub_w / 2, -font_size / 4 - sub_size - 8, sub_text)
+    else:
+        sub_text = "Verification Failed · Do Not Accept"
+        sub_size = 16
+        c.setFont("Helvetica-Bold", sub_size)
+        sub_color = Color(0.75, 0.2, 0.2)
+        c.setFillColor(sub_color)
+        sub_w = c.stringWidth(sub_text, "Helvetica-Bold", sub_size)
+        c.drawString(-sub_w / 2, -font_size / 4 - sub_size - 8, sub_text)
+
+    # Border rectangle around the stamp
+    effective_h = font_size * 0.85 + (sub_size + 16 if verified else sub_size + 10)
+    padding = 14
+    rect_x = -text_w / 2 - padding
+    rect_y = -font_size / 4 - padding
+    rect_w = max(text_w, sub_w if verified else 0) + padding * 2
+    rect_h = effective_h + padding * 2
+    border_color = Color(
+        stamp_color.red * 0.6, stamp_color.green * 0.6, stamp_color.blue * 0.6
+    )
+    c.setStrokeColor(border_color)
+    c.setLineWidth(3)
+    c.rect(rect_x, rect_y, rect_w, rect_h)
+
+    # Thinner outer border for seal effect
+    outer_pad = 6
+    c.setLineWidth(1.2)
+    c.rect(rect_x - outer_pad, rect_y - outer_pad,
+           rect_w + outer_pad * 2, rect_h + outer_pad * 2)
+
+    c.restoreState()
+    c.save()
+    buf.seek(0)
+    return buf.read()
+
+
+def stamp_pdf_with_watermark(pdf_path: str, verified: bool) -> bytes:
+    """
+    Read the signed PDF at pdf_path, merge the pantograph/stamp watermark
+    as an OVERLAY on every page, and return the result as bytes.
+    The original signed file on disk is not modified.
+
+    The watermark PDF uses opaque light colours (no alpha) so it merges
+    reliably regardless of pypdf's ExtGState handling.  Because the
+    colours are pale, the invoice content underneath remains fully legible
+    while the stamp is clearly visible.
+    """
+    from pypdf import PdfWriter, PdfReader as PyPdfReader
+
+    watermark_bytes = _build_watermark_pdf(verified)
+    wm_reader = PyPdfReader(io.BytesIO(watermark_bytes))
+    wm_page = wm_reader.pages[0]
+
+    original_reader = PyPdfReader(pdf_path)
+    writer = PdfWriter()
+
+    for page in original_reader.pages:
+        # over=True: watermark ON TOP of invoice content.
+        # Because the watermark uses pale opaque colours (no alpha),
+        # it stamps visibly while the invoice text remains readable.
+        page.merge_page(wm_page, over=True)
+        writer.add_page(page)
+
+    out = io.BytesIO()
+    writer.write(out)
+    out.seek(0)
+    return out.read()

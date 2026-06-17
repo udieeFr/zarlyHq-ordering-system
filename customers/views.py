@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from customers.auth_utils import customer_required
 from django.contrib.auth import logout, login
 from django.contrib import messages
-from django.http import Http404, HttpResponse, JsonResponse  # Required for PDF downloads
+from django.http import Http404, HttpResponse, JsonResponse, FileResponse  # Required for PDF downloads
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Q
 from django.views.decorators.http import require_http_methods
@@ -139,7 +139,7 @@ def get_cart_from_session(request):
 
     product_map = {
         str(p.id): p
-        for p in Product.objects.filter(id__in=raw_ids)
+        for p in Product.objects.filter(id__in=raw_ids, is_available=True)
     }
 
     cart_items = []
@@ -178,8 +178,8 @@ def product_list(request):
     Main Catalog View: Handles category/allergy filtering and provides
     data for the sidebar order tracking and cart count.
     """
-    products = Product.objects.all()
-    
+    products = Product.objects.filter(is_available=True)
+
     # 1. Filtering Logic
     cat_filter = request.GET.get('category')
     allergy_id = request.GET.get('allergy')
@@ -222,7 +222,7 @@ def product_list(request):
     favourite_ids = set()
     if request.user.is_authenticated:
         user_orders = Order.objects.filter(customer=request.user).order_by('-created_at')[:5]
-        completed_orders = Order.objects.filter(customer=request.user, status='approved')
+        completed_orders = Order.objects.filter(customer=request.user, status__in=['approved', 'delivered'])
         favourite_ids = set(Favourite.objects.filter(customer=request.user).values_list('product_id', flat=True))
 
     context = {
@@ -906,19 +906,21 @@ def confirm_order(request, order_id):
 def _cancel_pending_confirmation_order(order, user):
     """Restore stock and cancel an unconfirmed order."""
     from admins.models import OrderEvent
-    for item in order.items.select_related('product').all():
-        if item.is_bundle:
-            if not item.product.is_unlimited_stock and item.product.bundle_stock is not None:
-                item.product.bundle_stock += item.quantity
-                item.product.save(update_fields=['bundle_stock'])
-        else:
-            if not item.product.is_unlimited_stock:
-                item.product.stock += item.quantity
-                item.product.save(update_fields=['stock'])
-    order.status = 'cancelled'
-    order.save(update_fields=['status'])
-    OrderEvent.objects.create(order=order, status='cancelled', actor=user,
-                              note='Cancelled: OTP confirmation expired')
+    from django.db import transaction
+    with transaction.atomic():
+        for item in order.items.select_related('product').all():
+            if item.is_bundle:
+                if not item.product.is_unlimited_stock and item.product.bundle_stock is not None:
+                    item.product.bundle_stock += item.quantity
+                    item.product.save(update_fields=['bundle_stock'])
+            else:
+                if not item.product.is_unlimited_stock:
+                    item.product.stock += item.quantity
+                    item.product.save(update_fields=['stock'])
+        order.status = 'cancelled'
+        order.save(update_fields=['status'])
+        OrderEvent.objects.create(order=order, status='cancelled', actor=user,
+                                  note='Cancelled: OTP confirmation expired')
 
 @customer_required
 def order_success(request, order_id):
@@ -1358,32 +1360,81 @@ def awaiting_payment_orders(request):
 
 
 @login_required
+def download_watermarked_receipt(request, order_id):
+    """
+    Stream the signed receipt PDF with a pantograph watermark stamped dynamically
+    based on a live tamper check.  AUTHENTIC (green) if the file hash matches the
+    stored hash; VOID (red) if the file was modified.
+    The original signed file on disk is never modified.
+    Accessible by the order's customer or any sales_admin/manager.
+    """
+    from admins.models import DigitalSignature
+    from admins.utils import stamp_pdf_with_watermark
+    import hashlib, os, logging
+
+    logger = logging.getLogger(__name__)
+
+    is_staff = request.user.role in ('sales_admin', 'manager') or request.user.is_superuser
+    if is_staff:
+        sig = get_object_or_404(DigitalSignature, order__id=order_id)
+    else:
+        sig = get_object_or_404(DigitalSignature, order__id=order_id, order__customer=request.user)
+
+    pdf_path = os.path.join(settings.MEDIA_ROOT, sig.pdf_path.name)
+    if not os.path.exists(pdf_path):
+        logger.error("Signed PDF missing for order %s: %s", order_id, pdf_path)
+        raise Http404("Signed receipt file not found on server.")
+
+    # Live tamper check: recompute file hash and compare to stored value
+    sha256 = hashlib.sha256()
+    try:
+        with open(pdf_path, 'rb') as f:
+            for chunk in iter(lambda: f.read(8192), b''):
+                sha256.update(chunk)
+    except OSError as e:
+        logger.error("Failed to read signed PDF for order %s: %s", order_id, e)
+        raise Http404("Cannot read signed receipt file.")
+
+    verified = sha256.hexdigest() == sig.signature_hash
+
+    try:
+        pdf_bytes = stamp_pdf_with_watermark(pdf_path, verified)
+    except Exception as e:
+        logger.error("Watermark stamp failed for order %s: %s", order_id, e, exc_info=True)
+        # Fall back to serving the unstamped signed PDF
+        with open(pdf_path, 'rb') as f:
+            pdf_bytes = f.read()
+        verified = False  # force VOID status in filename if watermark failed
+
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    status_label = 'AUTHENTIC' if verified else 'VOID'
+    response['Content-Disposition'] = f'inline; filename="receipt_order_{order_id}_{status_label}.pdf"'
+    return response
+
+
+@login_required
 def serve_private_media(request, filepath):
-    """Authenticated file serving for private media via nginx X-Accel-Redirect."""
+    """Authenticated file serving for private media."""
+    import os
     allowed_subdirs = {'payment_proofs', 'signed_pdfs', 'complaint_evidence'}
     parts = filepath.split('/', 1)
     if len(parts) != 2 or parts[0] not in allowed_subdirs:
         raise Http404
     subdir = parts[0]
 
-    if request.user.role in ('sales_admin', 'manager') or request.user.is_superuser:
-        response = HttpResponse()
-        response['X-Accel-Redirect'] = f'/private-media/{filepath}'
-        del response['Content-Type']
-        return response
+    if not (request.user.role in ('sales_admin', 'manager') or request.user.is_superuser):
+        # Customers: verify ownership before serving
+        if subdir == 'payment_proofs':
+            get_object_or_404(Payment, proof_image=filepath, order__customer=request.user)
+        elif subdir == 'signed_pdfs':
+            get_object_or_404(DigitalSignature, pdf_path=filepath, order__customer=request.user)
+        elif subdir == 'complaint_evidence':
+            get_object_or_404(Complaint, evidence_image=filepath, customer=request.user)
 
-    # Customers: verify ownership before serving
-    if subdir == 'payment_proofs':
-        get_object_or_404(Payment, proof_image=filepath, order__customer=request.user)
-    elif subdir == 'signed_pdfs':
-        get_object_or_404(DigitalSignature, pdf_path=filepath, order__customer=request.user)
-    elif subdir == 'complaint_evidence':
-        get_object_or_404(Complaint, evidence_image=filepath, customer=request.user)
-
-    response = HttpResponse()
-    response['X-Accel-Redirect'] = f'/private-media/{filepath}'
-    del response['Content-Type']
-    return response
+    full_path = os.path.join(settings.MEDIA_ROOT, filepath)
+    if not os.path.exists(full_path):
+        raise Http404
+    return FileResponse(open(full_path, 'rb'))
 
 
 @ratelimit(key='ip', rate='20/m', block=False)
@@ -1568,23 +1619,24 @@ def cancel_order(request, order_id):
 
     reason = (request.POST.get('cancel_reason', '').strip() or 'No reason provided')[:500]
 
-    # Restore stock for each item (skip unlimited-stock products — their stock was never decremented)
-    for item in order.items.select_related('product').all():
-        if item.is_bundle:
-            if not item.product.is_unlimited_stock and item.product.bundle_stock is not None:
-                item.product.bundle_stock += item.quantity
-                item.product.save(update_fields=['bundle_stock'])
-        else:
-            if not item.product.is_unlimited_stock:
-                item.product.stock += item.quantity
-                item.product.save(update_fields=['stock'])
-
-    order.status = 'cancelled'
-    order.order_notes = (order.order_notes or '') + f'\n[CANCELLED by customer: {reason}]'
-    order.save(update_fields=['status', 'order_notes'])
-
+    from django.db import transaction
     from admins.models import OrderEvent
-    OrderEvent.objects.create(order=order, status='cancelled', actor=request.user, note=reason)
+    with transaction.atomic():
+        # Restore stock atomically — all items or none, preventing partial restore on crash
+        for item in order.items.select_related('product').all():
+            if item.is_bundle:
+                if not item.product.is_unlimited_stock and item.product.bundle_stock is not None:
+                    item.product.bundle_stock += item.quantity
+                    item.product.save(update_fields=['bundle_stock'])
+            else:
+                if not item.product.is_unlimited_stock:
+                    item.product.stock += item.quantity
+                    item.product.save(update_fields=['stock'])
+
+        order.status = 'cancelled'
+        order.order_notes = (order.order_notes or '') + f'\n[CANCELLED by customer: {reason}]'
+        order.save(update_fields=['status', 'order_notes'])
+        OrderEvent.objects.create(order=order, status='cancelled', actor=request.user, note=reason)
 
     log_audit(request, 'order_cancelled', target=order,
               description=f'Customer cancelled Order #{order.id}. Reason: {reason}',
@@ -1804,14 +1856,18 @@ def home(request):
     from django.db.models import Sum
     top_products = list(
         Product.objects
-        .filter(is_available=True)
+        .filter(is_available=True, image__isnull=False)
+        .exclude(image='')
         .annotate(total_sold=Sum('orderitem__quantity'))
         .order_by('-total_sold')[:4]
     )
     if len(top_products) < 4:
         seen = {p.id for p in top_products}
         fill = list(
-            Product.objects.filter(is_available=True).exclude(id__in=seen)[:4 - len(top_products)]
+            Product.objects
+            .filter(is_available=True, image__isnull=False)
+            .exclude(image='')
+            .exclude(id__in=seen)[:4 - len(top_products)]
         )
         top_products += fill
     return render(request, 'customers/home.html', {'top_products': top_products})
@@ -1869,14 +1925,19 @@ def customer_complaint_messages(request, complaint_id):
         body = request.POST.get('body', '').strip()
         if not body:
             return JsonResponse({'error': 'Message cannot be empty'}, status=400)
-        SupportMessage.objects.create(
+        msg = SupportMessage.objects.create(
             complaint=complaint,
             sender=request.user,
             body=encrypt_message(body),
         )
         log_audit(request, 'support_message_sent', target=complaint,
                   description=f'Customer sent support message on Complaint #{complaint.id}')
-        return JsonResponse({'ok': True})
+        return JsonResponse({'ok': True, 'message': {
+            'id': msg.id,
+            'body': body,
+            'created_at': msg.created_at.isoformat(),
+            'is_mine': True,
+        }})
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 

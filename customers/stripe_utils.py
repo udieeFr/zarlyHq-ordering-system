@@ -35,7 +35,8 @@ def create_stripe_checkout_session(order, request):
         success_url = request.build_absolute_uri(reverse('stripe_success', args=[order.id]))
         cancel_url = request.build_absolute_uri(reverse('stripe_cancel', args=[order.id]))
         
-        # Prepare line items from order
+        # Prepare line items from order — use item.unit_price (price locked at order time,
+        # reflects bundle pricing) rather than item.product.price (current retail price).
         line_items = []
         for item in order.items.all():
             line_items.append({
@@ -45,9 +46,23 @@ def create_stripe_checkout_session(order, request):
                         'name': item.product.name,
                         'description': f'Order #{order.id}',
                     },
-                    'unit_amount': int(item.product.price * 100),  # Stripe expects cents
+                    'unit_amount': int(item.unit_price * 100),
                 },
                 'quantity': item.quantity,
+            })
+
+        # Add shipping fee as a separate line item if non-zero
+        if order.shipping_fee and order.shipping_fee > 0:
+            line_items.append({
+                'price_data': {
+                    'currency': settings.STRIPE_CURRENCY.lower(),
+                    'product_data': {
+                        'name': 'Shipping Fee',
+                        'description': f'Delivery for Order #{order.id}',
+                    },
+                    'unit_amount': int(order.shipping_fee * 100),
+                },
+                'quantity': 1,
             })
         
         # Create checkout session

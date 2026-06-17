@@ -18,6 +18,7 @@ urlpatterns = [
     path('prepared-orders/', views.prepared_orders_list, name='prepared_orders_list'),
     path('prep-group/<str:group_id>/', views.prep_group_detail, name='prep_group_detail'),
     path('prep-group/<str:group_id>/ready/', views.mark_prep_group_ready, name='mark_prep_group_ready'),
+    path('prep-group/<str:group_id>/cancel/', views.cancel_prep_group, name='cancel_prep_group'),
     path('delivery-orders/', views.delivery_orders_list, name='delivery_orders_list'),
     path('order/<int:order_id>/out-for-delivery/', views.mark_order_out_for_delivery, name='mark_order_out_for_delivery'),
     path('order/<int:order_id>/delivered/', views.mark_order_delivered, name='mark_order_delivered'),
@@ -70,6 +71,7 @@ urlpatterns = [
 
     # Availability Toggle
     path('inventory/<int:product_id>/toggle-availability/', views.toggle_product_availability, name='toggle_product_availability'),
+    path('inventory/<int:product_id>/toggle-unlimited/', views.toggle_unlimited_stock, name='toggle_unlimited_stock'),
 
     # Priority Toggles
     path('order/<int:order_id>/toggle-priority/', views.toggle_order_priority, name='toggle_order_priority'),
