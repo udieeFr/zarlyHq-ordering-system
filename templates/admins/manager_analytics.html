@@ -1,4 +1,5 @@
 {% extends 'admin_base.html' %}
+{% load admin_extras %}
 {% block page_title %}Analytics Dashboard{% endblock %}
 
 {% block content %}
@@ -119,7 +120,7 @@
 
 {% if out_of_stock_products or low_stock_products or out_of_bundle_stock_products or low_bundle_stock_products %}
 <div class="alert alert-warning d-flex flex-wrap gap-3 align-items-start mb-3" style="border-left:4px solid #f59e0b;">
-  <div style="font-weight:800;font-size:.88rem;color:#92400e;min-width:120px;">⚠️ Stock Alert</div>
+  <div style="font-weight:800;font-size:.88rem;color:#92400e;min-width:120px;">Stock Alert</div>
   <div class="flex-fill">
     {% if out_of_stock_products %}
     <div style="font-size:.82rem;font-weight:700;color:#dc2626;margin-bottom:.35rem;">
@@ -203,7 +204,7 @@
       <div class="rpt-panel-title">Order Status Breakdown</div>
       {% for status, count in status_breakdown.items %}
       <div class="funnel-row">
-        <span style="text-transform:capitalize;">{{ status|cut:"_" }}</span>
+        <span style="text-transform:capitalize;">{{ status|replace:"_, " }}</span>
         <span class="funnel-count">{{ count }}</span>
       </div>
       {% endfor %}

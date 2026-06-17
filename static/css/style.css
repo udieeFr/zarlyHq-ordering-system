@@ -1234,30 +1234,18 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem 1rem 0.75rem;
+  padding: 0.5rem 0.75rem;
   flex-shrink: 0;
   border-bottom: 1px solid oklch(86% 0.07 62);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
-.lsb-logo-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: oklch(14% 0.045 52);
-  border: 2px solid #ff9933;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.lsb-logo-img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
   flex-shrink: 0;
 }
-
-.lsb-logo-icon svg {
-  width: 22px;
-  height: 22px;
-}
-.lsb-logo-icon circle { fill: rgb(255 153 51 / 0.2); }
-.lsb-logo-icon path  { stroke: #ff9933; }
 
 /* ── Nav items ────────────── */
 .lsb-nav {
@@ -2005,6 +1993,38 @@ a.cat-card.pill.pill-active .cat-icon-wrap {
   background: rgba(15, 23, 42, 0.55);
   padding: 0.25rem 0.65rem;
   border-radius: 999px;
+}
+
+/* Grey out sold-out cards */
+.pcard.pcard-soldout {
+  filter: grayscale(0.55);
+  opacity: 0.72;
+  pointer-events: none;
+}
+.pcard.pcard-soldout:hover {
+  box-shadow: 4px 4px 0 0 #170400, 0 1px 4px oklch(9% 0.04 32 / 0.05);
+  transform: none;
+}
+
+/* Stock badge on product image */
+.pcard-stock-badge {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  backdrop-filter: blur(4px);
+  letter-spacing: 0.02em;
+}
+.pcard-stock-badge.low {
+  background: rgba(239, 68, 68, 0.82);
+  color: #fff;
+}
+.pcard-stock-badge.ok {
+  background: rgba(15, 23, 42, 0.58);
+  color: oklch(96% 0.012 68);
 }
 
 .pcard-cat {

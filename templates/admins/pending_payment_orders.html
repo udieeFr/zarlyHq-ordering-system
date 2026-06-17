@@ -36,7 +36,8 @@
   }
   .pay-table td { padding: 0.72rem 1rem; border-bottom: 1px solid oklch(91% 0.025 62); color: oklch(22% 0.04 52); vertical-align: middle; background: oklch(99.5% 0.006 60); }
   .pay-table tr:last-child td { border-bottom: none; }
-  .pay-table tr:hover td { background: oklch(97% 0.022 62); }
+  .pay-table tbody tr { cursor: pointer; transition: background .12s; }
+  .pay-table tbody tr:hover td { background: oklch(97% 0.022 62); }
 
   .proof-thumb {
     width: 56px; height: 56px; border-radius: 8px;
@@ -143,7 +144,7 @@
       </thead>
       <tbody>
         {% for order in pending_payment_orders %}
-        <tr>
+        <tr data-href="{% url 'admin_order_detail' order.id %}" class="js-clickable-row">
           <td><strong style="color:oklch(16% 0.04 52);">#{{ order.id }}</strong></td>
           <td>
             <span style="font-weight:600;color:oklch(16% 0.04 52);">{{ order.customer_label }}</span>
@@ -235,26 +236,23 @@
 <div class="modal fade" id="rejectModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
-      <form method="post" id="rejectForm">
-        {% csrf_token %}
-        <div class="modal-header">
-          <h5 class="modal-title" style="font-size:.9rem;font-weight:700;">Reject Payment Proof</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      <div class="modal-header">
+        <h5 class="modal-title" style="font-size:.9rem;font-weight:700;">Reject Payment Proof</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:.85rem;color:oklch(48% 0.06 54);margin-bottom:1rem;">Order <strong id="rejectOrderId" style="color:oklch(16% 0.04 52);"></strong></p>
+        <div class="mb-3">
+          <label for="rejectionReason" class="form-label" style="font-size:.82rem;font-weight:600;color:oklch(28% 0.04 52);">Reason for rejection</label>
+          <textarea id="rejectionReason" class="form-control" rows="4"
+                    placeholder="Explain why the payment proof is being rejected. The customer will see this."></textarea>
         </div>
-        <div class="modal-body">
-          <p style="font-size:.85rem;color:oklch(48% 0.06 54);margin-bottom:1rem;">Order <strong id="rejectOrderId" style="color:oklch(16% 0.04 52);"></strong></p>
-          <div class="mb-3">
-            <label for="rejectionReason" class="form-label" style="font-size:.82rem;font-weight:600;color:oklch(28% 0.04 52);">Reason for rejection</label>
-            <textarea name="rejection_reason" id="rejectionReason" class="form-control" rows="4"
-                      placeholder="Explain why the payment proof is being rejected. The customer will see this." required></textarea>
-          </div>
-          <p style="font-size:.75rem;color:oklch(48% 0.06 54);margin:0;">The customer will be notified by email and asked to resubmit.</p>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-danger">Reject and notify customer</button>
-        </div>
-      </form>
+        <p style="font-size:.75rem;color:oklch(48% 0.06 54);margin:0;">The customer will be notified by email and asked to resubmit.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="rejectSubmitBtn">Reject and notify customer</button>
+      </div>
     </div>
   </div>
 </div>
@@ -263,7 +261,7 @@
 {% block extra_scripts %}
 <script nonce="{{ request.csp_nonce }}">
 (function () {
-  var rejectBaseUrl = "{% url 'reject_pending_payment' 0 %}".replace('/0/', '/');
+  var rejectUrlTemplate = "{% url 'reject_pending_payment' 0 %}";
 
   function showProofModal(imageUrl, orderLabel) {
     document.getElementById('proofImage').src = imageUrl;
@@ -271,13 +269,36 @@
     new bootstrap.Modal(document.getElementById('proofModal')).show();
   }
 
+  var currentRejectOrderId = null;
+
   function showRejectModal(orderId) {
+    currentRejectOrderId = orderId;
     document.getElementById('rejectOrderId').textContent = '#' + orderId;
-    document.getElementById('rejectForm').action = rejectBaseUrl + orderId + '/reject-payment/';
+    document.getElementById('rejectionReason').value = '';
     new bootstrap.Modal(document.getElementById('rejectModal')).show();
   }
 
+  document.getElementById('rejectSubmitBtn').addEventListener('click', function() {
+    var reason = document.getElementById('rejectionReason').value.trim();
+    if (!reason) {
+      adminToast('Please provide a rejection reason.', false);
+      return;
+    }
+    var url = rejectUrlTemplate.replace('/0/', '/' + currentRejectOrderId + '/');
+    var btn = this;
+    adminPost(url, {rejection_reason: reason}, btn, function() {
+      bootstrap.Modal.getInstance(document.getElementById('rejectModal')).hide();
+      setTimeout(function() { location.reload(); }, 1200);
+    });
+  });
+
   document.addEventListener('click', function (e) {
+    // Row click — navigate to order detail (skip if a button/form inside the row was clicked)
+    var row = e.target.closest('.js-clickable-row');
+    if (row && !e.target.closest('button, a, form, input, select, textarea')) {
+      window.location.href = row.dataset.href;
+      return;
+    }
     var proofImg = e.target.closest('.js-proof-img');
     if (proofImg) {
       showProofModal(proofImg.dataset.proofUrl, proofImg.dataset.orderLabel);
@@ -286,6 +307,18 @@
     var rejectBtn = e.target.closest('.js-reject-btn');
     if (rejectBtn) {
       showRejectModal(rejectBtn.dataset.orderId);
+      return;
+    }
+  });
+
+  document.addEventListener('submit', function(e) {
+    var form = e.target;
+    if (form.classList.contains('js-approve-form')) {
+      e.preventDefault();
+      var btn = form.querySelector('[type=submit]');
+      adminPost(form.action, {}, btn, function() {
+        setTimeout(function() { location.reload(); }, 1200);
+      });
       return;
     }
   });

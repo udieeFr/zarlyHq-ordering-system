@@ -5,101 +5,227 @@
 
 {% block content %}
 <style>
-  .notif-page { max-width: 720px; margin: 2rem auto 4rem; }
-  .notif-page-header {
+  .notif-page {
+    max-width: 680px;
+    margin: 2rem auto 4rem;
+    padding: 0 1rem;
+  }
+
+  .notif-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1.5rem;
   }
-  .notif-page-title { font-size: 1.35rem; font-weight: 800; color: var(--dark); margin: 0; }
 
-  .notif-card {
+  .notif-heading {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--dark);
+    margin: 0;
     display: flex;
-    gap: 1rem;
-    padding: 1rem 1.25rem;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .notif-count-pill {
+    font-size: 0.68rem;
+    font-weight: 700;
+    background: var(--brand);
+    color: oklch(99% 0.005 62);
+    padding: 0.15rem 0.5rem;
+    border-radius: 20px;
+    letter-spacing: 0.02em;
+  }
+
+  .notif-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .notif-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    padding: 0.85rem 1rem;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: #fff;
-    margin-bottom: 0.65rem;
+    background: var(--surface);
     text-decoration: none;
     color: inherit;
     transition: var(--transition);
-    position: relative;
   }
-  .notif-card:hover { border-color: var(--brand); box-shadow: var(--shadow-sm); }
-  .notif-card.unread { background: #fdf8f0; border-left: 3px solid var(--brand); }
-  .notif-card.unread:hover { background: #fef3e2; }
 
-  .notif-icon {
-    font-size: 1.5rem;
-    flex-shrink: 0;
-    width: 2.5rem;
-    text-align: center;
-    padding-top: 0.1rem;
+  .notif-item:hover {
+    border-color: var(--brand);
+    box-shadow: var(--shadow-sm);
   }
-  .notif-body { flex: 1; min-width: 0; }
+
+  .notif-item.unread {
+    background: var(--brand-light);
+    border-color: var(--brand-border);
+  }
+
+  .notif-item.unread:hover {
+    border-color: var(--brand);
+  }
+
+  .notif-icon-wrap {
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 0.05rem;
+  }
+
+  .notif-icon-wrap svg { width: 1rem; height: 1rem; }
+
+  .icon-order    { background: oklch(94% 0.05 45);  color: oklch(50% 0.16 45); }
+  .icon-payment  { background: oklch(93% 0.05 145); color: oklch(44% 0.15 145); }
+  .icon-delivery { background: oklch(93% 0.05 230); color: oklch(46% 0.14 230); }
+  .icon-complaint{ background: oklch(93% 0.05 20);  color: oklch(50% 0.16 20); }
+  .icon-system   { background: oklch(92% 0.02 260); color: oklch(44% 0.10 260); }
+
+  .notif-content { flex: 1; min-width: 0; }
+
   .notif-title {
-    font-size: 0.9rem;
-    font-weight: 700;
+    font-size: 0.875rem;
+    font-weight: 600;
     color: var(--dark);
     margin: 0 0 0.2rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .notif-message { font-size: 0.82rem; color: var(--muted); margin: 0 0 0.35rem; }
-  .notif-time { font-size: 0.73rem; color: #94a3b8; }
-  .notif-unread-dot {
-    width: 8px;
-    height: 8px;
+
+  .notif-item.unread .notif-title { font-weight: 700; }
+
+  .notif-message {
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin: 0 0 0.3rem;
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .notif-time { font-size: 0.72rem; color: #94a3b8; }
+
+  .notif-dot {
+    flex-shrink: 0;
+    align-self: center;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: var(--brand);
-    flex-shrink: 0;
-    margin-top: 0.4rem;
+    margin-left: 0.25rem;
   }
+
   .notif-empty {
+    padding: 4rem 1rem;
     text-align: center;
-    padding: 3rem 1rem;
-    color: var(--muted);
   }
-  .notif-empty-icon { font-size: 2.5rem; display: block; margin-bottom: 0.75rem; }
+
+  .notif-empty-icon {
+    display: block;
+    width: 2.5rem;
+    height: 2.5rem;
+    margin: 0 auto 1rem;
+    color: oklch(75% 0.04 62);
+  }
+
+  .notif-empty-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--dark-3);
+    margin: 0 0 0.3rem;
+  }
+
+  .notif-empty-sub {
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin: 0;
+  }
 </style>
 
 <div class="notif-page">
-  <div class="notif-page-header">
-    <h1 class="notif-page-title">Notifications
-      {% if unread_count %}<span class="badge bg-warning text-dark ms-2" style="font-size:0.7rem;">{{ unread_count }} unread</span>{% endif %}
+  <div class="notif-header">
+    <h1 class="notif-heading">
+      Notifications
+      {% if unread_count %}<span class="notif-count-pill">{{ unread_count }}</span>{% endif %}
     </h1>
     {% if unread_count %}
-    <a href="{% url 'notifications_mark_all_read' %}" class="btn btn-sm btn-outline-secondary">Mark all as read</a>
+    <a href="{% url 'notifications_mark_all_read' %}" class="btn btn-outline btn-sm">Mark all read</a>
     {% endif %}
   </div>
 
   {% if notifications %}
+  <div class="notif-list">
     {% for n in notifications %}
-    <a href="{% url 'notification_open' n.id %}" class="notif-card {% if not n.is_read %}unread{% endif %}">
-      <div class="notif-icon">
-        {% if n.notification_type == 'order_update' %}📦
-        {% elif n.notification_type == 'payment' %}💳
-        {% elif n.notification_type == 'delivery' %}🚚
-        {% elif n.notification_type == 'complaint' %}📝
-        {% else %}🔔{% endif %}
+    <a href="{% url 'notification_open' n.id %}" class="notif-item {% if not n.is_read %}unread{% endif %}">
+
+      <div class="notif-icon-wrap {% if n.notification_type == 'order_update' %}icon-order{% elif n.notification_type == 'payment' %}icon-payment{% elif n.notification_type == 'delivery' %}icon-delivery{% elif n.notification_type == 'complaint' %}icon-complaint{% else %}icon-system{% endif %}">
+        {% if n.notification_type == 'order_update' %}
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2.5 4.5h11l-1.5 7h-8z"/>
+          <circle cx="5.5" cy="13.5" r="0.8" fill="currentColor" stroke="none"/>
+          <circle cx="10.5" cy="13.5" r="0.8" fill="currentColor" stroke="none"/>
+          <path d="M2.5 4.5L2 2.5H1"/>
+        </svg>
+        {% elif n.notification_type == 'payment' %}
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="1.5" y="3.5" width="13" height="9" rx="1.5"/>
+          <path d="M1.5 6.5h13"/>
+          <path d="M4.5 9.5h2.5"/>
+        </svg>
+        {% elif n.notification_type == 'delivery' %}
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1.5 8V5.5h8V12H5.5"/>
+          <path d="M9.5 7h3.5l1.5 3v2h-1.5"/>
+          <circle cx="4" cy="12.5" r="1.5"/>
+          <circle cx="12.5" cy="12.5" r="1.5"/>
+        </svg>
+        {% elif n.notification_type == 'complaint' %}
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13 2H3a1.5 1.5 0 0 0-1.5 1.5v7A1.5 1.5 0 0 0 3 12h2.5l2.5 2 2.5-2H13a1.5 1.5 0 0 0 1.5-1.5v-7A1.5 1.5 0 0 0 13 2z"/>
+          <path d="M8 5v3"/>
+          <circle cx="8" cy="9.5" r="0.5" fill="currentColor" stroke="none"/>
+        </svg>
+        {% else %}
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="8" cy="8" r="6.5"/>
+          <path d="M8 7.5v3.5"/>
+          <circle cx="8" cy="5.5" r="0.6" fill="currentColor" stroke="none"/>
+        </svg>
+        {% endif %}
       </div>
-      <div class="notif-body">
+
+      <div class="notif-content">
         <p class="notif-title">{{ n.title }}</p>
         <p class="notif-message">{{ n.message|truncatechars:120 }}</p>
         <span class="notif-time">{{ n.created_at|timesince }} ago</span>
       </div>
-      {% if not n.is_read %}<div class="notif-unread-dot"></div>{% endif %}
+
+      {% if not n.is_read %}<div class="notif-dot"></div>{% endif %}
     </a>
     {% endfor %}
+  </div>
+
   {% else %}
-    <div class="notif-empty">
-      <span class="notif-empty-icon">🔔</span>
-      <p class="fw-bold mb-1">No notifications yet</p>
-      <p style="font-size:0.875rem;">Order updates and alerts will appear here.</p>
-    </div>
+  <div class="notif-empty">
+    <svg class="notif-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+    <p class="notif-empty-title">No notifications yet</p>
+    <p class="notif-empty-sub">Order updates and alerts will appear here.</p>
+  </div>
   {% endif %}
 </div>
 {% endblock %}

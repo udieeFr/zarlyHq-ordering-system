@@ -195,12 +195,12 @@
           </td>
           <td>
             <a href="{% url 'admin_order_detail' order.id %}" class="order-link">#{{ order.id }}</a>
-            {% if order.is_priority %}<span class="badge-priority ms-1">⚡ Priority</span>{% endif %}
+            {% if order.is_priority %}<span class="badge-priority ms-1">Priority</span>{% endif %}
             {% if order.id in unpaid_ids %}<span class="badge-unpaid-tag ms-1">UNPAID</span>{% endif %}
             <button class="priority-toggle"
                     data-url="{% url 'toggle_order_priority' order.id %}"
                     title="{% if order.is_priority %}Remove priority{% else %}Mark priority{% endif %}"
-                    style="background:none;border:none;cursor:pointer;padding:0 0 0 4px;font-size:.85rem;opacity:.45;vertical-align:middle;">{% if order.is_priority %}⚡{% else %}☆{% endif %}</button>
+                    style="background:none;border:none;cursor:pointer;padding:0 0 0 4px;font-size:.85rem;opacity:.45;vertical-align:middle;">{% if order.is_priority %}★{% else %}☆{% endif %}</button>
           </td>
           <td>
             <span style="font-weight:600;color:oklch(16% 0.04 52);">{{ order.customer_label }}</span>
@@ -218,7 +218,7 @@
             <a href="{% url 'admin_order_detail' order.id %}" class="btn btn-sm btn-outline-secondary me-1">View</a>
             <a href="{% url 'print_order_summary' order.id %}" class="btn btn-sm" style="background:#ff9933;color:oklch(13% 0.04 52);font-weight:700;border:none;" target="_blank">Receipt</a>
             {% if order.digital_signature %}
-            <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-sm btn-outline-secondary" download>Signed</a>
+            <a href="{% url 'serve_private_media' order.digital_signature.pdf_path.name %}" class="btn btn-sm btn-outline-secondary" download>Signed</a>
             {% endif %}
             <button type="button" class="btn btn-sm ms-1 prepare-btn" data-order-id="{{ order.id }}"
                     style="background:oklch(44% 0.14 148);color:#fff;font-weight:700;border:none;">Prepare</button>
@@ -348,26 +348,37 @@ document.getElementById('clear-selection').addEventListener('click', function() 
   updateSummary();
 });
 
-document.getElementById('print-prep-list').addEventListener('click', function() {
-  if (!selectedOrders.size) { alert('Please select at least one order.'); return; }
+function submitPrepForm(orderIds) {
   const form = document.getElementById('prep-group-form');
-  form.querySelectorAll('input[name="order_ids"]').forEach(i => i.remove());
-  selectedOrders.forEach(id => {
+  // Remove any previous order_ids and confirm_unpaid
+  form.querySelectorAll('input[name="order_ids"], input[name="confirm_unpaid"]').forEach(i => i.remove());
+  orderIds.forEach(id => {
     const input = document.createElement('input');
     input.type = 'hidden'; input.name = 'order_ids'; input.value = id;
     form.appendChild(input);
   });
+  // Check for unpaid orders
+  const hasUnpaid = orderIds.some(id => {
+    const o = ordersData.find(x => x.id === id);
+    return o && o.unpaid;
+  });
+  if (hasUnpaid) {
+    if (!confirm('Some selected orders have NOT been paid. These will be tagged UNPAID in the prep group. Proceed anyway?')) return;
+    const unpaidInput = document.createElement('input');
+    unpaidInput.type = 'hidden'; unpaidInput.name = 'confirm_unpaid'; unpaidInput.value = 'true';
+    form.appendChild(unpaidInput);
+  }
   form.submit();
+}
+
+document.getElementById('print-prep-list').addEventListener('click', function() {
+  if (!selectedOrders.size) { alert('Please select at least one order.'); return; }
+  submitPrepForm(Array.from(selectedOrders));
 });
 
 document.querySelectorAll('.prepare-btn').forEach(btn => {
   btn.addEventListener('click', function() {
-    const form = document.getElementById('prep-group-form');
-    form.querySelectorAll('input[name="order_ids"]').forEach(i => i.remove());
-    const input = document.createElement('input');
-    input.type = 'hidden'; input.name = 'order_ids'; input.value = this.dataset.orderId;
-    form.appendChild(input);
-    form.submit();
+    submitPrepForm([parseInt(this.dataset.orderId)]);
   });
 });
 

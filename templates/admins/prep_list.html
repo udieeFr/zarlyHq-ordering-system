@@ -12,13 +12,13 @@
 <!-- Navigation -->
 <div class="mb-4">
     <a href="{% url 'approved_orders_list' %}" class="btn btn-outline-secondary">← Back to Approved Orders</a>
-    <button onclick="window.print()" class="btn btn-primary ms-2">🖨️ Print Prep List</button>
+    <button onclick="window.print()" class="btn btn-primary ms-2">Print Prep List</button>
     <form method="post" action="{% url 'mark_orders_prepared' %}" class="d-inline ms-2" id="mark-prepared-form">
         {% csrf_token %}
         {% for order in orders %}
         <input type="hidden" name="order_ids" value="{{ order.id }}">
         {% endfor %}
-        <button type="submit" class="btn btn-success" onclick="return confirm('Mark these {{ order_count }} orders as prepared?')">✅ Mark as Prepared</button>
+        <button type="submit" class="btn btn-success" onclick="return confirm('Mark these {{ order_count }} orders as prepared?')">Mark as Prepared</button>
     </form>
 </div>
 

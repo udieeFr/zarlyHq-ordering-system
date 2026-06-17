@@ -77,7 +77,7 @@
 
         <div class="d-flex gap-2">
           <button type="submit" class="btn btn-primary" {% if not selected_customers %}disabled{% endif %}>
-            📧 Send Campaign ({{ selected_customers|length }} recipients)
+            Send Campaign ({{ selected_customers|length }} recipients)
           </button>
           <a href="{% url 'customers_crm_list' %}" class="btn btn-outline-secondary">Cancel</a>
         </div>

@@ -208,7 +208,7 @@
               <button type="button" class="btn-search-loc" id="btnSearch">Search</button>
             </div>
             <div class="map-actions">
-              <button type="button" class="btn-locate" id="btnLocate">📍 Use My Location</button>
+              <button type="button" class="btn-locate" id="btnLocate">Use My Location</button>
             </div>
             <div id="map"></div>
             <div id="location-status">Map loaded. Search an address or use your current location.</div>
@@ -254,7 +254,7 @@
               <input type="radio" name="payment_method" value="stripe" id="payStripe"
                      {% if not profile.preferred_payment_method or profile.preferred_payment_method == 'stripe' %}checked{% endif %}>
               <div>
-                <div class="pay-option-title">💳 Stripe — Card / Online Banking / e-Wallet</div>
+                <div class="pay-option-title">Stripe — Card / Online Banking / e-Wallet</div>
                 <div class="pay-option-sub">Instant verification. Safest option.</div>
               </div>
             </label>
@@ -265,7 +265,7 @@
               <input type="radio" name="payment_method" value="manual" id="payManual"
                      {% if profile.preferred_payment_method == 'manual' %}checked{% endif %}>
               <div style="width:100%;">
-                <div class="pay-option-title">🏦 Bank Transfer / DuitNow</div>
+                <div class="pay-option-title">Bank Transfer / DuitNow</div>
                 <div class="pay-option-sub">Pay via bank transfer or scan our DuitNow QR.</div>
                 <div class="pay-suboption" id="manual-suboptions">
                   <div class="subopt-row">

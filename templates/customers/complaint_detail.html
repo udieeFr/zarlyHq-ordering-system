@@ -31,9 +31,9 @@
             <div style="font-weight:700; margin-bottom:0.3rem;">{{ complaint.subject }}</div>
             <div style="color:var(--dark-3); font-size:0.88rem; margin-bottom:0.75rem;">{{ complaint.message }}</div>
             {% if complaint.status == 'resolved' %}
-            <span style="background:var(--success-bg); color:#065f46; border:1px solid #a7f3d0; border-radius:999px; padding:0.2rem 0.65rem; font-size:0.75rem; font-weight:700;">✅ Resolved</span>
+            <span style="background:var(--success-bg); color:#065f46; border:1px solid #a7f3d0; border-radius:999px; padding:0.2rem 0.65rem; font-size:0.75rem; font-weight:700;">Resolved</span>
             {% else %}
-            <span style="background:var(--warning-bg); color:#92400e; border:1px solid #fde68a; border-radius:999px; padding:0.2rem 0.65rem; font-size:0.75rem; font-weight:700;">⏳ Pending</span>
+            <span style="background:var(--warning-bg); color:#92400e; border:1px solid #fde68a; border-radius:999px; padding:0.2rem 0.65rem; font-size:0.75rem; font-weight:700;">Pending</span>
             {% endif %}
             {% if complaint.resolution_note %}
             <div style="margin-top:0.75rem; padding:0.65rem 0.85rem; background:var(--brand-light); border:1px solid var(--brand-border); border-radius:var(--radius-sm);">
@@ -45,10 +45,10 @@
 
         <!-- Chat thread -->
         <div style="background:#fff; border:1px solid var(--border); border-radius:var(--radius); padding:1rem 1.1rem; box-shadow:var(--shadow-sm);">
-            <div style="font-weight:700; font-size:0.95rem; margin-bottom:0.85rem; padding-bottom:0.65rem; border-bottom:1px solid var(--border);">💬 Support Chat</div>
+            <div style="font-weight:700; font-size:0.95rem; margin-bottom:0.85rem; padding-bottom:0.65rem; border-bottom:1px solid var(--border);">Support Chat</div>
 
             {% if locked %}
-            <div style="font-size:0.8rem; color:var(--muted); margin-bottom:0.75rem;">🔒 This complaint is resolved. Chat is read-only.</div>
+            <div style="font-size:0.8rem; color:var(--muted); margin-bottom:0.75rem;">This complaint is resolved. Chat is read-only.</div>
             {% endif %}
 
             <div class="chat-thread" id="chat-thread">

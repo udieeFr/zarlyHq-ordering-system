@@ -236,13 +236,13 @@
 {% block extra_scripts %}
 <script nonce="{{ request.csp_nonce }}">
 (function () {
-  var baseUrl = "{% url 'mark_refund_processed' 0 %}".replace('/0/', '/');
+  var urlTemplate = "{% url 'mark_refund_processed' 0 %}";
 
   function openModal(refundId, orderId, amount, customer) {
     document.getElementById('modalAmount').textContent   = 'RM ' + amount;
     document.getElementById('modalOrder').textContent    = '#' + orderId;
     document.getElementById('modalCustomer').textContent = customer;
-    document.getElementById('processForm').action = baseUrl + refundId + '/processed/';
+    document.getElementById('processForm').action = urlTemplate.replace('/0/', '/' + refundId + '/');
     document.getElementById('processModal').classList.add('open');
   }
 
@@ -260,6 +260,20 @@
     var btn = e.target.closest('.js-process-btn');
     if (!btn) return;
     openModal(btn.dataset.refundId, btn.dataset.orderId, btn.dataset.amount, btn.dataset.customer);
+  });
+
+  document.getElementById('processForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var submitBtn = this.querySelector('[type=submit]');
+    var bankRef = this.querySelector('[name=bank_reference]');
+    var notes   = this.querySelector('[name=notes]');
+    adminPost(this.action, {
+      bank_reference: bankRef ? bankRef.value : '',
+      notes: notes ? notes.value : ''
+    }, submitBtn, function() {
+      closeModal();
+      setTimeout(function() { location.reload(); }, 1200);
+    });
   });
 })();
 </script>

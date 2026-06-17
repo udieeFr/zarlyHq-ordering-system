@@ -129,8 +129,8 @@
         <h6 style="font-weight:700;color:oklch(16% 0.04 52);margin-bottom:.75rem;">{{ complaint.subject }}</h6>
         <p style="font-size:.85rem;color:oklch(38% 0.04 52);margin-bottom:1.25rem;">{{ complaint.message }}</p>
         {% if complaint.evidence_image %}
-          <img src="{{ complaint.evidence_image.url }}" class="evidence-img js-evidence-img img-fluid mb-2"
-               data-src="{{ complaint.evidence_image.url }}"
+          <img src="{% url 'serve_private_media' complaint.evidence_image.name %}" class="evidence-img js-evidence-img img-fluid mb-2"
+               data-src="{% url 'serve_private_media' complaint.evidence_image.name %}"
                alt="Evidence image">
         {% else %}
           <p style="font-size:.82rem;color:oklch(48% 0.06 54);">No evidence image provided.</p>
@@ -177,7 +177,7 @@
       </div>
       <div class="integrity-card-body">
         {% if order.digital_signature %}
-          <a href="{{ order.digital_signature.pdf_path.url }}" class="btn-signed-receipt" target="_blank">View Signed Receipt</a>
+          <a href="{% url 'serve_private_media' order.digital_signature.pdf_path.name %}" class="btn-signed-receipt" target="_blank">View Signed Receipt</a>
           <div class="hash-block">
             <div style="font-size:.6rem;color:oklch(42% 0.02 54);margin-bottom:4px;font-weight:700;letter-spacing:.05em;">SIGNATURE HASH</div>
             {{ order.digital_signature.signature_hash }}

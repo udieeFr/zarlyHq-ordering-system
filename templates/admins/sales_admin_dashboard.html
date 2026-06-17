@@ -156,7 +156,7 @@
 
 {% if out_of_stock_products or low_stock_products or out_of_bundle_stock_products or low_bundle_stock_products %}
 <div class="alert alert-warning d-flex flex-wrap gap-3 align-items-start mb-3" style="border-left:4px solid #f59e0b;">
-  <div style="font-weight:800;font-size:.88rem;color:#92400e;min-width:120px;">⚠️ Stock Alert</div>
+  <div style="font-weight:800;font-size:.88rem;color:#92400e;min-width:120px;">Stock Alert</div>
   <div class="flex-fill">
     {% if out_of_stock_products %}
     <div style="font-size:.82rem;font-weight:700;color:#dc2626;margin-bottom:.35rem;">
@@ -385,7 +385,7 @@
           <div style="display:flex;gap:.35rem;align-items:center;">
             <a href="{% url 'admin_order_detail' order.id %}" class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;padding:.22rem .6rem;">Details</a>
             {% if order.digital_signature %}
-            <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-sm btn-outline-success" style="font-size:.72rem;padding:.22rem .5rem;" download title="Download receipt">
+            <a href="{% url 'serve_private_media' order.digital_signature.pdf_path.name %}" class="btn btn-sm btn-outline-success" style="font-size:.72rem;padding:.22rem .5rem;" download title="Download receipt">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             </a>
             {% endif %}
@@ -545,6 +545,38 @@
           .catch(() => { confirmRejectPaymentBtn.disabled = false; confirmRejectPaymentBtn.textContent = 'Reject orders'; alert('Error rejecting orders. Please try again.'); });
       });
     }
+
+    function ajaxBulkAccept(formEl, checkboxSel) {
+      formEl.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var btn = formEl.querySelector('[type=submit]');
+        var ids = Array.from(formEl.querySelectorAll(checkboxSel + ':checked')).map(cb => cb.value);
+        if (!ids.length) { adminToast('No orders selected.', false); return; }
+        var fd = new FormData(formEl);
+        var origText = btn.textContent;
+        btn.disabled = true; btn.textContent = '…';
+        fetch(formEl.action, {
+          method: 'POST',
+          headers: {'X-Requested-With': 'XMLHttpRequest'},
+          body: fd
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          btn.disabled = false; btn.textContent = origText;
+          adminToast(d.message || d.error || 'Done.', d.ok !== false);
+          if (d.ok !== false) setTimeout(function() { location.reload(); }, 1200);
+        })
+        .catch(function() {
+          btn.disabled = false; btn.textContent = origText;
+          adminToast('Network error. Please try again.', false);
+        });
+      });
+    }
+
+    var bulkAcceptForm = document.getElementById('bulk-accept-form');
+    if (bulkAcceptForm) ajaxBulkAccept(bulkAcceptForm, '.order-checkbox');
+    var bulkAcceptPaymentForm = document.getElementById('bulk-accept-payment-form');
+    if (bulkAcceptPaymentForm) ajaxBulkAccept(bulkAcceptPaymentForm, '.payment-checkbox');
   });
 </script>
 {% endblock %}

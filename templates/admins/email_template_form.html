@@ -46,20 +46,19 @@
         <div class="mb-1">
           <label class="form-label fw-bold">Body (HTML supported)</label>
         </div>
-        <div class="placeholder-chips">
-          <span class="ph-chip" onclick="insertPlaceholder('{{customer_name}}')">{{customer_name}}</span>
-          <span class="ph-chip" onclick="insertPlaceholder('{{loyalty_tier}}')">{{loyalty_tier}}</span>
-          <span class="ph-chip" onclick="insertPlaceholder('{{last_order_date}}')">{{last_order_date}}</span>
-          <span class="ph-chip" onclick="insertPlaceholder('{{company_name}}')">{{company_name}}</span>
+        <div class="placeholder-chips" id="placeholderChips">
+          {% for ph in placeholders %}
+          <span class="ph-chip" data-placeholder="{{ ph }}">{{ ph }}</span>
+          {% endfor %}
         </div>
         <textarea name="body_html" id="bodyField" class="form-control font-monospace" rows="14"
-                  required oninput="updatePreview(this.value)"
-                  placeholder="Write your email body here. Use the placeholders above to personalise.">{% if form_data %}{{ form_data.body_html }}{% elif editing %}{{ tmpl.body_html }}{% endif %}</textarea>
+                  required
+                  placeholder="Write your email body here. Click the chips above to insert placeholders.">{% if form_data %}{{ form_data.body_html }}{% elif editing %}{{ tmpl.body_html }}{% endif %}</textarea>
         <div id="unsubscribeWarning" class="form-text text-danger" style="display:none;">
           &#9888;&#65039; Template must contain <code>&#123;&#123;unsubscribe_url&#125;&#125;</code> before saving.
         </div>
         <div class="form-text">
-          Include <code>&#123;&#123;unsubscribe_url&#125;&#125;</code> for the unsubscribe link. Also available: <code>&#123;&#123;customer_name&#125;&#125;</code>, <code>&#123;&#123;loyalty_tier&#125;&#125;</code>, <code>&#123;&#123;last_order_date&#125;&#125;</code>.
+          Click the chips above to insert placeholders. The unsubscribe link is automatically generated per recipient.
         </div>
         <div class="mt-3 d-flex gap-2">
           <button type="submit" class="btn btn-primary">{% if editing %}Save Changes{% else %}Create Template{% endif %}</button>
@@ -83,33 +82,46 @@
 
 {% block extra_scripts %}
 <script nonce="{{ request.csp_nonce }}">
-  function insertPlaceholder(text) {
-    const field = document.getElementById('bodyField');
-    const start = field.selectionStart, end = field.selectionEnd;
-    field.value = field.value.substring(0, start) + text + field.value.substring(end);
-    field.selectionStart = field.selectionEnd = start + text.length;
-    field.focus();
-    updatePreview(field.value);
-  }
+  var bodyField = document.getElementById('bodyField');
+  var previewPane = document.getElementById('previewPane');
+  var warn = document.getElementById('unsubscribeWarning');
 
   function updatePreview(html) {
-    document.getElementById('previewPane').innerHTML = html || '<span class="text-muted">Start typing…</span>';
+    previewPane.innerHTML = html || '<span class="text-muted">Start typing…</span>';
   }
 
-  {% if editing %}
-  updatePreview(document.getElementById('bodyField').value);
-  {% endif %}
+  function insertPlaceholder(text) {
+    var start = bodyField.selectionStart, end = bodyField.selectionEnd;
+    bodyField.value = bodyField.value.substring(0, start) + text + bodyField.value.substring(end);
+    bodyField.selectionStart = bodyField.selectionEnd = start + text.length;
+    bodyField.focus();
+    updatePreview(bodyField.value);
+    checkUnsubscribe();
+  }
 
-  (function() {
-    var bodyField = document.getElementById('bodyField');
-    var warn = document.getElementById('unsubscribeWarning');
-    if (bodyField && warn) {
-      function checkBody() {
-        warn.style.display = bodyField.value.includes('{{unsubscribe_url}}') ? 'none' : '';
-      }
-      bodyField.addEventListener('input', checkBody);
-      checkBody(); // run on page load too
+  function checkUnsubscribe() {
+    if (warn) {
+      warn.style.display = bodyField.value.indexOf('{{unsubscribe_url}}') !== -1 ? 'none' : '';
     }
-  })();
+  }
+
+  // ── Wire chips via event delegation (no inline onclick) ──
+  document.getElementById('placeholderChips').addEventListener('click', function(e) {
+    var chip = e.target.closest('.ph-chip');
+    if (!chip) return;
+    insertPlaceholder(chip.getAttribute('data-placeholder'));
+  });
+
+  // ── Wire textarea input (no inline oninput) ──
+  bodyField.addEventListener('input', function() {
+    updatePreview(bodyField.value);
+    checkUnsubscribe();
+  });
+
+  // ── Initial state ──
+  {% if editing %}
+  updatePreview(bodyField.value);
+  {% endif %}
+  checkUnsubscribe();
 </script>
 {% endblock %}

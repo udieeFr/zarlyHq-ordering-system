@@ -195,11 +195,11 @@
           <td>{{ order.customer_label }}<br><span style="font-size:.75rem;color:oklch(48% 0.06 54);">{{ order.full_name }}</span></td>
           <td>{{ order.phone_number }}</td>
           <td>
-            <form method="post" action="{% url 'update_order_tracking' order.id %}" class="d-inline-block w-100">
+            <form method="post" action="{% url 'update_order_tracking' order.id %}" class="d-inline-block w-100 js-tracking-form">
               {% csrf_token %}
               <div class="input-group input-group-sm">
                 <input type="text" name="tracking_number" class="form-control form-control-sm" placeholder="Enter tracking #" value="{{ order.tracking_number|default:'' }}" maxlength="100">
-                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Save tracking number">✓</button>
+                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Save tracking number">Save</button>
               </div>
             </form>
           </td>
@@ -215,13 +215,19 @@
           <td>
             {% if order.status == 'ready_for_delivery' %}
               {% if order.tracking_number %}
-              <a href="{% url 'mark_order_out_for_delivery' order.id %}" class="btn-brand-action">Out for Delivery</a>
+              <form method="post" action="{% url 'mark_order_out_for_delivery' order.id %}" style="display:inline;" class="js-out-delivery-form">
+                {% csrf_token %}
+                <button type="submit" class="btn-brand-action">Out for Delivery</button>
+              </form>
               {% else %}
               <button class="btn-brand-action" disabled title="Enter a tracking number first">Out for Delivery</button>
               <small class="d-block" style="font-size:.7rem;color:oklch(43% 0.1 22);">Tracking # required</small>
               {% endif %}
             {% else %}
-            <a href="{% url 'mark_order_delivered' order.id %}" class="btn-deliver-action">Mark Delivered</a>
+            <form method="post" action="{% url 'mark_order_delivered' order.id %}" style="display:inline;" class="js-delivered-form">
+              {% csrf_token %}
+              <button type="submit" class="btn-deliver-action">Mark Delivered</button>
+            </form>
             {% endif %}
           </td>
         </tr>
@@ -323,6 +329,25 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
   });
+});
+</script>
+<script nonce="{{ request.csp_nonce }}">
+document.addEventListener('submit', function(e) {
+  var form = e.target;
+  if (form.classList.contains('js-tracking-form')) {
+    e.preventDefault();
+    var btn = form.querySelector('[type=submit]');
+    var input = form.querySelector('[name=tracking_number]');
+    adminPost(form.action, {tracking_number: input ? input.value : ''}, btn, function() {});
+    return;
+  }
+  if (form.classList.contains('js-out-delivery-form') || form.classList.contains('js-delivered-form')) {
+    e.preventDefault();
+    var btn = form.querySelector('[type=submit]');
+    adminPost(form.action, {}, btn, function() {
+      setTimeout(function() { location.reload(); }, 1200);
+    });
+  }
 });
 </script>
 {% endblock %}

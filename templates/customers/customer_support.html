@@ -389,8 +389,8 @@
           {% if c.status == 'pending' %}ssp-pending
           {% elif c.status == 'resolved' %}ssp-resolved
           {% endif %}">
-          {% if c.status == 'pending' %}⏳ Pending Review
-          {% elif c.status == 'resolved' %}✅ Resolved
+          {% if c.status == 'pending' %}Pending Review
+          {% elif c.status == 'resolved' %}Resolved
           {% endif %}
         </span>
       </div>
@@ -403,14 +403,14 @@
           data-subject="{{ c.subject|escapejs }}"
           data-locked="{% if c.status == 'resolved' %}true{% else %}false{% endif %}"
           data-messages-url="{% url 'customer_complaint_messages' c.id %}">
-          💬 Chat
+          Chat
         </button>
       </div>
 
       {% if c.evidence_image %}
       <div class="support-evidence" style="margin-bottom:0.6rem;">
-        <a href="{{ c.evidence_image.url }}" target="_blank" class="support-evidence-link">
-          📎 View Evidence
+        <a href="{% url 'serve_private_media' c.evidence_image.name %}" target="_blank" class="support-evidence-link">
+          View Evidence
         </a>
       </div>
       {% endif %}
@@ -423,9 +423,9 @@
           {% elif c.action_taken == 'remake' %}sap-remake
           {% elif c.action_taken == 'dismissed' %}sap-dismissed
           {% endif %}">
-          {% if c.action_taken == 'refund' %}💸 Refund Initiated
-          {% elif c.action_taken == 'remake' %}🔄 Order Remade
-          {% elif c.action_taken == 'dismissed' %}✗ Dismissed
+          {% if c.action_taken == 'refund' %}Refund Initiated
+          {% elif c.action_taken == 'remake' %}Order Remade
+          {% elif c.action_taken == 'dismissed' %}Dismissed
           {% endif %}
         </span>
       </div>
@@ -442,7 +442,7 @@
 
   {% else %}
   <div class="support-empty">
-    <span class="support-empty-icon">🎉</span>
+    <span class="support-empty-icon"></span>
     <p class="fw-bold mb-1">No complaints yet</p>
     <p class="text-muted" style="font-size:0.875rem;">
       Had an issue with a completed order?
@@ -500,6 +500,7 @@
 </div>
 
 <!-- ── Chat Drawer ─────────────────────────────────────── -->
+<form id="chatCsrfHolder" style="display:none;">{% csrf_token %}</form>
 <div class="chat-drawer-overlay" id="chatOverlay"></div>
 
 <div class="chat-drawer" id="chatDrawer">
@@ -507,7 +508,7 @@
     <span class="chat-drawer-title" id="drawerTitle">Support Chat</span>
     <button class="chat-drawer-close" id="drawerClose">✕</button>
   </div>
-  <div class="chat-drawer-locked" id="drawerLocked" style="display:none;">🔒 This complaint is resolved. Chat is read-only.</div>
+  <div class="chat-drawer-locked" id="drawerLocked" style="display:none;">This complaint is resolved. Chat is read-only.</div>
   <div class="chat-drawer-thread" id="drawerThread">
     <p class="chat-drawer-empty" id="drawerEmpty">Loading…</p>
   </div>
@@ -519,19 +520,12 @@
 
 <script nonce="{{ request.csp_nonce }}">
 (function () {
-  function getCookie(name) {
-    let val = null;
-    if (document.cookie && document.cookie !== '') {
-      document.cookie.split(';').forEach(c => {
-        c = c.trim();
-        if (c.substring(0, name.length + 1) === name + '=') {
-          val = decodeURIComponent(c.substring(name.length + 1));
-        }
-      });
-    }
-    return val;
+  const csrfHolder = document.getElementById('chatCsrfHolder');
+  function getCSRF() {
+    const el = csrfHolder ? csrfHolder.querySelector('[name=csrfmiddlewaretoken]') : null;
+    return el ? el.value : '{{ csrf_token }}';
   }
-  const CSRF = getCookie('csrftoken');
+
   const overlay   = document.getElementById('chatOverlay');
   const drawer    = document.getElementById('chatDrawer');
   const closeBtn  = document.getElementById('drawerClose');
@@ -550,11 +544,15 @@
   let locked      = false;
   let hasMessages = false;
   let emptyEl     = null;   // refreshed each time the drawer is opened
+  const shownIds  = new Set();
 
   function appendMessage(msg) {
+    if (msg.id && shownIds.has(msg.id)) return;
+    if (msg.id) shownIds.add(msg.id);
     if (emptyEl && emptyEl.parentNode) { emptyEl.remove(); emptyEl = null; }
     hasMessages = true;
     const wrap = document.createElement('div');
+    wrap.style.cssText = msg.is_mine ? 'display:flex;justify-content:flex-end;margin-bottom:4px;' : 'display:flex;justify-content:flex-start;margin-bottom:4px;';
     const bubble = document.createElement('div');
     bubble.className = msg.is_mine ? 'chat-drawer-bubble bubble-mine' : 'chat-drawer-bubble bubble-theirs';
     const sender = document.createElement('div');
@@ -566,7 +564,7 @@
     bubble.appendChild(body);
     wrap.appendChild(bubble);
     thread.appendChild(wrap);
-    lastSeen = msg.created_at;
+    if (msg.created_at) lastSeen = msg.created_at;
     thread.scrollTop = thread.scrollHeight;
   }
 
@@ -579,17 +577,20 @@
   function poll() {
     if (!messagesUrl) return;
     const url = lastSeen ? messagesUrl + '?since=' + encodeURIComponent(lastSeen) : messagesUrl;
-    fetch(url).then(handleExpiry).then(data => {
-      if (!data) return;
-      if (!hasMessages && data.messages.length === 0 && emptyEl) {
-        emptyEl.textContent = 'No messages yet. Start the conversation.';
-      }
-      data.messages.forEach(appendMessage);
-      if (data.locked) {
-        foot.style.display = 'none';
-        lockedBanner.style.display = '';
-      }
-    });
+    fetch(url, { credentials: 'same-origin' })
+      .then(handleExpiry)
+      .then(data => {
+        if (!data) return;
+        if (!hasMessages && data.messages.length === 0 && emptyEl) {
+          emptyEl.textContent = 'No messages yet. Start the conversation.';
+        }
+        data.messages.forEach(appendMessage);
+        if (data.locked) {
+          foot.style.display = 'none';
+          lockedBanner.style.display = '';
+        }
+      })
+      .catch(function () {});
   }
 
   function startPolling() { pollTimer = setInterval(poll, 20000); }
@@ -600,15 +601,43 @@
   sendBtn.addEventListener('click', doSend);
   input.addEventListener('keydown', e => { if (e.key === 'Enter') doSend(); });
 
+  function showSendError(msg) {
+    var existing = thread.querySelector('.chat-send-error');
+    if (existing) existing.remove();
+    var err = document.createElement('div');
+    err.className = 'chat-send-error';
+    err.style.cssText = 'text-align:center;font-size:.75rem;color:#ef4444;padding:.25rem 0;';
+    err.textContent = msg || 'Failed to send. Please try again.';
+    thread.appendChild(err);
+    thread.scrollTop = thread.scrollHeight;
+    setTimeout(function() { if (err.parentNode) err.remove(); }, 4000);
+  }
+
   function doSend() {
-    const body = input.value.trim();
-    if (!body || !messagesUrl || locked) return;
-    input.value = '';
+    const text = input.value.trim();
+    if (!text || !messagesUrl || locked) return;
+    sendBtn.disabled = true;
     fetch(messagesUrl, {
       method: 'POST',
-      headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'body=' + encodeURIComponent(body),
-    }).then(handleExpiry).then(data => { if (data && data.ok) poll(); });
+      credentials: 'same-origin',
+      headers: { 'X-CSRFToken': getCSRF(), 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'body=' + encodeURIComponent(text),
+    })
+    .then(handleExpiry)
+    .then(function(data) {
+      sendBtn.disabled = false;
+      if (data && data.ok) {
+        input.value = '';
+        appendMessage(data.message);
+        poll();
+      } else {
+        showSendError(data && data.error ? data.error : null);
+      }
+    })
+    .catch(function() {
+      sendBtn.disabled = false;
+      showSendError('Network error. Please check your connection.');
+    });
   }
 
   window.openChatDrawer = function (btn) {
@@ -621,6 +650,7 @@
     emptyEl     = thread.querySelector('.chat-drawer-empty');
     hasMessages = false;
     lastSeen    = null;
+    shownIds.clear();
 
     if (locked) {
       foot.style.display = 'none';

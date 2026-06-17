@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block page_title %}Zarly BigFood — Fresh Food, Easy Ordering{% endblock %}
+{% block page_title %}Zarly BigFood — Snacks &amp; Biscuits, Easy Ordering{% endblock %}
 
 {% block content %}
 <style>
@@ -376,12 +376,12 @@
 <!-- ── Hero ──────────────────────────────────────────────────────── -->
 <section class="lp-hero">
   <div class="lp-hero-left">
-    <div class="lp-badge">Fresh today</div>
+    <div class="lp-badge">Now in stock</div>
     <h1 class="lp-hero-title">
-      Made to order.<br><em>Ready when you are.</em>
+      Your favourite snacks.<br><em>Ready to order.</em>
     </h1>
     <p class="lp-hero-sub">
-      Real food, prepared fresh daily. Browse the menu and order
+      Snacks and biscuits you love, all in one place. Browse the range and order
       for pickup or delivery — easy, every time.
     </p>
     <div class="lp-hero-actions">
@@ -407,15 +407,7 @@
       Recommended size: 800 × 600 px, JPG or WebP, warm lighting.
       ═══════════════════════════════════════════════════════════════
     -->
-    <div class="lp-hero-placeholder">
-      <svg width="52" height="52" viewBox="0 0 24 24" fill="none"
-           stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="18" height="18" rx="2"/>
-        <circle cx="8.5" cy="8.5" r="1.5"/>
-        <polyline points="21 15 16 10 5 21"/>
-      </svg>
-      <span>Your hero food photo here</span>
-    </div>
+    <img src="{% static 'homePage/herozarly.png' %}" alt="Zarly BigFood" class="lp-hero-img">
   </div>
 </section>
 
@@ -429,8 +421,8 @@
         <circle cx="12" cy="10" r="3"/>
       </svg>
     </div>
-    <div class="lp-feat-title">Fresh Ingredients</div>
-    <div class="lp-feat-desc">Prepared same-day from quality ingredients, no shortcuts.</div>
+    <div class="lp-feat-title">Quality Selection</div>
+    <div class="lp-feat-desc">Handpicked snacks and biscuits from trusted brands.</div>
   </div>
   <div class="lp-feat">
     <div class="lp-feat-icon">
@@ -483,7 +475,7 @@
             No image for "{{ product.name }}" yet.
             Upload one at: /admin/customers/product/{{ product.id }}/change/
           -->
-          <div class="lp-card-img-ph">🍽</div>
+          <div class="lp-card-img-ph"></div>
         {% endif %}
       </div>
       <div class="lp-card-body">

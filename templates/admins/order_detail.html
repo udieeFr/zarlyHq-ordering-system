@@ -227,12 +227,12 @@
     <div class="od-actions">
       {% if order.status == 'pending' %}
         {% if has_payment %}
-        <form method="post" action="{% url 'approve_order' order.id %}" style="display:inline;">
+        <form method="post" action="{% url 'approve_order' order.id %}" style="display:inline;" class="js-approve-order-form">
           {% csrf_token %}
           <button type="submit" class="od-btn b-approve">✅ Approve</button>
         </form>
         {% else %}
-        <form method="post" action="{% url 'approve_order' order.id %}" style="display:inline;">
+        <form method="post" action="{% url 'approve_order' order.id %}" style="display:inline;" class="js-approve-order-form">
           {% csrf_token %}
           <button type="submit" class="od-btn b-warn">→ Payment</button>
         </form>
@@ -241,8 +241,9 @@
       {% elif order.status == 'pending_payment' %}
         <button type="button" class="od-btn b-warn" id="forceApproveBtn">Approve Unpaid</button>
         <form id="forceApproveForm" method="post" action="{% url 'force_approve_unpaid' order.id %}" style="display:none;">{% csrf_token %}</form>
+        <button type="button" class="od-btn b-ghost" id="rejectToggle">Reject</button>
       {% endif %}
-      {% if order.status == 'pending_payment' or order.status == 'approved' or order.status == 'prepared' or order.status == 'ready_for_delivery' or order.status == 'out_for_delivery' %}
+      {% if order.status == 'prepared' or order.status == 'ready_for_delivery' or order.status == 'out_for_delivery' %}
       <button type="button" class="btn btn-outline-warning btn-sm"
               onclick="document.getElementById('stepBackModal').style.display='flex'">
         ↩ Step Back
@@ -252,9 +253,9 @@
   </div>
 
   <!-- ════ Reject panel ════════════════════════════════════ -->
-  {% if order.status == 'pending' %}
+  {% if order.status == 'pending' or order.status == 'pending_payment' %}
   <div class="od-reject-panel" id="rejectPanel">
-    <form method="post" action="{% url 'reject_order' order.id %}">
+    <form method="post" action="{% url 'reject_order' order.id %}" class="js-reject-order-form">
       {% csrf_token %}
       <div>
         <div class="od-label" style="margin-bottom:.3rem;">Rejection reason</div>
@@ -403,27 +404,40 @@
         </div>
       </div>
 
-      <!-- Signature / Invoice -->
+      <!-- Receipt / Invoice -->
       {% if order.digital_signature %}
       <div class="od-card" style="border-color:oklch(82% 0.1 148);">
         <div class="od-card-head" style="background:oklch(95% 0.06 148);">
           <div class="od-card-icon" style="background:oklch(88% 0.1 148);">🔏</div>
-          <span class="od-card-title" style="color:oklch(26% 0.1 148);">Digitally Signed</span>
+          <span class="od-card-title" style="color:oklch(26% 0.1 148);">Receipt</span>
+          <span class="od-pill" style="background:oklch(88% 0.1 148);color:oklch(26% 0.1 148);">✓ Signed</span>
         </div>
         <div class="od-card-body">
           <div class="od-label">Signature Hash</div>
           <div style="font-family:monospace;font-size:.68rem;color:oklch(48% 0.04 52);margin-bottom:.625rem;word-break:break-all;">{{ order.digital_signature.signature_hash|truncatechars:36 }}</div>
-          <div style="display:flex;flex-direction:column;gap:.375rem;">
-            <a href="{{ order.digital_signature.pdf_path.url }}" class="btn btn-sm fw-semibold w-100" style="background:oklch(88% 0.1 148);color:oklch(26% 0.1 148);border:none;" download>📄 Download Signed Receipt</a>
-            <a href="{% url 'print_order_summary' order.id %}" class="btn btn-outline-secondary btn-sm w-100" target="_blank">🖨️ View Invoice</a>
-          </div>
+          <a href="{% url 'serve_private_media' filepath=order.digital_signature.pdf_path.name %}" class="btn btn-sm fw-semibold w-100" style="background:oklch(88% 0.1 148);color:oklch(26% 0.1 148);border:none;" download>📄 Download Receipt</a>
         </div>
       </div>
-      {% elif order.status in 'approved,pending_payment,prepared,ready_for_delivery,out_for_delivery,delivered' %}
+      {% elif has_payment %}
+      <div class="od-card" style="border-color:oklch(82% 0.1 148);">
+        <div class="od-card-head" style="background:oklch(95% 0.06 148);">
+          <div class="od-card-icon" style="background:oklch(88% 0.1 148);">📄</div>
+          <span class="od-card-title" style="color:oklch(26% 0.1 148);">Receipt</span>
+          <span class="od-pill" style="background:oklch(88% 0.1 148);color:oklch(26% 0.1 148);">Paid</span>
+        </div>
+        <div class="od-card-body">
+          <a href="{% url 'print_order_summary' order.id %}" class="btn btn-sm fw-semibold w-100" style="background:oklch(88% 0.1 148);color:oklch(26% 0.1 148);border:none;" target="_blank">📄 View Receipt</a>
+        </div>
+      </div>
+      {% elif order.status == 'pending_payment' %}
       <div class="od-card">
-        <div class="od-card-body" style="text-align:center;padding:.625rem .875rem;">
-          <div style="font-size:.75rem;color:oklch(57% 0.03 54);margin-bottom:.45rem;">No digital signature on file.</div>
-          <a href="{% url 'print_order_summary' order.id %}" class="btn btn-outline-secondary btn-sm w-100" target="_blank">🖨️ View / Print Invoice</a>
+        <div class="od-card-head">
+          <div class="od-card-icon">🧾</div>
+          <span class="od-card-title">Invoice</span>
+          <span class="od-pill" style="background:oklch(92% 0.06 22);color:oklch(36% 0.1 18);">Pending Payment</span>
+        </div>
+        <div class="od-card-body">
+          <a href="{% url 'print_order_summary' order.id %}" class="btn btn-outline-secondary btn-sm w-100" target="_blank">🧾 View Invoice</a>
         </div>
       </div>
       {% endif %}
@@ -509,10 +523,37 @@
   if (forceBtn && forceForm) {
     forceBtn.addEventListener('click', function () {
       if (confirm('Approve Order #{{ order.id }} without confirmed payment?\n\nIt will appear in Approved Orders tagged UNPAID. Staff must collect on delivery.')) {
-        forceForm.submit();
+        adminPost(forceForm.action, {}, forceBtn, function() {
+          setTimeout(function() { location.reload(); }, 1200);
+        });
       }
     });
   }
+
+  // Approve order (AJAX)
+  document.addEventListener('submit', function(e) {
+    var form = e.target;
+    if (form.classList.contains('js-approve-order-form')) {
+      e.preventDefault();
+      var btn = form.querySelector('[type=submit]');
+      adminPost(form.action, {}, btn, function() {
+        setTimeout(function() { location.reload(); }, 1200);
+      });
+      return;
+    }
+    if (form.classList.contains('js-reject-order-form')) {
+      e.preventDefault();
+      var btn = form.querySelector('[type=submit]');
+      var reasonId = form.querySelector('[name=rejection_reason_id]');
+      var custom   = form.querySelector('[name=custom_reason]');
+      adminPost(form.action, {
+        rejection_reason_id: reasonId ? reasonId.value : '',
+        custom_reason: custom ? custom.value : ''
+      }, btn, function() {
+        setTimeout(function() { location.reload(); }, 1200);
+      });
+    }
+  });
 
   // Staff notes
   var btn = document.getElementById('staffNoteSaveBtn');
@@ -547,9 +588,6 @@
     <h5 class="fw-bold mb-1">Step Back Order #{{ order.id }}?</h5>
     <p style="font-size:.85rem;color:#64748b;margin-bottom:1rem;">
       This will revert the order to its previous status.
-      {% if order.status == 'approved' or order.status == 'pending_payment' %}
-      <strong class="text-warning d-block mt-1">⚠️ If this order has a confirmed payment, no refund will be triggered. Use Reject to issue a refund.</strong>
-      {% endif %}
     </p>
     <form id="stepBackForm" method="post" action="{% url 'step_back_order' order.id %}">
       {% csrf_token %}

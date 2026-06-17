@@ -26,12 +26,7 @@
 
     <!-- Logo -->
     <div class="lsb-logo">
-        <div class="lsb-logo-icon">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="10" fill="rgba(255,255,255,0.2)"/>
-                <path d="M10 8l4 4-4 4" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-        </div>
+        <img src="{% static 'images/newlogo.png' %}" alt="Zarly logo" class="lsb-logo-img" />
     </div>
 
     <!-- Navigation -->
@@ -114,7 +109,7 @@
         <div class="container navbar-content">
             <!-- Logo (visible on mobile when sidebar is hidden) -->
             <a class="navbar-logo" href="{% url 'customer_home' %}">
-              <img src="{% static 'images/finallogo.png' %}" alt="Zarly logo" style="height:64px;width:auto;display:inline-block;vertical-align:middle;" />
+              <img src="{% static 'images/newlogo.png' %}" alt="Zarly logo" style="height:48px;width:auto;display:inline-block;vertical-align:middle;" />
             </a>
 
             <!-- Nav Links -->
@@ -173,7 +168,7 @@
 
                 <!-- Cart -->
                 <div class="cart-badge cart-nav-wrap">
-                    <a href="{% url 'cart' %}" class="cart-link" aria-label="View cart">🛒</a>
+                    <a href="{% url 'cart' %}" class="cart-link" aria-label="View cart"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></a>
                     <span class="badge-count cart-badge-count"{% if not cart_count %} style="display:none"{% endif %}>{{ cart_count|default:0 }}</span>
                     {% if cart_count %}
                     <div class="cart-nav-tooltip">
@@ -231,7 +226,6 @@
                 {% if request.user.is_authenticated %}
                 <div class="user-dropdown">
                     <button class="user-link" type="button" id="userMenuBtn">
-                        <span>👤</span>
                         <span>{{ request.user.username }}</span>
                         <span style="font-size:0.7rem; opacity:0.6;">▼</span>
                     </button>
@@ -248,22 +242,22 @@
                         </div>
 
                         {% if request.user.role == 'customer' %}
-                            <a href="{% url 'product_list' %}" class="dropdown-item">🍽 Browse Menu</a>
-                            <a href="{% url 'cart' %}" class="dropdown-item">🛒 My Cart</a>
-                            <a href="{% url 'customer_orders' %}" class="dropdown-item">📋 My Orders</a>
-                            <a href="{% url 'customer_profile' %}" class="dropdown-item">👤 My Profile</a>
+                            <a href="{% url 'product_list' %}" class="dropdown-item">Browse Menu</a>
+                            <a href="{% url 'cart' %}" class="dropdown-item">My Cart</a>
+                            <a href="{% url 'customer_orders' %}" class="dropdown-item">My Orders</a>
+                            <a href="{% url 'customer_profile' %}" class="dropdown-item">My Profile</a>
                         {% elif request.user.is_superuser or request.user.role in 'manager|sales_admin' %}
-                            <a href="{% url 'sales_admin_dashboard' %}" class="dropdown-item">📊 Dashboard</a>
+                            <a href="{% url 'sales_admin_dashboard' %}" class="dropdown-item">Dashboard</a>
                             {% if request.user.is_superuser or request.user.role == 'manager' %}
-                                <a href="{% url 'manager_analytics_view' %}" class="dropdown-item">📈 Analytics</a>
-                                <a href="{% url 'admin:index' %}" class="dropdown-item">⚙️ Django Admin</a>
+                                <a href="{% url 'manager_analytics_view' %}" class="dropdown-item">Analytics</a>
+                                <a href="{% url 'admin:index' %}" class="dropdown-item">Django Admin</a>
                             {% endif %}
-                            <a href="{% url 'inventory_list' %}" class="dropdown-item">📦 Inventory</a>
-                            <a href="{% url 'admin_complaints_list' %}" class="dropdown-item">🚨 Complaints</a>
+                            <a href="{% url 'inventory_list' %}" class="dropdown-item">Inventory</a>
+                            <a href="{% url 'admin_complaints_list' %}" class="dropdown-item">Complaints</a>
                         {% endif %}
 
                         <hr class="dropdown-divider">
-                        <a href="{% url 'logout' %}" class="dropdown-item text-danger">🚪 Sign Out</a>
+                        <a href="{% url 'logout' %}" class="dropdown-item text-danger">Sign Out</a>
                     </div>
                 </div>
                 {% else %}
@@ -406,7 +400,7 @@ function saveProfile() {
   .then(data => {
     if (data.success) {
       alert.style.cssText = 'display:block;background:#d1fae5;color:#065f46;padding:.6rem .9rem;border-radius:8px;font-size:.82rem;margin-bottom:1rem;';
-      alert.textContent = '✓ Profile updated successfully.';
+      alert.textContent = 'Profile updated successfully.';
       setTimeout(closeProfileModal, 1400);
     } else {
       alert.style.cssText = 'display:block;background:#fee2e2;color:#991b1b;padding:.6rem .9rem;border-radius:8px;font-size:.82rem;margin-bottom:1rem;';

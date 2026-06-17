@@ -149,7 +149,7 @@
                 <th class="text-end">Price</th>
                 <th class="text-center">Current Stock</th>
                 <th style="width: 130px;">Update Stock</th>
-                <th class="text-center">Stock Status</th>
+                <th class="text-center">Unlimited</th>
                 {% if request.user.role == 'manager' or request.user.is_superuser %}
                 <th class="text-center">Available</th>
                 <th class="text-end pe-4">Actions</th>
@@ -184,18 +184,18 @@
                            value="{{ item.staged_stock|default:item.product.stock }}"
                            class="form-control form-control-sm stock-input"
                            data-url="{% url 'stage_stock_update' item.product.id %}"
-                           style="width: 100px;">
+                           style="width: 100px;"
+                           {% if item.product.is_unlimited_stock %}disabled{% endif %}>
                 </td>
                 <td class="text-center">
-                    {% if item.has_change %}
-                        <span class="stock-badge stock-updating" style="background:oklch(52% 0.16 46);color:oklch(97% 0.01 60);">Updating</span>
-                    {% elif not item.product.is_available %}
-                        <span class="stock-badge stock-hidden" style="background:oklch(56% 0.025 60);color:oklch(97% 0.006 60);">Hidden</span>
-                    {% elif item.product.stock <= 0 %}
-                        <span class="stock-badge stock-soldout" style="background:oklch(48% 0.18 22);color:oklch(97% 0.01 22);">Out of Stock</span>
-                    {% else %}
-                        <span class="stock-badge stock-instock" style="background:oklch(42% 0.14 148);color:oklch(97% 0.01 148);">In Stock</span>
-                    {% endif %}
+                    <div class="form-check form-switch d-inline-block">
+                        <input class="form-check-input unlimited-toggle" type="checkbox" role="switch"
+                               id="unlim-{{ item.product.id }}"
+                               {% if item.product.is_unlimited_stock %}checked{% endif %}
+                               data-url="{% url 'toggle_unlimited_stock' item.product.id %}"
+                               data-name="{{ item.product.name|escapejs }}"
+                               title="{% if item.product.is_unlimited_stock %}Unlimited stock — no tracking{% else %}Limited stock — tracked{% endif %}">
+                    </div>
                 </td>
                 {% if request.user.role == 'manager' or request.user.is_superuser %}
                 <td class="text-center">
@@ -343,19 +343,50 @@ document.querySelectorAll('.availability-toggle').forEach(toggle => {
         }).then(r => r.json())
           .then(data => {
               toggleSwitch.title = data.is_available ? 'Visible to customers' : 'Hidden from menu';
-              const row = toggleSwitch.closest('tr');
-              const statusCell = row.querySelector('td:nth-child(6)');
-              if (statusCell) {
-                  if (data.is_available) {
-                      statusCell.innerHTML = '<span class="stock-badge stock-instock" style="background:oklch(42% 0.14 148);color:oklch(97% 0.01 148);">In Stock</span>';
-                  } else {
-                      statusCell.innerHTML = '<span class="stock-badge stock-hidden" style="background:oklch(56% 0.025 60);color:oklch(97% 0.006 60);">Hidden</span>';
-                  }
-              }
               AdminAJAX.showToast('Availability updated', 'success');
           })
           .catch(error => {
               AdminAJAX.showToast('Failed to update availability', 'error');
+              toggleSwitch.checked = !toggleSwitch.checked;
+          })
+          .finally(() => {
+              toggleSwitch.disabled = false;
+              toggleSwitch.style.opacity = '1';
+          });
+    });
+});
+
+document.querySelectorAll('.unlimited-toggle').forEach(toggle => {
+    toggle.addEventListener('change', function () {
+        const url = this.dataset.url;
+        const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const toggleSwitch = this;
+
+        toggleSwitch.disabled = true;
+        toggleSwitch.style.opacity = '0.6';
+
+        fetch(url, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(r => r.json())
+          .then(data => {
+              toggleSwitch.title = data.is_unlimited_stock ? 'Unlimited stock — no tracking' : 'Limited stock — tracked';
+              const row = toggleSwitch.closest('tr');
+              const stockCell = row.querySelector('td:nth-child(4)');
+              const stockInput = row.querySelector('.stock-input');
+              if (data.is_unlimited_stock) {
+                  if (stockCell) stockCell.innerHTML = '<span class="badge bg-success">∞</span>';
+                  if (stockInput) stockInput.disabled = true;
+              } else {
+                  if (stockInput) {
+                      stockInput.disabled = false;
+                      stockInput.value = stockInput.value || 0;
+                  }
+              }
+              AdminAJAX.showToast(data.is_unlimited_stock ? 'Stock set to unlimited' : 'Stock tracking enabled', 'success');
+          })
+          .catch(error => {
+              AdminAJAX.showToast('Failed to update', 'error');
               toggleSwitch.checked = !toggleSwitch.checked;
           })
           .finally(() => {

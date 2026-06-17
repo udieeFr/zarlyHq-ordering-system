@@ -238,7 +238,7 @@
             <a href="{% url 'order_success' o.id %}" class="upcoming-order-id" style="text-decoration:none;color:inherit;">Order #{{ o.id }}</a>
             <div class="upcoming-order-date">{{ o.created_at|date:"N j, Y" }} · {{ o.created_at|time:"g:i A" }}</div>
           </div>
-          <span class="order-status-pill status-pay">💳 Awaiting Payment</span>
+          <span class="order-status-pill status-pay">Awaiting Payment</span>
         </div>
         <div class="upcoming-items-section">
           <div class="upcoming-items-list">
@@ -288,10 +288,10 @@
             {% elif o.status == 'ready_for_delivery' %}status-ready
             {% elif o.status == 'out_for_delivery' %}status-on-way
             {% endif %}">
-            {% if o.status == 'pending' %}⏳ Order Received
-            {% elif o.status == 'prepared' %}👨‍🍳 Preparing
-            {% elif o.status == 'ready_for_delivery' %}📦 Ready
-            {% elif o.status == 'out_for_delivery' %}🛵 On the Way
+            {% if o.status == 'pending' %}Order Received
+            {% elif o.status == 'prepared' %}Preparing
+            {% elif o.status == 'ready_for_delivery' %}Ready
+            {% elif o.status == 'out_for_delivery' %}On the Way
             {% endif %}
           </span>
         </div>
@@ -311,9 +311,9 @@
           <div class="upcoming-card-bottom">
             <span class="upcoming-total-label">Total: <strong>RM {{ o.total_amount }}</strong></span>
             {% if o.tracking_number %}
-              <a href="https://www.citylinkexpress.com/track-your-shipment/?trackingNo={{ o.tracking_number }}"
+              <a href="https://www.citylinkexpress.com/tracking-result/?track0={{ o.tracking_number }}"
                  class="upcoming-track-btn" target="_blank" rel="noopener noreferrer" style="background:#f59e0b;color:#fff;">
-                🚚 TRACK
+                TRACK
               </a>
             {% else %}
               <a href="{% url 'order_success' o.id %}" class="upcoming-track-btn">TRACK</a>
@@ -350,7 +350,7 @@
 
   {% if not unpaid_orders and not upcoming_orders %}
   <div class="orders-empty">
-    <span class="orders-empty-icon">🕐</span>
+    <span class="orders-empty-icon"></span>
     <p class="fw-bold mb-1">No upcoming orders</p>
     <p class="text-muted" style="font-size:0.875rem;">Your active orders will appear here.</p>
     <a href="{% url 'product_list' %}" class="btn btn-primary btn-sm mt-3">Browse Menu</a>
@@ -393,9 +393,9 @@
           {% elif o.status == 'delivered' %}status-delivered
           {% elif o.status == 'rejected' %}status-rejected
           {% endif %}">
-          {% if o.status == 'approved' %}✅ Completed
-          {% elif o.status == 'delivered' %}✅ Delivered
-          {% elif o.status == 'rejected' %}✗ Rejected
+          {% if o.status == 'approved' %}Completed
+          {% elif o.status == 'delivered' %}Delivered
+          {% elif o.status == 'rejected' %}Rejected
           {% endif %}
         </span>
       </div>
@@ -476,7 +476,7 @@
 
   {% else %}
   <div class="orders-empty">
-    <span class="orders-empty-icon">📋</span>
+    <span class="orders-empty-icon"></span>
     <p class="fw-bold mb-1">No previous orders yet</p>
     <p class="text-muted" style="font-size:0.875rem;">Completed and past orders will show here.</p>
   </div>

@@ -1,7 +1,7 @@
 {% load static %}
 {% for p in products %}
 <div class="col-6 col-md-4 col-lg-3 d-flex">
-  <div class="pcard w-100">
+  <div class="pcard w-100 {% if not p.is_unlimited_stock and p.stock <= 0 %}{% if not p.has_bundle or p.bundle_stock == 0 %}pcard-soldout{% endif %}{% endif %}">
     <div class="pcard-img-wrap">
       {% if p.image %}
         <img src="{{ p.image.url }}" alt="{{ p.name }}" loading="lazy">
@@ -21,6 +21,7 @@
           </svg>
         </div>
       {% endif %}
+
       {% if not p.is_unlimited_stock and p.stock <= 0 %}
         {% if not p.has_bundle or p.bundle_stock == 0 %}
         <div class="pcard-soldout-overlay">
@@ -28,9 +29,11 @@
         </div>
         {% endif %}
       {% endif %}
+
       {% if p.category %}
         <span class="pcard-cat">{{ p.category|slice:":1"|upper }}</span>
       {% endif %}
+
       {% if request.user.is_authenticated %}
         <button class="pcard-fav {% if p.id in favourite_ids %}pcard-fav-on{% endif %}"
                 type="button" data-fav-btn data-product-id="{{ p.id }}"
@@ -41,6 +44,18 @@
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
           </svg>
         </button>
+      {% endif %}
+
+      {% if not p.is_unlimited_stock %}
+        {% if p.stock <= 0 %}
+          {% if not p.has_bundle or p.bundle_stock == 0 %}
+          <span class="pcard-stock-badge low">Sold out</span>
+          {% endif %}
+        {% elif p.stock <= 5 %}
+        <span class="pcard-stock-badge low">Only {{ p.stock }} left</span>
+        {% else %}
+        <span class="pcard-stock-badge ok">{{ p.stock }} in stock</span>
+        {% endif %}
       {% endif %}
     </div>
     <div class="pcard-body">
@@ -84,9 +99,6 @@
       <div class="pcard-foot">
         <div class="pcard-foot-left">
           <span class="pcard-price" data-retail-price="RM {{ p.price }}" data-bundle-price="{% if p.bundle_price %}RM {{ p.bundle_price }}{% endif %}">RM {{ p.price }}</span>
-          {% if not p.is_unlimited_stock and p.stock > 0 and p.stock <= 5 %}
-            <span class="pcard-meta">Only {{ p.stock }} left</span>
-          {% endif %}
         </div>
         {% if p.is_unlimited_stock or p.stock > 0 or p.has_bundle and p.bundle_stock != 0 %}
           <form method="post" action="{% url 'add_to_cart' %}" data-cart-form>

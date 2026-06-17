@@ -6,11 +6,11 @@
 <div class="container my-5">
     <div class="row">
         <div class="col-12">
-            <h1 class="mb-4">⏳ Orders Awaiting Payment</h1>
+            <h1 class="mb-4">Orders Awaiting Payment</h1>
             
             {% if total_awaiting == 0 %}
                 <div class="alert alert-success" role="alert">
-                    <h4 class="alert-heading">✓ All caught up!</h4>
+                    <h4 class="alert-heading">All caught up!</h4>
                     <p class="mb-0">You have no pending payments. All your orders are paid or resolved.</p>
                 </div>
             {% else %}
@@ -26,7 +26,7 @@
                     <div class="card-header bg-light border-warning">
                         <div class="row align-items-center">
                             <div class="col">
-                                <h5 class="mb-1">⏳ Order #{{ item.order.id }}</h5>
+                                <h5 class="mb-1">Order #{{ item.order.id }}</h5>
                                 <small class="text-muted">
                                     Created {{ item.order.created_at|date:"d M Y, H:i" }}
                                 </small>
@@ -64,20 +64,20 @@
                         <hr>
 
                         <!-- Payment Methods (Tabbed Interface) -->
-                        <h6 class="fw-bold mb-3">💰 Choose Payment Method & Upload Proof</h6>
+                        <h6 class="fw-bold mb-3">Payment Method</h6>
                         
                         <ul class="nav nav-tabs mb-4" role="tablist">
                             {% if item.payment_methods.duitnow %}
                             <li class="nav-item" role="presentation">
                                 <button class="nav-link active" id="duitnow-tab-{{ item.order.id }}" data-bs-toggle="tab" data-bs-target="#duitnow-{{ item.order.id }}" type="button" role="tab">
-                                    📱 DuitNow
+                                    DuitNow
                                 </button>
                             </li>
                             {% endif %}
                             {% if item.payment_methods.bank_transfer %}
                             <li class="nav-item" role="presentation">
                                 <button class="nav-link" id="bank-tab-{{ item.order.id }}" data-bs-toggle="tab" data-bs-target="#bank-{{ item.order.id }}" type="button" role="tab">
-                                    🏦 Bank Transfer
+                                    Bank Transfer
                                 </button>
                             </li>
                             {% endif %}
@@ -128,8 +128,8 @@
                         </div>
 
                         <!-- Upload Proof Form -->
-                        <div class="card bg-light border-0 p-4">
-                            <h6 class="fw-bold mb-3">📸 Upload Payment Proof</h6>
+                        <div class="mt-4 pt-4" style="border-top: 1px solid #e9ecef;">
+                            <h6 class="fw-bold mb-3">Upload Payment Proof</h6>
                             <form method="post" action="{% url 'upload_payment_proof' item.order.id %}" enctype="multipart/form-data" class="payment-proof-form">
                                 {% csrf_token %}
                                 <div class="mb-3">
@@ -143,18 +143,18 @@
                                         required
                                     >
                                     <small class="text-muted d-block mt-2">
-                                        ✓ JPG, PNG, PDF (max 5MB)
+                                        JPG, PNG, PDF — max 5 MB
                                     </small>
                                 </div>
                                 <button type="submit" class="btn btn-warning w-100 fw-bold py-2">
-                                    ✓ Submit Payment Proof
+                                    Submit Proof
                                 </button>
                             </form>
                         </div>
                     </div>
                     <div class="card-footer bg-light">
                         <small class="text-muted">
-                            ℹ️ <strong>Note:</strong> Please upload your payment proof after your order has been approved by our admin team.
+                            <strong>Note:</strong> Upload your payment proof after your order has been approved.
                         </small>
                     </div>
                 </div>
