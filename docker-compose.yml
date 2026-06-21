@@ -19,6 +19,23 @@ services:
     networks:
       - zarlyos-network
 
+  redis:
+    image: redis:7-alpine
+    container_name: zarlyos-redis
+    restart: unless-stopped
+    # Persist OTP / rate-limit state across restarts (appendonly file).
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    # No ports exposed — only reachable internally on the VPS network.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zarlyos-network
+
   django:
     image: udieefr/zarlyhq:latest
     container_name: zarlyos-app
@@ -26,8 +43,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       DEBUG: ${DEBUG:-False}
+      # Shared cache across all gunicorn workers — required for OTP + rate limiting.
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       SECRET_KEY: ${SECRET_KEY}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost}
       DATABASE_NAME: ${DB_NAME:-zarlyos}
@@ -37,8 +58,15 @@ services:
       DATABASE_PORT: "5432"
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
+      STRIPE_PUBLIC_KEY: ${STRIPE_PUBLIC_KEY:-${STRIPE_PUBLISHABLE_KEY}}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
       FERNET_KEY: ${FERNET_KEY}
+      SUPPORT_CHAT_KEY: ${SUPPORT_CHAT_KEY:-${FERNET_KEY}}
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
+      EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-True}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@zarlybigfood.com}
       EMAIL_HOST_USER: ${EMAIL_HOST_USER}
       EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
     volumes:
@@ -80,3 +108,4 @@ networks:
 volumes:
   postgres_data:
   static_files:
+  redis_data:

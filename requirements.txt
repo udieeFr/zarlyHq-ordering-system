@@ -10,6 +10,8 @@ Django==5.1.4
 django-bootstrap5==26.1
 django-ratelimit==4.1.0
 django-csp==3.8
+django-redis==5.4.0
+redis==5.2.1
 gunicorn==23.0.0
 idna==3.11
 lxml==6.0.2

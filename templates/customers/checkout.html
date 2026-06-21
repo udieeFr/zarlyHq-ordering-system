@@ -393,9 +393,11 @@
     reverseGeocode(lat, lng);
   });
 
-  // Prime fields with whatever the map defaulted to
+  // Prime fields with whatever the map defaulted to. The saved-address fill is
+  // deferred to the end of the script: fillAddress() now calls updateShipping(),
+  // which reads shipping constants declared further down — calling it here would
+  // hit a const temporal-dead-zone error.
   setFields(DEFAULT_LAT, DEFAULT_LNG);
-  if (SAVED) fillAddress(SAVED.street, SAVED.city, SAVED.state, SAVED.postcode, SAVED.formatted);
 
   // ── Use saved address ──────────────────────────────────────
   function useSavedAddress() {
@@ -420,6 +422,8 @@
     document.getElementById('state').value            = state    || '';
     document.getElementById('postcode').value         = postcode || '';
     document.getElementById('formatted_address').value = formatted || '';
+    // Programmatic value changes don't fire 'input', so recalc shipping here.
+    updateShipping();
   }
 
   function setStatus(msg, isErr=false) {
@@ -568,10 +572,12 @@
 
   document.getElementById('state').addEventListener('input', updateShipping);
 
-  // Hook into fillAddress so geocoding/saved-address also triggers update
-  const _origFillAddress = fillAddress;
-  function fillAddress(street, city, state, postcode, formatted) {
-    _origFillAddress(street, city, state, postcode, formatted);
+  // Shipping constants and updateShipping() are now defined, so it is safe to
+  // prime the saved address (fillAddress -> updateShipping) or compute the
+  // initial shipping line for a fresh checkout.
+  if (SAVED) {
+    fillAddress(SAVED.street, SAVED.city, SAVED.state, SAVED.postcode, SAVED.formatted);
+  } else {
     updateShipping();
   }
 

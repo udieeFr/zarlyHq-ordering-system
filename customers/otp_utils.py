@@ -214,3 +214,69 @@ def send_pw_change_email(user, otp):
         )
     except Exception as e:
         logger.warning(f'Could not send password change email to {user.email}: {e}')
+
+
+# ── Order confirmation OTP (separate key prefix — must not collide with email_otp_) ──
+
+def _order_confirm_cache_key(user_pk):
+    return f'order_confirm_otp_{user_pk}'
+
+
+def _order_confirm_attempts_key(user_pk):
+    return f'order_confirm_otp_attempts_{user_pk}'
+
+
+def generate_and_cache_order_otp(user):
+    """Generate a 6-digit OTP for order confirmation. Separate from email verification OTP."""
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    cache.set(_order_confirm_cache_key(user.pk), code, OTP_TTL)
+    cache.delete(_order_confirm_attempts_key(user.pk))
+    return code
+
+
+def verify_order_otp(user, submitted_code):
+    """
+    Verify an order-confirmation OTP.
+    Returns: 'ok' | 'invalid' | 'expired'
+    Single-use; invalidated after MAX_ATTEMPTS wrong guesses.
+    """
+    key = _order_confirm_cache_key(user.pk)
+    stored = cache.get(key)
+    if stored is None:
+        return 'expired'
+
+    att_key = _order_confirm_attempts_key(user.pk)
+    attempts = (cache.get(att_key) or 0) + 1
+
+    if stored != submitted_code:
+        if attempts >= MAX_ATTEMPTS:
+            cache.delete(key)
+            cache.delete(att_key)
+            return 'expired'
+        cache.set(att_key, attempts, OTP_TTL)
+        return 'invalid'
+
+    cache.delete(key)
+    cache.delete(att_key)
+    return 'ok'
+
+
+def send_order_confirmation_email(user, otp, order):
+    """Send OTP with order summary so customer can confirm the exact contents."""
+    try:
+        items = list(order.items.select_related('product').all())
+        send_mail(
+            subject=f'Confirm your order #{order.id} — ZarlyHQ',
+            message=(
+                f'Hi {user.username},\n\n'
+                f'Your confirmation code for Order #{order.id} is: {otp}\n'
+                f'It expires in 5 minutes.\n\n'
+                f'Order total: RM {order.total_amount}\n'
+                f'Items: {", ".join(f"{i.product.name} x{i.quantity}" for i in items)}\n\n'
+                f'Enter this code on the confirmation page to place your order.'
+            ),
+            from_email=None,
+            recipient_list=[user.email],
+        )
+    except Exception as e:
+        logger.warning(f'Could not send order confirmation email to {user.email}: {e}')

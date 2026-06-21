@@ -29,5 +29,7 @@ USER appuser
 # Expose port
 EXPOSE 8000
 
-# Run Gunicorn
+# Re-collect static on startup so newly added assets reach the (named-volume
+# backed) static dir that nginx serves, then run Gunicorn.
+ENTRYPOINT ["sh", "/app/entrypoint.sh"]
 CMD ["gunicorn", "--config", "gunicorn_config.py", "zarlyOs.wsgi:application"]

@@ -1,210 +1,404 @@
 {% extends 'base.html' %}
 {% load static %}
 
+{% block page_title %}Sign In · Zarly BigFood{% endblock %}
+
 {% block content %}
-<div class="container py-5">
-    <div class="row justify-content-center min-vh-100 align-items-center">
-        <div class="col-md-5">
-            <!-- Login Card -->
-            <div class="card border-0 login-card">
-                <div class="card-body p-5">
-                    <!-- Header -->
-                    <div class="text-center mb-4">
-                        <div class="login-logo-wrap">🍊</div>
-                        <h2 class="fw-bold mb-1" style="letter-spacing:-0.02em;">Zarly BigFood</h2>
-                        <p class="text-muted mb-0" style="font-size:0.875rem;">Sign in to your account</p>
+<div class="auth-split">
+
+    <div class="auth-brand-panel">
+        <div class="auth-brand-inner">
+            <div class="auth-brand-logo">
+                <!-- <img src="{% static 'images/finallogo.png' %}" alt="Zarly BigFood" /> -->
+            </div>
+            <h1 class="auth-brand-title">Zarly BigFood</h1>
+            <p class="auth-brand-tagline">Seize The Moment</p>
+            <ul class="auth-brand-features">
+                
+            </ul>
+        </div>
+    </div>
+
+    <div class="auth-form-panel">
+        <div class="auth-form-box">
+
+            <div class="auth-form-hd">
+                <h2>Sign in</h2>
+                <p>Welcome back. Enter your details to continue.</p>
+            </div>
+
+            {% if form.errors or form.non_field_errors %}
+            <div class="auth-inline-error" role="alert">
+                <strong>Couldn't sign you in.</strong>
+                {% for field, errors in form.errors.items %}
+                    {% for error in errors %}<span>{{ error }}</span>{% endfor %}
+                {% endfor %}
+                {% for error in form.non_field_errors %}<span>{{ error }}</span>{% endfor %}
+            </div>
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+
+                <div class="auth-field">
+                    <label for="{{ form.username.id_for_label }}">Username or email</label>
+                    {{ form.username }}
+                </div>
+
+                <div class="auth-field">
+                    <div class="auth-field-top">
+                        <label for="{{ form.password.id_for_label }}">Password</label>
+                        <a href="{% url 'request_password_reset' %}" class="auth-aux-link">Forgot?</a>
                     </div>
-
-                    <!-- Error Messages -->
-                    {% if form.errors or form.non_field_errors %}
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        <strong>Login Failed</strong>
-                        {% for field, errors in form.errors.items %}
-                            {% for error in errors %}
-                                <div>{{ error }}</div>
-                            {% endfor %}
-                        {% endfor %}
-                        {% if form.non_field_errors %}
-                            {% for error in form.non_field_errors %}
-                                <div>{{ error }}</div>
-                            {% endfor %}
-                        {% endif %}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                    {% endif %}
-
-                    <!-- Login Form -->
-                    <form method="post" class="mb-4">
-                        {% csrf_token %}
-                        
-                        <!-- Username Field -->
-                        <div class="mb-3">
-                            <label for="{{ form.username.id_for_label }}" class="form-label fw-bold small">
-                                Username or Email
-                            </label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-white border-end-0">👤</span>
-                                {{ form.username }}
-                            </div>
-                        </div>
-
-                        <!-- Password Field -->
-                        <div class="mb-4">
-                            <label for="{{ form.password.id_for_label }}" class="form-label fw-bold small">
-                                Password
-                            </label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-white border-end-0">🔒</span>
-                                {{ form.password }}
-                            </div>
-                        </div>
-
-                        <!-- Submit Button -->
-                        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold mb-2">
-                            <span>Sign In</span>
+                    <div class="pw-wrap">
+                        {{ form.password }}
+                        <button type="button" class="pw-reveal" aria-label="Show password" onclick="togglePw(this)">
+                            <svg class="ico-show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <svg class="ico-hide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                         </button>
-                        <div class="text-end mb-1">
-                            <a href="{% url 'request_password_reset' %}" class="text-decoration-none" style="font-size:0.8rem;color:#ff9933;">
-                                Forgot password?
-                            </a>
-                        </div>
-                    </form>
-
-                    <!-- Divider -->
-                    <div class="position-relative mb-4">
-                        <hr class="text-muted">
-                        <span class="position-absolute top-50 start-50 translate-middle bg-white px-2 text-muted small">or</span>
-                    </div>
-
-                    <!-- Guest Access -->
-                    <a href="{% url 'product_list' %}" class="btn btn-outline-secondary w-100 py-2 fw-semibold mb-3">
-                        👁️ Browse as Guest
-                    </a>
-
-                    <!-- Role Information -->
-                    <div class="row g-2 mt-3 pt-3 border-top">
-                        <div class="col-6">
-                            <div class="role-card small">
-                                <div style="font-size: 1.4rem; margin-bottom: 0.375rem;">👥</div>
-                                <strong style="font-size:0.85rem;">Customer</strong>
-                                <p class="text-muted mb-0" style="font-size: 0.78rem;">Order food & track status</p>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="role-card small">
-                                <div style="font-size: 1.4rem; margin-bottom: 0.375rem;">⚙️</div>
-                                <strong style="font-size:0.85rem;">Staff</strong>
-                                <p class="text-muted mb-0" style="font-size: 0.78rem;">Access your dashboard</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Register Link -->
-                    <div class="text-center mt-4 pt-3 border-top">
-                        <p class="text-muted small mb-0">
-                            New customer?
-                            <a href="{% url 'customer_signup' %}" class="fw-semibold text-decoration-none" style="color:#ff9933;">
-                                Create a free account
-                            </a>
-                        </p>
                     </div>
                 </div>
-            </div>
 
-            <!-- Additional Info -->
-            <div class="text-center mt-4">
-                <p class="text-muted small">
-                    Protected access • Role-based system • Secure login
-                </p>
-            </div>
+                <button type="submit" class="btn-auth-primary">Sign in</button>
+            </form>
+
+            <div class="auth-sep"><span>or</span></div>
+
+            <a href="{% url 'product_list' %}" class="btn-auth-ghost">Browse without signing in</a>
+
+            <p class="auth-foot">No account? <a href="{% url 'customer_signup' %}">Create one free</a></p>
+
         </div>
     </div>
 </div>
 
+<script>
+function togglePw(btn) {
+    var inp = btn.previousElementSibling;
+    var show = inp.type === 'password';
+    inp.type = show ? 'text' : 'password';
+    btn.querySelector('.ico-show').style.display = show ? 'none' : '';
+    btn.querySelector('.ico-hide').style.display = show ? '' : 'none';
+}
+</script>
+
 <style>
-    body { background: linear-gradient(135deg, #fff7ed 0%, #f8fafc 60%, #fff7ed 100%); }
+.main-content {
+    padding: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
 
-    .login-card {
-        border-radius: 16px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 20px 50px rgb(0 0 0 / 0.08);
+/* ── Two-panel split ───────────────────────── */
+.auth-split {
+    flex: 1;
+    display: flex;
+    min-height: 560px;
+}
+
+/* ── Brand panel ───────────────────────────── */
+.auth-brand-panel {
+    flex: 0 0 40%;
+    background: oklch(72% 0.17 48);
+    display: flex;
+    align-items: center;
+    padding: 4rem 3.5rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.auth-brand-panel::before {
+    content: '';
+    position: absolute;
+    top: -5rem; right: -5rem;
+    width: 22rem; height: 22rem;
+    border-radius: 50%;
+    background: oklch(79% 0.14 48 / 0.38);
+    pointer-events: none;
+}
+
+.auth-brand-panel::after {
+    content: '';
+    position: absolute;
+    bottom: -4rem; left: -5rem;
+    width: 18rem; height: 18rem;
+    border-radius: 50%;
+    background: oklch(64% 0.18 48 / 0.28);
+    pointer-events: none;
+}
+
+.auth-brand-inner { position: relative; z-index: 1; }
+
+.auth-brand-logo {
+    width: auto; height: auto;
+    border-radius: 0;
+    overflow: visible;
+    background: transparent;
+    margin-bottom: 1rem;
+}
+
+.auth-brand-logo img { height: 96px; width: auto; object-fit: contain; display:block; }
+
+.auth-brand-title {
+    font-size: 2rem;
+    font-weight: 800;
+    color: oklch(99% 0.003 50);
+    letter-spacing: -0.04em;
+    margin: 0 0 0.5rem;
+    line-height: 1.1;
+}
+
+.auth-brand-tagline {
+    font-size: 0.9375rem;
+    color: oklch(99% 0.003 50 / 0.72);
+    margin: 0 0 2.25rem;
+}
+
+.auth-brand-features {
+    list-style: none;
+    margin: 0; padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+
+.auth-brand-features li {
+    font-size: 0.875rem;
+    color: oklch(99% 0.003 50 / 0.78);
+    padding-left: 1rem;
+    position: relative;
+}
+
+.auth-brand-features li::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 50%;
+    transform: translateY(-50%);
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: oklch(99% 0.003 50 / 0.6);
+}
+
+/* ── Form panel ────────────────────────────── */
+.auth-form-panel {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: oklch(99% 0.005 50);
+    padding: 3rem 2rem;
+}
+
+.auth-form-box {
+    width: 100%;
+    max-width: 376px;
+}
+
+/* ── Header ────────────────────────────────── */
+.auth-form-hd { margin-bottom: 2rem; }
+
+.auth-form-hd h2 {
+    font-size: 1.625rem;
+    font-weight: 700;
+    color: oklch(18% 0.006 50);
+    letter-spacing: -0.03em;
+    margin: 0 0 0.375rem;
+}
+
+.auth-form-hd p {
+    font-size: 0.875rem;
+    color: oklch(50% 0.005 50);
+    margin: 0;
+}
+
+/* ── Error ─────────────────────────────────── */
+.auth-inline-error {
+    background: oklch(96% 0.018 22);
+    border: 1px solid oklch(87% 0.05 22);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.8125rem;
+    color: oklch(35% 0.1 22);
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.auth-inline-error strong { font-weight: 700; }
+
+/* ── Fields ────────────────────────────────── */
+.auth-field { margin-bottom: 1.125rem; }
+
+.auth-field > label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: oklch(30% 0.005 50);
+    margin-bottom: 0.4rem;
+}
+
+.auth-field-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 0.4rem;
+}
+
+.auth-field-top label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: oklch(30% 0.005 50);
+}
+
+.auth-aux-link {
+    font-size: 0.75rem;
+    color: oklch(68% 0.12 48);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.auth-aux-link:hover { color: oklch(58% 0.17 48); text-decoration: underline; }
+
+.auth-form-box .form-control,
+.auth-form-box input[type="text"],
+.auth-form-box input[type="email"],
+.auth-form-box input[type="password"] {
+    border: 1.5px solid oklch(88% 0.005 50) !important;
+    border-radius: 8px !important;
+    padding: 0.6875rem 0.875rem !important;
+    font-size: 0.9rem !important;
+    color: oklch(18% 0.006 50) !important;
+    background: oklch(99% 0.003 50) !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    transition: border-color 0.15s ease-out, box-shadow 0.15s ease-out !important;
+}
+
+.auth-form-box .form-control:focus,
+.auth-form-box input:focus {
+    border-color: oklch(72% 0.17 48) !important;
+    box-shadow: 0 0 0 3px oklch(72% 0.17 48 / 0.13) !important;
+    outline: none !important;
+}
+
+/* Password reveal */
+.pw-wrap { position: relative; }
+
+.pw-wrap .form-control,
+.pw-wrap input[type="password"],
+.pw-wrap input[type="text"] {
+    padding-right: 2.75rem !important;
+}
+
+.pw-reveal {
+    position: absolute;
+    right: 0.75rem; top: 50%;
+    transform: translateY(-50%);
+    background: none; border: none;
+    padding: 0; cursor: pointer;
+    color: oklch(62% 0.004 50);
+    display: flex; align-items: center;
+    line-height: 1;
+}
+
+.pw-reveal svg { width: 16px; height: 16px; }
+.pw-reveal:hover { color: oklch(42% 0.004 50); }
+
+/* ── Primary button ────────────────────────── */
+.btn-auth-primary {
+    display: block;
+    width: 100%;
+    background: oklch(72% 0.17 48);
+    color: oklch(99% 0.003 50);
+    border: none;
+    border-radius: 8px;
+    padding: 0.75rem;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    margin-top: 0.625rem;
+    transition: background 0.18s ease-out, transform 0.12s ease-out;
+}
+
+.btn-auth-primary:hover { background: oklch(62% 0.17 48); transform: translateY(-1px); }
+.btn-auth-primary:active { transform: translateY(0); }
+
+/* ── Separator ─────────────────────────────── */
+.auth-sep {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 1.375rem 0;
+    font-size: 0.8rem;
+    color: oklch(62% 0.004 50);
+}
+
+.auth-sep::before,
+.auth-sep::after {
+    content: ''; flex: 1;
+    height: 1px;
+    background: oklch(89% 0.004 50);
+}
+
+/* ── Ghost button ──────────────────────────── */
+.btn-auth-ghost {
+    display: block;
+    text-align: center;
+    padding: 0.625rem 1rem;
+    border: 1.5px solid oklch(88% 0.005 50);
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: oklch(38% 0.005 50);
+    text-decoration: none;
+    transition: border-color 0.15s ease-out, color 0.15s ease-out, background 0.15s ease-out;
+}
+
+.btn-auth-ghost:hover {
+    border-color: oklch(72% 0.17 48);
+    color: oklch(62% 0.17 48);
+    background: oklch(97% 0.012 48);
+}
+
+/* ── Footer note ───────────────────────────── */
+.auth-foot {
+    text-align: center;
+    font-size: 0.8125rem;
+    color: oklch(52% 0.004 50);
+    margin: 1.25rem 0 0;
+}
+
+.auth-foot a {
+    color: oklch(72% 0.17 48);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.auth-foot a:hover { text-decoration: underline; }
+
+/* ── Mobile ────────────────────────────────── */
+@media (max-width: 768px) {
+    .auth-split { flex-direction: column; }
+
+    .auth-brand-panel {
+        flex: none;
+        padding: 1.75rem 1.5rem;
     }
 
-    .login-logo-wrap {
-        width: 64px;
-        height: 64px;
-        background: linear-gradient(135deg, #ff9933, #e07e1e);
-        border-radius: 16px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.75rem;
-        margin: 0 auto 1rem;
-        box-shadow: 0 8px 20px rgba(255, 153, 51, 0.3);
-    }
+    .auth-brand-panel::before,
+    .auth-brand-panel::after { display: none; }
 
-    .form-control, .input-group-text {
-        border-radius: 8px;
-        border: 1.5px solid #e2e8f0;
-        font-size: 0.9rem;
-        padding: 0.6rem 0.875rem;
-    }
+    .auth-brand-features { display: none; }
+    .auth-brand-tagline { margin-bottom: 0; }
+    .auth-brand-title { font-size: 1.375rem; }
+    .auth-brand-logo { margin-bottom: 0.75rem; }
 
-    .form-control:focus {
-        border-color: #ff9933;
-        box-shadow: 0 0 0 3px rgba(255, 153, 51, 0.18);
-    }
-
-    .input-group-text {
-        background: #f8fafc;
-        border-right: none;
-        color: #64748b;
-    }
-
-    .input-group .form-control { border-left: none; }
-
-    .btn-primary {
-        background: linear-gradient(135deg, #ff9933, #e07e1e);
-        border: none;
-        font-weight: 700;
-        letter-spacing: 0.01em;
-        box-shadow: 0 4px 14px rgba(255, 153, 51, 0.35);
-        transition: all 0.2s;
-    }
-
-    .btn-primary:hover {
-        background: linear-gradient(135deg, #e07e1e, #c96d10);
-        transform: translateY(-1px);
-        box-shadow: 0 6px 20px rgba(255, 153, 51, 0.4);
-    }
-
-    .btn-outline-secondary {
-        border: 1.5px solid #e2e8f0;
-        color: #334155;
-        font-weight: 600;
-        background: #fff;
-    }
-
-    .btn-outline-secondary:hover {
-        background: #f8fafc;
-        border-color: #ff9933;
-        color: #ff9933;
-    }
-
-    .role-card {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 0.875rem;
-        text-align: center;
-        transition: all 0.2s;
-    }
-
-    .role-card:hover {
-        border-color: #ff9933;
-        background: #fff7ed;
-    }
-
-    .card { border-radius: 16px; }
+    .auth-form-panel { padding: 2rem 1.25rem; }
+}
 </style>
 {% endblock %}
